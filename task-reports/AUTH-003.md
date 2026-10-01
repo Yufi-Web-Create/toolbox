@@ -10,7 +10,7 @@ Added the Supabase verification callback Route Handler with safe code exchange, 
 `codex/auth-003`
 
 ## Pull request
-Draft PR targeting `main` (URL recorded in the Issue #13 completion report after creation).
+[Draft PR #14](https://github.com/Yufi-Web-Create/toolbox/pull/14), targeting `main`.
 
 ## Changed files
 - `src/app/auth/callback/route.ts`
