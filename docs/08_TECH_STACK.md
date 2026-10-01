@@ -170,3 +170,16 @@ The baseline versions are intentionally fixed for initial development.
 
 Do not automatically upgrade framework/runtime/dependencies during implementation.
 Security updates are reviewed separately before upgrading.
+
+
+## Development Supabase Project
+
+- Project name: `toolbox-dev`
+- Project ref: `lrfjjqnsswrzuwpwtaei`
+- Region: `ap-northeast-1`
+- Status at creation: `ACTIVE_HEALTHY`
+
+This is a development infrastructure identifier only.
+Do not treat `toolbox` as the final customer-facing service name.
+
+No secret keys, passwords, or private environment variable values may be stored in this repository.
