@@ -21,10 +21,15 @@ Do not make product, architecture, security, database, or UX decisions unless th
 14. Create an implementation report in `/task-reports/`.
 15. Clearly report any deviation from the specification.
 16. Do not proceed to the next task unless explicitly instructed.
+17. Follow `docs/07_COMMUNICATION.md` for all required GitHub reports.
+18. Before making implementation changes, post a `[CODEX:START]` report on the assigned task Issue.
+19. If blocked or a decision is required, stop work and post `[CODEX:BLOCKED]`. Do not choose an option yourself.
+20. At completion, post `[CODEX:COMPLETE]` and link the PR and implementation report.
+21. Never start the next task automatically.
 
 ## Security
 - Treat authentication, authorization, tenant isolation, secrets, and external OAuth tokens as security-sensitive.
-- Never expose secrets in source code, browser bundles, logs, screenshots, test fixtures, or reports.
+- Never expose secrets in source code, browser bundles, logs, screenshots, test fixtures, Issue comments, or reports.
 - Tenant isolation must be enforced at the database layer using RLS where specified.
 - UI hiding is never a substitute for authorization.
 
@@ -33,6 +38,9 @@ Do not make product, architecture, security, database, or UX decisions unless th
 - Keep diffs limited to the task scope.
 - Do not mix unrelated fixes.
 - Commit messages should include the task ID when possible.
+- GitHub Issues are the official live work log.
+- PR creation does not authorize merge.
+- Task completion does not authorize the next task.
 
 ## Completion
 A task is complete only when:
@@ -40,4 +48,5 @@ A task is complete only when:
 - required tests pass,
 - required build/type/lint checks pass,
 - no prohibited changes were made,
-- and the implementation report is written.
+- the implementation report is written,
+- and the required GitHub completion report has been posted.
