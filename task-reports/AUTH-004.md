@@ -10,7 +10,7 @@ Added the minimal email/password login flow at `/login` using a server-controlle
 `codex/auth-004`
 
 ## Pull request
-Draft PR targeting `main` (URL recorded in the Issue #15 completion report after creation).
+[Draft PR #16](https://github.com/Yufi-Web-Create/toolbox/pull/16), targeting `main`.
 
 ## Changed files
 - `src/app/login/page.tsx`
