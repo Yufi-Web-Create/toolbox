@@ -10,7 +10,7 @@ Added the minimal reusable server-side logout action using the existing Supabase
 `codex/auth-005`
 
 ## Pull request
-Draft PR targeting `main` (URL recorded in the Issue #17 completion report after creation).
+[Draft PR #18](https://github.com/Yufi-Web-Create/toolbox/pull/18), targeting `main`.
 
 ## Changed files
 - `src/app/logout/actions.ts`
