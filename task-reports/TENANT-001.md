@@ -10,7 +10,7 @@ Added the initial organization and membership schema, database constraints, leas
 `codex/tenant-001`
 
 ## Pull request
-Pending.
+[Draft PR #24](https://github.com/Yufi-Web-Create/toolbox/pull/24), targeting `main`.
 
 ## Changed files
 - `supabase/migrations/20261002160703_tenant_001_organization_membership_foundation.sql`
