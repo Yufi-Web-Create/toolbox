@@ -84,6 +84,8 @@ None.
 - `npm run typecheck`: PASS
 - `npm test`: PASS (12 test files, 56 tests)
 - `npm run build`: PASS
+- GitHub Actions quality gate: PASS
+- Vercel Preview: PASS
 - SQL/RLS isolation specification: NOT RUN locally; repository/environment has no runnable local Supabase database harness, and approved development-database verification remains the reviewer gate.
 
 ## Security review notes
