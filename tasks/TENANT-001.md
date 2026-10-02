@@ -31,15 +31,17 @@ Required columns:
 - `created_by uuid not null references auth.users(id)`
 - `created_at timestamptz not null default now()`
 
-Required constraint:
+Required constraints:
 
 - organization name must not be blank after trimming
+- `unique (id, created_by)`
 
 ### organization_members
 
 Required columns:
 
-- `organization_id uuid not null references organizations(id) on delete cascade`
+- `organization_id uuid not null`
+- `organization_created_by uuid not null`
 - `user_id uuid not null references auth.users(id) on delete cascade`
 - `role text not null`
 - `created_at timestamptz not null default now()`
@@ -50,6 +52,14 @@ Required constraints:
 - role limited to:
   - `owner`
   - `member`
+- composite foreign key:
+  - `(organization_id, organization_created_by)`
+  - references `organizations(id, created_by)`
+  - `on delete cascade`
+
+The `organization_created_by` column is intentionally denormalized.
+Its purpose is to let owner-membership RLS validate creator ownership without querying `organizations`, thereby avoiding a circular RLS dependency.
+The composite foreign key must guarantee that the duplicated creator id matches the target organization.
 
 ## Required RLS
 
@@ -74,7 +84,10 @@ SELECT:
 INSERT:
 - current user may insert only their own row
 - role must be `owner`
-- target organization must have been created by the same current user
+- `organization_created_by = auth.uid()`
+
+Do NOT query `organizations` from the membership INSERT policy.
+The composite foreign key is the database-level guarantee that `organization_created_by` matches the actual organization creator.
 
 Do not add UPDATE or DELETE policies in this task.
 
@@ -90,7 +103,7 @@ Do not:
 - create permissive catch-all policies
 - allow arbitrary self-joining to another organization
 
-If the specified policies cannot be implemented safely without one of the forbidden mechanisms, stop and report `[CODEX:BLOCKED]`.
+If the specified design still cannot be implemented safely without one of the forbidden mechanisms, stop and report `[CODEX:BLOCKED]`.
 
 ## Migration
 
@@ -115,6 +128,7 @@ At minimum cover two distinct users and two organizations:
 - User A cannot self-join Organization B.
 - User B cannot self-join Organization A.
 - User A cannot create a membership for User B.
+- A user cannot insert an owner row when `organization_created_by` does not match the target organization's actual creator.
 - non-owner initial role insertion is rejected.
 
 Tests must not rely on service-role access as the authorization being tested.
@@ -165,6 +179,7 @@ PASS requires:
 - both tables match `docs/02_DATABASE.md`
 - RLS is enabled on both tables
 - policies match the approved rules
+- no circular RLS dependency remains
 - no SECURITY DEFINER functions/triggers/views are introduced
 - no service-role bypass is introduced
 - two-user/two-organization isolation tests/spec are present
