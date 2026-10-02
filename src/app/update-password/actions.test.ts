@@ -40,7 +40,12 @@ describe("updatePassword", () => {
       },
     });
     mocks.getClaims.mockResolvedValue({
-      data: { claims: { sub: "recovery-user" } },
+      data: {
+        claims: {
+          sub: "recovery-user",
+          amr: [{ method: "recovery", timestamp: 1 }],
+        },
+      },
       error: null,
     });
     mocks.updateUser.mockResolvedValue({ error: null });
@@ -85,6 +90,55 @@ describe("updatePassword", () => {
       message:
         "Your password reset session is no longer valid. Request a new reset link.",
     });
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects ordinary password-authenticated claims", async () => {
+    mocks.getClaims.mockResolvedValue({
+      data: {
+        claims: {
+          sub: "password-user",
+          amr: [{ method: "password", timestamp: 1 }],
+        },
+      },
+      error: null,
+    });
+
+    const result = await updatePassword(
+      initialState,
+      createPasswordData("new-password"),
+    );
+
+    expect(result).toEqual({
+      status: "error",
+      message:
+        "Your password reset session is no longer valid. Request a new reset link.",
+    });
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects provider errors while checking recovery claims", async () => {
+    mocks.getClaims.mockResolvedValue({
+      data: {
+        claims: {
+          sub: "recovery-user",
+          amr: [{ method: "recovery", timestamp: 1 }],
+        },
+      },
+      error: { message: "raw provider error containing token details" },
+    });
+
+    const result = await updatePassword(
+      initialState,
+      createPasswordData("new-password"),
+    );
+
+    expect(result).toEqual({
+      status: "error",
+      message:
+        "Your password reset session is no longer valid. Request a new reset link.",
+    });
+    expect(result.message).not.toContain("raw provider error");
     expect(mocks.updateUser).not.toHaveBeenCalled();
   });
 

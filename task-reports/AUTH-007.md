@@ -4,7 +4,7 @@
 AUTH-007
 
 ## Summary
-Added the minimal password recovery flow with server-controlled reset requests, the existing safe callback exchange, and a server-checked password update page.
+Added the minimal password recovery flow with server-controlled reset requests, the existing safe callback exchange, and a server-checked password update page. The review correction now requires a verified recovery authentication method before password updates.
 
 ## Branch
 `codex/auth-007`
@@ -20,6 +20,7 @@ Added the minimal password recovery flow with server-controlled reset requests, 
 - `src/app/forgot-password/validation.ts`
 - `src/app/update-password/page.tsx`
 - `src/app/update-password/page.test.tsx`
+- `src/app/update-password/recovery-session.ts`
 - `src/app/update-password/update-password-form.tsx`
 - `src/app/update-password/actions.ts`
 - `src/app/update-password/actions.test.ts`
@@ -53,7 +54,8 @@ None.
 ## Recovery/session checks
 - Uses `supabase.auth.getClaims()` on the server page before rendering the update form.
 - Rechecks claims inside the update Server Action before changing the password.
-- Missing claims and claims lookup failures fail closed to `/forgot-password` at page access or a safe session-expired action message.
+- Uses one reusable predicate in both checks and requires an `amr` entry whose `method` is `recovery`.
+- Ordinary password-authenticated claims, missing claims, non-recovery claims, and claims lookup failures fail closed to `/forgot-password` at page access or a safe session-expired action message.
 - The route is force-dynamic and does not use ISR or shared static caching.
 
 ## Error handling
@@ -74,6 +76,8 @@ None.
 - Passwords shorter than eight characters are rejected.
 - Mocked `updateUser({ password })` call and controlled `/login` success outcome.
 - Missing update claims fail closed.
+- Recovery claims are accepted while ordinary password claims are rejected on both the page and Server Action paths.
+- Provider errors during recovery-claims checks fail closed without exposing raw details.
 - Update provider failures expose only a fixed safe message.
 - Update page renders only with claims and fails closed on missing/error states.
 - Supabase is mocked; no live service, real credentials, or email sending is used.
@@ -89,7 +93,7 @@ None.
 - Clean dependency installation: PASS
 - ESLint: PASS
 - TypeScript validation: PASS
-- Vitest: PASS (12 test files, 53 tests)
+- Vitest: PASS (12 test files, 56 tests)
 - Production build: PASS
 - `/forgot-password` and dynamic `/update-password` included in the production build: PASS
 

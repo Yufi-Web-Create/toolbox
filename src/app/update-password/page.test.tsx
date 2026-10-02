@@ -28,9 +28,14 @@ describe("/update-password", () => {
     });
   });
 
-  it("renders the form when authenticated claims exist", async () => {
+  it("renders the form when recovery claims exist", async () => {
     mocks.getClaims.mockResolvedValue({
-      data: { claims: { sub: "recovery-user" } },
+      data: {
+        claims: {
+          sub: "recovery-user",
+          amr: [{ method: "recovery", timestamp: 1 }],
+        },
+      },
       error: null,
     });
 
@@ -39,6 +44,23 @@ describe("/update-password", () => {
     expect(html).toContain("Choose a new password");
     expect(html).toContain('type="password"');
     expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("rejects ordinary password-authenticated claims", async () => {
+    mocks.getClaims.mockResolvedValue({
+      data: {
+        claims: {
+          sub: "password-user",
+          amr: [{ method: "password", timestamp: 1 }],
+        },
+      },
+      error: null,
+    });
+
+    await expect(UpdatePasswordPage()).rejects.toThrow(
+      "redirect:/forgot-password",
+    );
+    expect(mocks.redirect).toHaveBeenCalledWith("/forgot-password");
   });
 
   it("redirects when recovery authentication is missing", async () => {
@@ -51,7 +73,15 @@ describe("/update-password", () => {
   });
 
   it("fails closed when the claims provider fails", async () => {
-    mocks.getClaims.mockRejectedValue(new Error("raw provider failure"));
+    mocks.getClaims.mockResolvedValue({
+      data: {
+        claims: {
+          sub: "recovery-user",
+          amr: [{ method: "recovery", timestamp: 1 }],
+        },
+      },
+      error: { message: "raw provider failure" },
+    });
 
     await expect(UpdatePasswordPage()).rejects.toThrow(
       "redirect:/forgot-password",

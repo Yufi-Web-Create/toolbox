@@ -1,22 +1,23 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "../../lib/supabase/server";
+import { hasRecoveryAuthentication } from "./recovery-session";
 import { UpdatePasswordForm } from "./update-password-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function UpdatePasswordPage() {
-  let hasAuthenticatedSession = false;
+  let hasRecoverySession = false;
 
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.getClaims();
-    hasAuthenticatedSession = !error && Boolean(data?.claims);
+    hasRecoverySession = !error && hasRecoveryAuthentication(data?.claims);
   } catch {
-    hasAuthenticatedSession = false;
+    hasRecoverySession = false;
   }
 
-  if (!hasAuthenticatedSession) {
+  if (!hasRecoverySession) {
     redirect("/forgot-password");
   }
 

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "../../lib/supabase/server";
+import { hasRecoveryAuthentication } from "./recovery-session";
 
 export type UpdatePasswordState = {
   status: "idle" | "error";
@@ -38,7 +39,10 @@ export async function updatePassword(
     const { data: claimsData, error: claimsError } =
       await supabase.auth.getClaims();
 
-    if (claimsError || !claimsData?.claims) {
+    if (
+      claimsError ||
+      !hasRecoveryAuthentication(claimsData?.claims)
+    ) {
       return {
         status: "error",
         message: SESSION_ERROR,
