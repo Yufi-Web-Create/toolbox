@@ -70,7 +70,9 @@ For public auth routes:
 
 Initial policy:
 - Email verification is required before the account is treated as ready for normal application use.
-- Signup behavior and verification callback handling are implemented in separate tasks.
+- Signup verification emails must return through the application-controlled `/auth/callback` route.
+- The callback exchanges the Supabase authorization code and then redirects only to an approved local application path.
+- Signup must not rely on the Supabase Site URL root as the final verification handler.
 - Do not silently bypass verification in application code.
 
 ## Password reset flow
@@ -88,6 +90,9 @@ Planned flow:
 - Redirect targets must be controlled by the application.
 - Never trust an arbitrary external redirect URL from query parameters.
 - Any optional next/redirect parameter must be validated as a local application path.
+- Absolute auth email redirect URLs must be built from a trusted server-side application origin configuration, not directly from request `Host` or `Origin` headers.
+- The trusted origin configuration for auth emails is `APP_URL`.
+- `APP_URL` is configuration, not a secret, and must not contain a path, query, or fragment.
 
 ## Error behavior
 
@@ -149,6 +154,12 @@ Authentication work is intentionally split into narrow tasks:
 - forgot-password
 - callback/recovery handling
 - update-password
+
+### AUTH-008 — Trusted auth email redirect origin
+- Add trusted server-side `APP_URL` configuration.
+- Signup verification emails return through `/auth/callback?next=/login`.
+- Password recovery emails use the same trusted origin for `/auth/callback?next=/update-password`.
+- Do not weaken callback local-redirect validation.
 
 ## Completion gate
 
