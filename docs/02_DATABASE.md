@@ -30,9 +30,13 @@ Columns:
 - `created_by uuid not null references auth.users(id)`
 - `created_at timestamptz not null default now()`
 
-Rules:
+Required constraints:
 
 - `name` must not be blank after trimming.
+- `unique (id, created_by)` must exist so memberships can enforce creator consistency with a composite foreign key.
+
+Rules:
+
 - `created_by` identifies the authenticated user who created the organization.
 - RLS must be enabled.
 - An authenticated user may insert an organization only when `created_by = auth.uid()`.
@@ -45,16 +49,29 @@ Rules:
 
 Columns:
 
-- `organization_id uuid not null references organizations(id) on delete cascade`
+- `organization_id uuid not null`
+- `organization_created_by uuid not null`
 - `user_id uuid not null references auth.users(id) on delete cascade`
 - `role text not null`
 - `created_at timestamptz not null default now()`
+
+Required constraints:
+
 - primary key: `(organization_id, user_id)`
+- role limited to:
+  - `owner`
+  - `member`
+- composite foreign key:
+  - `(organization_id, organization_created_by)`
+  - references `organizations(id, created_by)`
+  - `on delete cascade`
 
-Initial allowed role values:
+Why `organization_created_by` exists:
 
-- `owner`
-- `member`
+- It deliberately duplicates the organization's creator id in the membership row.
+- The composite foreign key guarantees it matches the creator stored on the target organization.
+- This lets the initial owner-insert RLS policy verify ownership without querying `organizations`, avoiding a circular RLS dependency.
+- This is an intentional denormalization for authorization safety in the initial tenant foundation.
 
 Rules:
 
@@ -63,7 +80,8 @@ Rules:
 - In the initial tenant task, a user may insert only:
   - their own membership row,
   - with role `owner`,
-  - for an organization they themselves created.
+  - with `organization_created_by = auth.uid()`.
+- Because of the composite foreign key, that owner row can only target an organization actually created by the same authenticated user.
 - This prevents arbitrary self-joining of another organization.
 - Adding other users, invitations, role changes, ownership transfer, membership deletion, and organization deletion are separate future tasks.
 - No update or delete policy is authorized in the initial tenant task.
@@ -73,7 +91,11 @@ Rules:
 Initial organization creation is intentionally two-step and server-controlled:
 
 1. Insert `organizations` with `created_by = auth.uid()`.
-2. Insert the creator's `organization_members` row with role `owner`.
+2. Insert the creator's `organization_members` row with:
+   - `organization_id = organizations.id`
+   - `organization_created_by = auth.uid()`
+   - `user_id = auth.uid()`
+   - `role = 'owner'`
 
 No trigger or SECURITY DEFINER function is introduced for this milestone.
 
@@ -90,6 +112,7 @@ At minimum, tests must prove:
 - User A cannot insert themselves into Organization B.
 - User B cannot insert themselves into Organization A.
 - A user cannot insert a membership row for another user.
+- A user cannot insert an owner row using an `organization_created_by` value that does not match the target organization's actual creator.
 - A user cannot assign themselves a role other than the explicitly allowed initial owner creation path.
 
 ## Future candidate tables
