@@ -10,7 +10,7 @@ Added the first protected application route at `/app` with a server-side Supabas
 `codex/auth-006`
 
 ## Pull request
-Draft PR targeting `main` (URL recorded in the Issue #19 completion report after creation).
+[Draft PR #20](https://github.com/Yufi-Web-Create/toolbox/pull/20), targeting `main`.
 
 ## Changed files
 - `src/app/app/page.tsx`
