@@ -96,6 +96,8 @@ None.
 - Vitest: PASS (12 test files, 56 tests)
 - Production build: PASS
 - `/forgot-password` and dynamic `/update-password` included in the production build: PASS
+- GitHub Actions quality gate after the review correction: PASS
+- Vercel Preview deployment after the review correction: PASS
 
 ## Deviations
 None.
