@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   requestPasswordReset,
@@ -7,16 +7,11 @@ import {
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
-  headers: vi.fn(),
   resetPasswordForEmail: vi.fn(),
 }));
 
 vi.mock("../../lib/supabase/server", () => ({
   createClient: mocks.createClient,
-}));
-
-vi.mock("next/headers", () => ({
-  headers: mocks.headers,
 }));
 
 const initialState: ForgotPasswordState = {
@@ -35,13 +30,15 @@ function createResetData(email?: string) {
 describe("requestPasswordReset", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.headers.mockResolvedValue(
-      new Headers({ origin: "https://toolbox.example" }),
-    );
+    vi.stubEnv("APP_URL", "https://toolbox.example");
     mocks.createClient.mockResolvedValue({
       auth: { resetPasswordForEmail: mocks.resetPasswordForEmail },
     });
     mocks.resetPasswordForEmail.mockResolvedValue({ error: null });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it.each(["", "invalid", "person@localhost"])(
@@ -97,4 +94,24 @@ describe("requestPasswordReset", () => {
     });
     expect(result.message).not.toContain("user not found");
   });
+
+  it.each(["", "javascript:alert(1)"])(
+    "keeps the response non-enumerating for invalid APP_URL: %s",
+    async (appUrl) => {
+      vi.stubEnv("APP_URL", appUrl);
+
+      const result = await requestPasswordReset(
+        initialState,
+        createResetData("person@example.com"),
+      );
+
+      expect(result).toEqual({
+        status: "success",
+        message:
+          "If an account exists for that email, we sent password reset instructions.",
+      });
+      expect(mocks.createClient).not.toHaveBeenCalled();
+      expect(mocks.resetPasswordForEmail).not.toHaveBeenCalled();
+    },
+  );
 });

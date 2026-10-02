@@ -1,9 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
-
+import { getAppOrigin } from "../../lib/app-url";
 import { createClient } from "../../lib/supabase/server";
-import { getRecoveryRedirectUrl } from "./validation";
 
 export type ForgotPasswordState = {
   status: "idle" | "success" | "error";
@@ -34,12 +32,13 @@ export async function requestPasswordReset(
   }
 
   try {
-    const requestHeaders = await headers();
-    const redirectTo = getRecoveryRedirectUrl(requestHeaders.get("origin"));
+    const appOrigin = getAppOrigin();
 
-    if (redirectTo) {
+    if (appOrigin) {
       const supabase = await createClient();
-      await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${appOrigin}/auth/callback?next=/update-password`,
+      });
     }
   } catch {
     // The response remains identical so account existence cannot be inferred.
