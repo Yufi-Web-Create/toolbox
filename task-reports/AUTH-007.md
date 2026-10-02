@@ -10,7 +10,7 @@ Added the minimal password recovery flow with server-controlled reset requests, 
 `codex/auth-007`
 
 ## Pull request
-Draft PR targeting `main` (URL recorded in the Issue #21 completion report after creation).
+[Draft PR #22](https://github.com/Yufi-Web-Create/toolbox/pull/22), targeting `main`.
 
 ## Changed files
 - `src/app/forgot-password/page.tsx`
