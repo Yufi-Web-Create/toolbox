@@ -10,7 +10,7 @@ Added a trusted server-side application origin for authentication emails and rou
 `codex/auth-008`
 
 ## Pull request
-Pending.
+[Draft PR #26](https://github.com/Yufi-Web-Create/toolbox/pull/26), targeting `main`.
 
 ## Changed files
 - `.env.example`
