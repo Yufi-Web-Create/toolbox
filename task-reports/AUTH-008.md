@@ -79,6 +79,8 @@ None. The real deployment value remains reviewer-managed configuration.
 - `npm run typecheck`: PASS
 - `npm test`: PASS (13 test files, 71 tests)
 - `npm run build`: PASS
+- GitHub Actions quality gate: PASS
+- Vercel Preview: PASS
 
 ## Deviations
 None.
