@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 
-import {
-  createOrganizationWithOwner,
-  getVisibleOrganizationStatus,
-} from "../../../../lib/organizations/server";
+import { createOrganizationWithOwner } from "../../../../lib/organizations/server";
 import { createClient } from "../../../../lib/supabase/server";
+
+type Membership = {
+  organization_id: string;
+  role: "owner" | "member";
+};
 
 async function getMembership(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-) {
+): Promise<Membership | null> {
   const { data, error } = await supabase
     .from("organization_members")
     .select("organization_id, role")
@@ -20,7 +22,7 @@ async function getMembership(
     return null;
   }
 
-  return data[0] as { organization_id: string; role: "owner" | "member" };
+  return data[0] as Membership;
 }
 
 export async function GET() {
@@ -33,42 +35,55 @@ export async function GET() {
       return NextResponse.json({ authenticated: false });
     }
 
-    let membership = await getMembership(supabase, claims.sub);
-
-    if (!membership) {
-      const organizationStatus = await getVisibleOrganizationStatus();
-
-      if (organizationStatus.success && !organizationStatus.hasOrganization) {
-        await createOrganizationWithOwner("OmniBox Workspace");
-        membership = await getMembership(supabase, claims.sub);
-      }
-    }
-
-    let organization: { id: string; name: string } | null = null;
-
-    if (membership) {
-      const { data: organizations } = await supabase
-        .from("organizations")
-        .select("id, name")
-        .eq("id", membership.organization_id)
-        .limit(1);
-
-      if (Array.isArray(organizations) && organizations.length === 1) {
-        organization = organizations[0] as { id: string; name: string };
-      }
-    }
-
-    const email = typeof claims.email === "string" ? claims.email : "";
     const metadata =
       claims.user_metadata && typeof claims.user_metadata === "object"
         ? (claims.user_metadata as Record<string, unknown>)
         : {};
+    const accountType =
+      metadata.account_type === "member" ? "member" : "owner";
+
+    let membership = await getMembership(supabase, claims.sub);
+
+    // A newly-created administrator owns a workspace, but must complete its
+    // human-facing organization name/login ID before normal app use.
+    if (!membership && accountType === "owner") {
+      const created = await createOrganizationWithOwner("OmniBox Workspace");
+      if (created.success) {
+        membership = await getMembership(supabase, claims.sub);
+      }
+    }
+
+    let organization: {
+      id: string;
+      name: string;
+      loginId: string | null;
+    } | null = null;
+
+    if (membership) {
+      const { data: organizations } = await supabase
+        .from("organizations")
+        .select("id, name, login_id")
+        .eq("id", membership.organization_id)
+        .limit(1);
+
+      if (Array.isArray(organizations) && organizations.length === 1) {
+        organization = {
+          id: organizations[0].id,
+          name: organizations[0].name,
+          loginId: organizations[0].login_id ?? null,
+        };
+      }
+    }
+
+    const email = typeof claims.email === "string" ? claims.email : "";
     const name =
       typeof metadata.full_name === "string" && metadata.full_name.trim()
         ? metadata.full_name.trim()
         : email.split("@")[0] || "スタッフ";
 
-    const roleKey = membership?.role ?? "member";
+    const roleKey = membership?.role ?? accountType;
+    const requiresOrganizationSetup =
+      roleKey === "owner" && (!organization || !organization.loginId);
 
     return NextResponse.json({
       authenticated: true,
@@ -80,6 +95,8 @@ export async function GET() {
         roleKey,
       },
       organization,
+      requiresOrganizationSetup,
+      membershipReady: Boolean(membership),
     });
   } catch {
     return NextResponse.json({ authenticated: false });
