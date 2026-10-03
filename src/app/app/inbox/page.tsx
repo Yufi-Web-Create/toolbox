@@ -60,10 +60,27 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
 
   if (!organizationStatus.hasOrganization) redirect("/app/onboarding");
 
+  const supabase = await createClient();
+  const { data: organizations, error: organizationsError } = await supabase
+    .from("organizations")
+    .select("id")
+    .limit(1);
+
+  if (
+    organizationsError ||
+    !Array.isArray(organizations) ||
+    organizations.length !== 1
+  ) {
+    redirect("/app/onboarding");
+  }
+
   const params = await searchParams;
   const requestedConversation =
     typeof params.conversation === "string" ? params.conversation : null;
-  const inbox = await getInboxSnapshot(requestedConversation);
+  const inbox = await getInboxSnapshot(
+    organizations[0].id,
+    requestedConversation,
+  );
 
   if (!inbox.success) {
     return (
