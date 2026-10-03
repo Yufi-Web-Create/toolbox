@@ -4,8 +4,8 @@ import {
   exchangeOAuthCode,
   getProviderConfig,
   isOAuthProvider,
-} from "../../../../../../../lib/integrations/oauth/providers";
-import { createClient } from "../../../../../../../lib/supabase/server";
+} from "../../../../../../lib/integrations/oauth/providers";
+import { createClient } from "../../../../../../lib/supabase/server";
 
 type Context = { params: Promise<{ provider: string }> };
 
