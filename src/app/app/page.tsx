@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getVisibleOrganizationStatus } from "../../lib/organizations/server";
@@ -44,6 +45,7 @@ export default async function ApplicationPage() {
     <main>
       <h1>Application</h1>
       <p>You are signed in.</p>
+      <Link href="/app/inbox">LINE受信箱を開く</Link>
     </main>
   );
 }
