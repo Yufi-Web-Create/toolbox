@@ -516,8 +516,8 @@
             本画面はリアルタイムデータベースと直結しています。同梱の <code class="bg-slate-800 px-1.5 py-0.5 rounded text-teal-300 font-mono">server.js</code> を起動し、LINE DevelopersコンソールにWebhook URLを設定するだけで、実際のお客さまのLINEメッセージがこの画面に直接着信します。
           </p>
           <div class="bg-slate-950 p-3 rounded-xl font-mono text-[11px] text-slate-300 flex items-center justify-between">
-            <span>Webhookエンドポイント: https://your-server-domain.com/api/webhook/line</span>
-            <button onclick="copyToClipboard('https://your-server-domain.com/api/webhook/line')" class="text-teal-400 hover:text-teal-300 ml-2">コピー</button>
+            <span>Webhookエンドポイント: https://omnibox-line-bridge.onrender.com/webhooks/line</span>
+            <button onclick="copyToClipboard('https://omnibox-line-bridge.onrender.com/webhooks/line')" class="text-teal-400 hover:text-teal-300 ml-2">コピー</button>
           </div>
         </div>
 
@@ -1165,7 +1165,19 @@
         const selectedId = payload.selectedConversation?.id || conversationId || null;
         const selectedMessages = Array.isArray(payload.messages) ? payload.messages : [];
 
-        connectedAccounts = [{
+        let lineConnected = false;
+        try {
+          const statusResponse = await fetch('/api/omnibox/line/status', {
+            credentials: 'same-origin',
+            cache: 'no-store'
+          });
+          if (statusResponse.ok) {
+            const status = await statusResponse.json();
+            lineConnected = status.lineConnected === true;
+          }
+        } catch {}
+
+        connectedAccounts = lineConnected ? [{
           id: 'acc_line_live',
           platform: 'line',
           platformName: 'LINE公式',
@@ -1173,8 +1185,8 @@
           handle: 'Messaging API',
           badgeColor: 'bg-emerald-500',
           active: true,
-          connectedVia: 'server'
-        }];
+          connectedVia: 'secure_setup'
+        }] : [];
 
         threads = (payload.conversations || []).map((conversation) => {
           const isSelected = conversation.id === selectedId;
@@ -2041,72 +2053,18 @@
     };
 
     window.startOAuthFlow = function(platform) {
-      const mockProfiles = {
-        instagram: {
-          title: 'Meta / Instagram 連携',
-          btnClass: 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700',
-          iconText: 'IG',
-          iconBg: 'bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600',
-          name: 'OmniBox 公式ショップ (Instagram)',
-          handle: '@omnibox_japan',
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-          platform: 'instagram',
-          platformName: 'Instagram'
-        },
-        line: {
-          title: 'LINE 公式アカウント連携',
-          btnClass: 'bg-emerald-600 hover:bg-emerald-700',
-          iconText: 'LINE',
-          iconBg: 'bg-emerald-500',
-          name: 'Omniサポート公式LINE窓口',
-          handle: '@omni_line_bot',
-          avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
-          platform: 'line',
-          platformName: 'LINE公式'
-        },
-        x: {
-          title: '𝕏 (旧Twitter) 連携',
-          btnClass: 'bg-slate-900 hover:bg-black',
-          iconText: '𝕏',
-          iconBg: 'bg-slate-900',
-          name: 'Omni広報アカウント',
-          handle: '@Omni_Official_PR',
-          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-          platform: 'x',
-          platformName: 'X (旧Twitter)'
-        },
-        email: {
-          title: 'Google / Gmail 窓口連携',
-          btnClass: 'bg-blue-600 hover:bg-blue-700',
-          iconText: 'Mail',
-          iconBg: 'bg-blue-600',
-          name: 'Omni カスタマーサポート代表',
-          handle: 'support@omnistore-cloud.jp',
-          avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80',
-          platform: 'email',
-          platformName: 'サポートメール'
-        }
-      };
+      if (platform === 'line') {
+        window.switchConnectTab('direct');
+        const select = document.getElementById('direct-platform-select');
+        select.value = 'line';
+        window.updateDirectFormLabels();
+        document.getElementById('direct-account-name').value = 'LINE公式アカウント';
+        document.getElementById('direct-account-user').focus();
+        showToast('LINE DevelopersのChannel IDとChannel Secretを入力してください');
+        return;
+      }
 
-      const selected = mockProfiles[platform];
-      if (!selected) return;
-
-      pendingOAuthData = selected;
-
-      document.getElementById('oauth-popup-title').textContent = selected.title;
-      const iconBox = document.getElementById('oauth-popup-icon');
-      iconBox.className = `w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md ${selected.iconBg}`;
-      iconBox.textContent = selected.iconText;
-
-      document.getElementById('oauth-detected-avatar').src = selected.avatar;
-      document.getElementById('oauth-detected-name').textContent = selected.name;
-      document.getElementById('oauth-detected-handle').textContent = selected.handle;
-
-      const confirmBtn = document.getElementById('oauth-confirm-btn');
-      confirmBtn.className = `w-1/2 py-2 text-xs font-bold text-white rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition ${selected.btnClass}`;
-
-      document.getElementById('oauth-popup-modal').classList.remove('hidden');
-      lucide.createIcons();
+      showToast('このSNSの実OAuth連携は現在実装中です。LINE連携から先に利用できます');
     };
 
     window.closeOAuthPopup = function() {
@@ -2163,10 +2121,10 @@
         passLabel.textContent = 'Instagram ログインパスワード';
         passHint.textContent = '※Metaの公式APIトークンが自動生成されて安全に保存されます。';
       } else if (pf === 'line') {
-        userLabel.textContent = 'LINE公式アカウント ID または Channel ID';
-        userInput.placeholder = '例: @line_store_id または 165xxxxxxxx';
-        passLabel.textContent = 'Channel Secret または 認証パスコード';
-        passHint.textContent = '※Messaging APIの接続キーです。自動疎通確認が行われます。';
+        userLabel.textContent = 'Messaging API Channel ID';
+        userInput.placeholder = '例: 2001234567';
+        passLabel.textContent = 'Channel Secret';
+        passHint.textContent = '※LINE Developers > Messaging APIチャネルの基本設定にあるChannel ID / Channel Secretを使用します。アクセストークンとWebhook URLはOmniBoxが自動設定します。';
       } else {
         userLabel.textContent = 'X ユーザー名 (@〜) / メール';
         userInput.placeholder = '例: @official_x_account';
@@ -2194,51 +2152,73 @@
       const user = document.getElementById('direct-account-user').value.trim();
       const pass = document.getElementById('direct-account-pass').value.trim();
 
+      if (platform !== 'line') {
+        showToast('現在、実接続はLINE公式アカウントから対応しています');
+        return;
+      }
+
       if (!name || !user || !pass) {
-        showToast('表示名、ユーザー名、パスワードをすべて入力してください');
+        showToast('表示名、Channel ID、Channel Secretをすべて入力してください');
         return;
       }
 
       const submitBtn = document.getElementById('direct-submit-btn');
       submitBtn.disabled = true;
-      submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>接続テスト中...</span>`;
+      submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>LINEへ接続中...</span>';
       lucide.createIcons();
 
-      await new Promise(r => setTimeout(r, 1200));
+      try {
+        const response = await fetch('/api/omnibox/line/configure', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channelId: user,
+            channelSecret: pass
+          })
+        });
 
-      const meta = getChannelMeta(platform);
-      const newAcc = {
-        id: 'acc_' + Date.now(),
-        platform: platform,
-        platformName: meta.name,
-        accountName: name,
-        handle: user.startsWith('@') || user.includes('@') ? user : `@${user}`,
-        badgeColor: meta.color,
-        active: true,
-        connectedVia: 'direct_login',
-        connectedAt: Date.now()
-      };
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'LINEへ接続できませんでした');
+        }
 
-      if (isCloudReady && db) {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', newAcc.id), newAcc);
-      } else {
-        connectedAccounts.push(newAcc);
+        document.getElementById('direct-account-pass').value = '';
+
+        connectedAccounts = [{
+          id: 'acc_line_live',
+          platform: 'line',
+          platformName: 'LINE公式',
+          accountName: name,
+          handle: 'Channel ID: ' + user,
+          badgeColor: 'bg-emerald-500',
+          active: result.webhookActive === true,
+          connectedVia: 'secure_setup'
+        }];
+
         renderAccountFilters();
         renderConnectedAccounts();
         renderTargetAccountsCheckboxes();
+        renderPublishChannelsSummary();
         updateBadges();
+
+        window.closeAddAccountModal();
+
+        if (result.webhookActive) {
+          showToast('✅ LINE公式アカウントの接続が完了しました。送受信できます');
+        } else if (result.webhookVerified) {
+          showToast('✅ 接続・Webhook検証まで完了。LINE Developersで「Use webhook」をONにしてください');
+        } else {
+          showToast('LINE設定を保存しました。Webhookの有効化状態をご確認ください');
+        }
+      } catch (error) {
+        console.error('LINE setup failed:', error);
+        showToast(error.message || 'LINE公式アカウントへ接続できませんでした');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i data-lucide="plug" class="w-3.5 h-3.5"></i><span>接続テスト & 連携完了</span>';
+        lucide.createIcons();
       }
-
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = `<i data-lucide="plug" class="w-3.5 h-3.5"></i><span>接続テスト & 連携完了</span>`;
-
-      document.getElementById('direct-account-name').value = '';
-      document.getElementById('direct-account-user').value = '';
-      document.getElementById('direct-account-pass').value = '';
-      window.closeAddAccountModal();
-
-      showToast(`✅ 認証成功！「${name}」を正常に連携しました！`);
-      lucide.createIcons();
     };
 
     window.testSyncAccount = function(name) {
