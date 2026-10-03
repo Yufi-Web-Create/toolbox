@@ -122,17 +122,31 @@ Deno.serve(async (req) => {
   }
 
   if (payload.action === "inbound") {
-    const conversationPayload = {
+    const { data: existingConversation } = await supabase
+      .from("conversations")
+      .select("id, customer_name_source")
+      .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+      .eq("provider", "line")
+      .eq("provider_thread_id", payload.providerThreadId)
+      .maybeSingle();
+
+    const conversationPayload: Record<string, unknown> = {
       organization_id: ALLOWED_ORGANIZATION_ID,
       provider: "line",
       provider_thread_id: payload.providerThreadId,
       customer_external_id: payload.customerExternalId,
-      customer_display_name: payload.customerDisplayName || "LINE user",
+      customer_avatar_url: payload.customerAvatarUrl || null,
       status: "unread",
       last_message_preview: String(payload.body ?? "").slice(0, 500),
       last_message_at: payload.occurredAt,
       updated_at: payload.occurredAt,
     };
+
+    if (existingConversation?.customer_name_source !== "custom") {
+      conversationPayload.customer_display_name =
+        payload.customerDisplayName || "LINE user";
+      conversationPayload.customer_name_source = "provider";
+    }
 
     const { data: conversation, error: conversationError } = await supabase
       .from("conversations")
@@ -159,6 +173,49 @@ Deno.serve(async (req) => {
 
     if (messageError) return json(500, { ok: false, error: "message_persist_failed" });
     return json(200, { ok: true, conversationId: conversation.id });
+  }
+
+  if (payload.action === "profile") {
+    const conversationId = String(payload.conversationId ?? "");
+    const displayName = String(payload.customerDisplayName ?? "").trim();
+    const avatarUrl = String(payload.customerAvatarUrl ?? "").trim();
+
+    const { data: conversation, error: conversationError } = await supabase
+      .from("conversations")
+      .select("id, customer_name_source")
+      .eq("id", conversationId)
+      .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+      .maybeSingle();
+
+    if (conversationError || !conversation) {
+      return json(404, { ok: false, error: "conversation_not_found" });
+    }
+
+    const updates: Record<string, unknown> = {
+      customer_avatar_url: avatarUrl || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (conversation.customer_name_source !== "custom" && displayName) {
+      updates.customer_display_name = displayName;
+      updates.customer_name_source = "provider";
+    }
+
+    const { error: updateError } = await supabase
+      .from("conversations")
+      .update(updates)
+      .eq("id", conversationId)
+      .eq("organization_id", ALLOWED_ORGANIZATION_ID);
+
+    if (updateError) {
+      return json(500, { ok: false, error: "profile_update_failed" });
+    }
+
+    return json(200, {
+      ok: true,
+      customerDisplayName: displayName || null,
+      customerAvatarUrl: avatarUrl || null,
+    });
   }
 
   if (payload.action === "outbound") {
