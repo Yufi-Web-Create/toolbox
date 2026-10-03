@@ -63,6 +63,47 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("従業員としてログイン");
   });
 
+  it("keeps the full account area clickable", () => {
+    expect(html).toContain('id="user-menu-trigger"');
+    expect(html).toContain("e.target.closest('#user-menu-trigger')");
+  });
+
+  it("provides real quick demo sessions for administrator and staff", () => {
+    expect(html).toContain("クイック体験・デモログイン");
+    expect(html).toContain("quickLoginDemo('admin')");
+    expect(html).toContain("quickLoginDemo('staff')");
+    expect(html).toContain("/api/omnibox/demo-login");
+  });
+
+  it("supports persistent template creation and deletion", () => {
+    expect(html).toContain("定型文を登録");
+    expect(html).toContain("/api/omnibox/templates");
+    expect(html).toContain("createReplyTemplate");
+    expect(html).toContain("deleteReplyTemplate");
+  });
+
+  it("supports customer rename, avatars, and icon-only platform badges", () => {
+    expect(html).toContain("saveCustomerName");
+    expect(html).toContain("/api/omnibox/customer");
+    expect(html).toContain("/api/omnibox/customer/profile");
+    expect(html).toContain("customerAvatarUrl");
+    expect(html).toContain('data-lucide="message-circle"');
+    expect(html).not.toContain("meta.text");
+  });
+
+  it("loads conversation detail without rebuilding the entire inbox list", () => {
+    expect(html).toContain("loadConversationDetail");
+    expect(html).toContain("Conversation detail load failed");
+    expect(html).not.toContain("await loadLiveInbox(thread.liveConversationId)");
+  });
+
+  it("provides employee rename, password reset, and deletion controls", () => {
+    expect(html).toContain("renameEmployee");
+    expect(html).toContain("resetEmployeePassword");
+    expect(html).toContain("deleteEmployeeAccount");
+    expect(html).toContain("ログイン用組織ID");
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
