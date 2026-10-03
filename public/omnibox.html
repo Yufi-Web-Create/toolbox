@@ -1146,8 +1146,10 @@
     let isCloudReady = false;
 
     let currentAuthMode = 'login';
+    let currentLoginType = 'admin';
     let loggedInUser = null;
     let currentOrganization = null;
+    let requiresOrganizationSetup = false;
 
     let threads = [];
     let connectedAccounts = [];
@@ -1426,15 +1428,31 @@
             avatar: (session.user.name || session.user.email || '担').slice(0, 1)
           };
           currentOrganization = session.organization || null;
-          await loadLiveInbox();
+          requiresOrganizationSetup = session.requiresOrganizationSetup === true;
+          updateHeaderUserUI();
+
+          if (requiresOrganizationSetup && loggedInUser.roleKey === 'owner') {
+            onDataUpdated();
+            window.openSettings('organization');
+          } else if (session.membershipReady === false) {
+            threads = [];
+            connectedAccounts = [];
+            onDataUpdated();
+            showToast('所属組織を確認できません。管理者にアカウント設定をご確認ください');
+          } else {
+            await loadLiveInbox();
+          }
         } else {
           loggedInUser = null;
           currentOrganization = null;
+          requiresOrganizationSetup = false;
           onDataUpdated();
         }
       } catch (err) {
         console.error('Session init failed:', err);
         loggedInUser = null;
+        currentOrganization = null;
+        requiresOrganizationSetup = false;
         threads = [];
         connectedAccounts = [];
         onDataUpdated();
@@ -2670,6 +2688,10 @@
     }
 
     window.switchView = function(viewName) {
+      if (requiresOrganizationSetup && loggedInUser?.roleKey === 'owner' && viewName !== 'settings') {
+        viewName = 'settings';
+      }
+
       document.querySelectorAll('.view-panel').forEach(el => el.classList.add('hidden'));
       const activePanel = document.getElementById(`view-${viewName}`);
       if (activePanel) activePanel.classList.remove('hidden');
@@ -2776,18 +2798,43 @@
       const tabLogin = document.getElementById('auth-tab-login');
       const tabRegister = document.getElementById('auth-tab-register');
       const nameGroup = document.getElementById('auth-name-group');
+      const loginTypeGroup = document.getElementById('auth-login-type-group');
+      const organizationGroup = document.getElementById('auth-organization-group');
       const submitLabel = document.getElementById('auth-submit-label');
 
       if (mode === 'login') {
         tabLogin.className = 'flex-1 py-2 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
         tabRegister.className = 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
         nameGroup.classList.add('hidden');
-        submitLabel.textContent = 'ログインして業務を開始';
+        loginTypeGroup.classList.remove('hidden');
+        organizationGroup.classList.toggle('hidden', currentLoginType !== 'employee');
+        submitLabel.textContent = currentLoginType === 'employee' ? '従業員としてログイン' : '管理者としてログイン';
       } else {
         tabRegister.className = 'flex-1 py-2 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
         tabLogin.className = 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
         nameGroup.classList.remove('hidden');
-        submitLabel.textContent = 'アカウントを新規作成';
+        loginTypeGroup.classList.add('hidden');
+        organizationGroup.classList.add('hidden');
+        submitLabel.textContent = '管理者アカウントを作成';
+      }
+      lucide.createIcons();
+    };
+
+    window.switchLoginType = function(type) {
+      currentLoginType = type === 'employee' ? 'employee' : 'admin';
+      const adminButton = document.getElementById('auth-login-type-admin');
+      const employeeButton = document.getElementById('auth-login-type-employee');
+      const organizationGroup = document.getElementById('auth-organization-group');
+      const submitLabel = document.getElementById('auth-submit-label');
+
+      const active = 'py-2 rounded-lg bg-white text-slate-800 shadow-xs text-xs font-semibold flex items-center justify-center gap-1.5';
+      const inactive = 'py-2 rounded-lg text-slate-600 text-xs font-semibold flex items-center justify-center gap-1.5';
+      adminButton.className = currentLoginType === 'admin' ? active : inactive;
+      employeeButton.className = currentLoginType === 'employee' ? active : inactive;
+      organizationGroup.classList.toggle('hidden', currentLoginType !== 'employee');
+
+      if (currentAuthMode === 'login') {
+        submitLabel.textContent = currentLoginType === 'employee' ? '従業員としてログイン' : '管理者としてログイン';
       }
       lucide.createIcons();
     };
@@ -2809,15 +2856,22 @@
       e.preventDefault();
       const email = document.getElementById('auth-input-email').value.trim();
       const password = document.getElementById('auth-input-password').value;
-      const name = document.getElementById('auth-input-name').value.trim() || email.split('@')[0];
+      const rawName = document.getElementById('auth-input-name').value.trim();
+      const name = rawName || email.split('@')[0];
+      const organizationId = document.getElementById('auth-input-organization').value.trim().toUpperCase();
 
       if (!email || !password) {
         showToast('メールアドレスとパスワードを入力してください');
         return;
       }
 
-      if (currentAuthMode === 'register' && !document.getElementById('auth-input-name').value.trim()) {
-        showToast('スタッフ表示名を入力してください');
+      if (currentAuthMode === 'register' && !rawName) {
+        showToast('管理者名を入力してください');
+        return;
+      }
+
+      if (currentAuthMode === 'login' && currentLoginType === 'employee' && !organizationId) {
+        showToast('組織IDを入力してください');
         return;
       }
 
@@ -2834,7 +2888,13 @@
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password })
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+            loginType: currentLoginType,
+            organizationId
+          })
         });
         const result = await response.json();
 
@@ -2845,6 +2905,7 @@
         if (currentAuthMode === 'register') {
           showToast(result.message || '確認メールを送信しました');
           window.switchAuthTab('login');
+          window.switchLoginType('admin');
           document.getElementById('auth-input-password').value = '';
           return;
         }
@@ -2867,19 +2928,33 @@
           avatar: (session.user.name || name).slice(0, 1)
         };
         currentOrganization = session.organization || null;
+        requiresOrganizationSetup = session.requiresOrganizationSetup === true;
 
         const portal = document.getElementById('auth-portal-overlay');
         portal.classList.add('hidden');
         portal.classList.remove('flex');
         updateHeaderUserUI();
-        await loadLiveInbox();
-        showToast(`ようこそ、${loggedInUser.name}さん！OmniBoxへログインしました`);
+
+        if (requiresOrganizationSetup && loggedInUser.roleKey === 'owner') {
+          onDataUpdated();
+          window.openSettings('organization');
+          showToast('管理者アカウントの準備ができました。最初に組織設定を完了してください');
+        } else {
+          await loadLiveInbox();
+          window.switchView('inbox');
+          showToast(`ようこそ、${loggedInUser.name}さん！OmniBoxへログインしました`);
+        }
       } catch (error) {
         console.error('Auth failed:', error);
         showToast(error.message || '認証できませんでした');
       } finally {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = `<i data-lucide="arrow-right-circle" class="w-4 h-4"></i><span>${currentAuthMode === 'login' ? 'ログインして業務を開始' : 'アカウントを新規作成'}</span>`;
+        const label = currentAuthMode === 'register'
+          ? '管理者アカウントを作成'
+          : currentLoginType === 'employee'
+            ? '従業員としてログイン'
+            : '管理者としてログイン';
+        submitBtn.innerHTML = `<i data-lucide="arrow-right-circle" class="w-4 h-4"></i><span>${label}</span>`;
         lucide.createIcons();
       }
     };
@@ -2917,12 +2992,23 @@
       document.getElementById('settings-account-email').value = loggedInUser?.email || '';
       document.getElementById('settings-account-password').value = '';
 
+      const initialBanner = document.getElementById('settings-initial-organization-banner');
+      if (initialBanner) {
+        initialBanner.classList.toggle('hidden', !requiresOrganizationSetup);
+      }
+
       if (isOwner && currentOrganization) {
-        document.getElementById('settings-organization-name').value = currentOrganization.name || '';
-        document.getElementById('settings-organization-id').value = currentOrganization.id || '';
+        document.getElementById('settings-organization-name').value =
+          requiresOrganizationSetup && currentOrganization.name === 'OmniBox Workspace'
+            ? ''
+            : (currentOrganization.name || '');
+        document.getElementById('settings-organization-id').value = currentOrganization.loginId || '';
       }
 
       window.switchSettingsTab(isOwner && tab === 'organization' ? 'organization' : 'account');
+      if (isOwner && !requiresOrganizationSetup) {
+        window.loadEmployees();
+      }
     };
 
     window.switchSettingsTab = function(tab) {
@@ -2987,13 +3073,15 @@
       }
 
       const name = document.getElementById('settings-organization-name').value.trim();
+      const loginId = document.getElementById('settings-organization-id').value.trim().toUpperCase();
+      const wasInitialSetup = requiresOrganizationSetup;
 
       try {
         const response = await fetch('/api/omnibox/settings/organization', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name })
+          body: JSON.stringify({ name, loginId })
         });
         const result = await response.json();
 
@@ -3002,11 +3090,107 @@
         }
 
         currentOrganization = result.organization;
+        requiresOrganizationSetup = false;
         document.getElementById('settings-organization-name').value = currentOrganization.name;
-        document.getElementById('settings-organization-id').value = currentOrganization.id;
-        showToast('組織設定を保存しました');
+        document.getElementById('settings-organization-id').value = currentOrganization.loginId || '';
+        document.getElementById('settings-initial-organization-banner')?.classList.add('hidden');
+
+        await window.loadEmployees();
+
+        if (wasInitialSetup) {
+          await loadLiveInbox();
+          window.switchView('inbox');
+          showToast('初期組織設定が完了しました。OmniBoxを利用できます');
+        } else {
+          showToast('組織設定を保存しました');
+        }
       } catch (error) {
         showToast(error.message || '組織設定を更新できませんでした');
+      }
+    };
+
+    window.loadEmployees = async function() {
+      if (loggedInUser?.roleKey !== 'owner' || requiresOrganizationSetup) return;
+
+      const list = document.getElementById('employee-list');
+      const badge = document.getElementById('employee-count-badge');
+      if (!list || !badge) return;
+
+      try {
+        const response = await fetch('/api/omnibox/settings/employees', {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || '従業員一覧を読み込めませんでした');
+        }
+
+        const employees = Array.isArray(result.employees) ? result.employees : [];
+        badge.textContent = `${employees.length}名`;
+
+        if (employees.length === 0) {
+          list.innerHTML = '<div class="text-xs text-slate-400 py-3">従業員アカウントはまだありません。</div>';
+          return;
+        }
+
+        list.innerHTML = employees.map(employee => `
+          <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-slate-800 truncate">${employee.name}</div>
+              <div class="text-[11px] text-slate-500 font-mono truncate">${employee.email}</div>
+            </div>
+            <span class="text-[10px] px-2 py-1 rounded bg-white border border-slate-200 text-slate-500 shrink-0">従業員</span>
+          </div>
+        `).join('');
+      } catch (error) {
+        list.innerHTML = `<div class="text-xs text-red-500 py-3">${error.message || '従業員一覧を読み込めませんでした'}</div>`;
+      }
+    };
+
+    window.createEmployeeAccount = async function(e) {
+      e.preventDefault();
+
+      if (loggedInUser?.roleKey !== 'owner') {
+        showToast('従業員アカウントの作成は管理者のみ行えます');
+        return;
+      }
+
+      if (!currentOrganization?.loginId) {
+        showToast('先に組織名と組織IDを保存してください');
+        return;
+      }
+
+      const name = document.getElementById('employee-create-name').value.trim();
+      const email = document.getElementById('employee-create-email').value.trim();
+      const password = document.getElementById('employee-create-password').value;
+      const button = document.getElementById('employee-create-button');
+
+      button.disabled = true;
+
+      try {
+        const response = await fetch('/api/omnibox/settings/employees', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password })
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || '従業員アカウントを作成できませんでした');
+        }
+
+        document.getElementById('employee-create-name').value = '';
+        document.getElementById('employee-create-email').value = '';
+        document.getElementById('employee-create-password').value = '';
+        await window.loadEmployees();
+        showToast(`従業員アカウントを作成しました。組織ID「${currentOrganization.loginId}」でログインできます`);
+      } catch (error) {
+        showToast(error.message || '従業員アカウントを作成できませんでした');
+      } finally {
+        button.disabled = false;
       }
     };
 
@@ -3032,6 +3216,7 @@
       } finally {
         loggedInUser = null;
         currentOrganization = null;
+        requiresOrganizationSetup = false;
         threads = [];
         connectedAccounts = [];
         currentThreadId = null;
@@ -3041,6 +3226,9 @@
         portal.classList.add('flex');
         document.getElementById('auth-input-email').value = '';
         document.getElementById('auth-input-password').value = '';
+        document.getElementById('auth-input-organization').value = '';
+        window.switchAuthTab('login');
+        window.switchLoginType('admin');
         onDataUpdated();
         showToast('ログアウトしました');
       }
