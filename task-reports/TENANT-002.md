@@ -9,11 +9,12 @@ TENANT-002 — Atomic organization bootstrap RPC
 Added one authenticated-only PostgreSQL RPC that creates an organization and
 its creator's owner membership atomically with the caller's privileges. Added
 the minimal server-side TypeScript wrapper and focused automated coverage. No
-visible onboarding UI was added, and the migration was not applied to Supabase.
+visible onboarding UI was added, and Codex did not apply the migration to
+Supabase.
 
 ## Changed files
 
-- `supabase/migrations/20261003011133_create_organization_with_owner.sql`
+- `supabase/migrations/20261003012304_create_organization_with_owner.sql`
 - `supabase/tests/tenant_002_atomic_organization_bootstrap.sql`
 - `src/lib/organizations/server.ts`
 - `src/lib/organizations/server.test.ts`
@@ -35,7 +36,10 @@ None.
   receives execute permission.
 - Existing tables, columns, constraints, indexes, RLS policies, triggers, and
   views are unchanged.
-- The migration was not applied locally or remotely.
+- The reviewer reported that the Supabase-side applied migration version is
+  `20261003012304`. The unchanged migration file was renamed to that version in
+  this same PR. Codex did not apply the migration or modify remote migration
+  history.
 
 ## Implementation details
 
@@ -79,10 +83,12 @@ None.
 
 ## Results
 
-Local application validation passed. The SQL/spec file was not executed against
-`toolbox-dev` because this task explicitly prohibits applying the migration.
-The reviewer must apply the reviewed migration and run the SQL/live gate before
-final approval.
+All required local validation was rerun after the filename alignment and
+passed. The SQL/spec file was not executed by
+Codex against `toolbox-dev`; applying migrations and changing remote migration
+history were outside the authorized scope. The reviewer-reported applied
+version is `20261003012304`, and the repository filename now matches it within
+this same PR.
 
 ## Deviations from specification
 
@@ -90,10 +96,7 @@ None.
 
 ## Known issues
 
-- Remote migration application and live RPC/RLS/atomicity verification are
-  intentionally pending reviewer action on `toolbox-dev`.
-- If Supabase assigns a different migration version, the existing migration
-  file must be renamed within this same task and PR, followed by revalidation.
+- Live RPC/RLS/atomicity verification on `toolbox-dev` remains reviewer-managed.
 
 ## Security notes
 
