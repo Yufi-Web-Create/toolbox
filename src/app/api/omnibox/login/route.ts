@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     const email = typeof body?.email === "string" ? body.email.trim() : "";
     const password = typeof body?.password === "string" ? body.password : "";
     const loginType = body?.loginType === "employee" ? "employee" : "admin";
+    void loginType;
     const organizationId =
       typeof body?.organizationId === "string"
         ? body.organizationId.trim().toUpperCase()
@@ -23,10 +24,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      loginType === "employee" &&
-      (!organizationId || !ORGANIZATION_ID_PATTERN.test(organizationId))
-    ) {
+    if (organizationId && !ORGANIZATION_ID_PATTERN.test(organizationId)) {
       return NextResponse.json(
         { ok: false, message: "組織IDを確認してください。" },
         { status: 400 },
@@ -57,15 +55,18 @@ export async function POST(request: Request) {
         ? memberships[0]
         : null;
 
-    if (loginType === "employee") {
-      if (!membership || membership.role !== "member") {
-        await supabase.auth.signOut();
-        return NextResponse.json(
-          { ok: false, message: "組織IDまたは従業員ログイン情報が正しくありません。" },
-          { status: 401 },
-        );
-      }
+    if (!membership) {
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { ok: false, message: "所属組織を確認できませんでした。" },
+        { status: 403 },
+      );
+    }
 
+    // The stored membership is the source of truth. The UI selector is only a
+    // login aid and must never turn a member into an administrator or block a
+    // valid member merely because the selector was out of sync.
+    if (membership.role === "member" && organizationId) {
       const { data: organizations, error: organizationError } = await supabase
         .from("organizations")
         .select("id, login_id")
@@ -86,19 +87,17 @@ export async function POST(request: Request) {
       ) {
         await supabase.auth.signOut();
         return NextResponse.json(
-          { ok: false, message: "組織IDまたは従業員ログイン情報が正しくありません。" },
+          { ok: false, message: "組織IDまたはログイン情報が正しくありません。" },
           { status: 401 },
         );
       }
-    } else if (membership?.role === "member") {
-      await supabase.auth.signOut();
-      return NextResponse.json(
-        { ok: false, message: "このアカウントは従業員ログインをご利用ください。" },
-        { status: 403 },
-      );
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      roleKey: membership.role,
+      loginType: membership.role === "member" ? "employee" : "admin",
+    });
   } catch {
     return NextResponse.json(
       { ok: false, message: "ログインできませんでした。もう一度お試しください。" },
