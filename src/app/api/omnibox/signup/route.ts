@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       email,
       password,
       options: {
-        data: { full_name: name },
+        data: { full_name: name, account_type: "owner" },
         emailRedirectTo: `${appOrigin}/auth/callback?next=/omnibox.html`,
       },
     });
