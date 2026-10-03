@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "../../lib/supabase/server";
+import { getAppOrigin } from "../../lib/app-url";
 
 export type SignupState = {
   status: "idle" | "success" | "error";
@@ -38,8 +39,23 @@ export async function signup(
   }
 
   try {
+    const appOrigin = getAppOrigin();
+
+    if (!appOrigin) {
+      return {
+        status: "error",
+        message: "We could not create your account. Please try again.",
+      };
+    }
+
     const supabase = await createClient();
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${appOrigin}/auth/callback?next=/login`,
+      },
+    });
 
     if (error) {
       return {

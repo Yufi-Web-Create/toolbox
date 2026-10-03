@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { signup, type SignupState } from "./actions";
 
@@ -33,9 +33,14 @@ function createSignupData(email?: string, password?: string) {
 describe("signup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("APP_URL", "https://toolbox.example");
     mocks.createClient.mockResolvedValue({
       auth: { signUp: mocks.signUp },
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it.each(["", "invalid", "person@localhost"])(
@@ -78,6 +83,10 @@ describe("signup", () => {
     expect(mocks.signUp).toHaveBeenCalledWith({
       email: "person@example.com",
       password: "password123",
+      options: {
+        emailRedirectTo:
+          "https://toolbox.example/auth/callback?next=/login",
+      },
     });
     expect(result).toEqual({
       status: "success",
@@ -102,4 +111,23 @@ describe("signup", () => {
     });
     expect(result.message).not.toContain("raw provider detail");
   });
+
+  it.each(["", "https://toolbox.example/path"])(
+    "fails closed with a safe message for invalid APP_URL: %s",
+    async (appUrl) => {
+      vi.stubEnv("APP_URL", appUrl);
+
+      const result = await signup(
+        initialState,
+        createSignupData("person@example.com", "password123"),
+      );
+
+      expect(result).toEqual({
+        status: "error",
+        message: "We could not create your account. Please try again.",
+      });
+      expect(mocks.createClient).not.toHaveBeenCalled();
+      expect(mocks.signUp).not.toHaveBeenCalled();
+    },
+  );
 });
