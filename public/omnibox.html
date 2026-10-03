@@ -1078,7 +1078,7 @@
   </div>
 
   <!-- トースト通知 -->
-  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs shadow-xl flex items-center gap-2 transform translate-y-16 opacity-0 transition-all duration-300 z-50">
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs shadow-2xl flex items-center gap-2 transform translate-y-16 opacity-0 transition-all duration-300 z-[120] pointer-events-none">
     <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
     <span id="toast-message">処理が完了しました</span>
   </div>
@@ -1122,12 +1122,12 @@
           </div>
 
           <div id="auth-organization-group" class="hidden">
-            <label class="text-xs font-bold text-slate-600 block mb-1">組織ID</label>
+            <label class="text-xs font-bold text-slate-600 block mb-1">組織ID <span class="font-normal text-slate-400">（任意）</span></label>
             <div class="relative">
               <i data-lucide="building-2" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
               <input type="text" id="auth-input-organization" maxlength="32" autocomplete="organization" placeholder="例: HAJIMARI_BEPPU" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition uppercase">
             </div>
-            <p class="text-[10px] text-slate-400 mt-1">管理者から案内された組織IDを入力してください。</p>
+            <p class="text-[10px] text-slate-400 mt-1">入力した場合は所属組織と照合します。従業員権限は登録情報から自動判定されます。</p>
           </div>
 
           <div id="auth-name-group" class="hidden">
@@ -2063,6 +2063,10 @@
           })
         });
         const result = await response.json();
+
+        if (response.ok && result.ok && result.loginType) {
+          currentLoginType = result.loginType;
+        }
 
         if (!response.ok || !result.ok) {
           throw new Error(result.message || 'お客様名を変更できませんでした');
@@ -3244,11 +3248,6 @@
 
       if (currentAuthMode === 'register' && !rawName) {
         showToast('管理者名を入力してください');
-        return;
-      }
-
-      if (currentAuthMode === 'login' && currentLoginType === 'employee' && !organizationId) {
-        showToast('組織IDを入力してください');
         return;
       }
 
