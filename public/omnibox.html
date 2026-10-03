@@ -510,10 +510,10 @@
         <div class="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-md">
           <div class="flex items-center gap-2 mb-2 font-bold text-sm text-teal-400">
             <i data-lucide="terminal" class="w-4 h-4"></i>
-            <span>実際のLINE公式アカウント / Meta Graph APIと接続するには</span>
+            <span>LINE公式アカウントの実接続</span>
           </div>
           <p class="text-xs text-slate-300 leading-relaxed mb-3">
-            本画面はリアルタイムデータベースと直結しています。同梱の <code class="bg-slate-800 px-1.5 py-0.5 rounded text-teal-300 font-mono">server.js</code> を起動し、LINE DevelopersコンソールにWebhook URLを設定するだけで、実際のお客さまのLINEメッセージがこの画面に直接着信します。
+            「新規アカウントを追加」からLINEを選び、LINE DevelopersのMessaging APIチャネルにあるChannel ID / Channel Secretを入力してください。OmniBoxがアクセストークン発行、Webhook URL設定、疎通確認まで自動で行います。
           </p>
           <div class="bg-slate-950 p-3 rounded-xl font-mono text-[11px] text-slate-300 flex items-center justify-between">
             <span>Webhookエンドポイント: https://omnibox-line-bridge.onrender.com/webhooks/line</span>
@@ -665,10 +665,10 @@
               </div>
               <div class="text-left">
                 <div class="text-xs font-bold text-slate-800 group-hover:text-emerald-700 flex items-center gap-1.5">
-                  <span>LINE Business ID でログインして連携</span>
+                  <span>LINE公式アカウントを接続</span>
                   <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-medium">チャット送受信</span>
                 </div>
-                <div class="text-[11px] text-slate-400">公式アカウントの友だちメッセージを自動同期</div>
+                <div class="text-[11px] text-slate-400">Messaging APIのChannel ID / Channel Secretで安全に接続</div>
               </div>
             </div>
             <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition"></i>
@@ -711,7 +711,7 @@
 
         <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-800 flex items-center gap-2">
           <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 shrink-0"></i>
-          <span>公式OAuth認証のため、パスワードを当システムに預けることなく安全に連携できます。</span>
+          <span>連携情報は公式APIで検証し、LINEの秘密情報は暗号化して保存します。</span>
         </div>
       </div>
 
