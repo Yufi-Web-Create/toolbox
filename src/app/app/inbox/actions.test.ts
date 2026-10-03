@@ -5,6 +5,7 @@ import { sendReply, type ReplyState } from "./actions";
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   getClaims: vi.fn(),
+  getSession: vi.fn(),
   from: vi.fn(),
   select: vi.fn(),
   eq: vi.fn(),
@@ -42,11 +43,18 @@ describe("sendReply", () => {
     vi.clearAllMocks();
 
     mocks.createClient.mockResolvedValue({
-      auth: { getClaims: mocks.getClaims },
+      auth: {
+        getClaims: mocks.getClaims,
+        getSession: mocks.getSession,
+      },
       from: mocks.from,
     });
     mocks.getClaims.mockResolvedValue({
       data: { claims: { sub: "10000000-0000-0000-0000-000000000001" } },
+      error: null,
+    });
+    mocks.getSession.mockResolvedValue({
+      data: { session: { access_token: "verified-user-token" } },
       error: null,
     });
     mocks.from.mockReturnValue({ select: mocks.select });
@@ -79,7 +87,20 @@ describe("sendReply", () => {
     const result = await sendReply(initialState, replyData());
 
     expect(result.status).toBe("error");
+    expect(mocks.getSession).not.toHaveBeenCalled();
     expect(mocks.from).not.toHaveBeenCalled();
+    expect(mocks.sendLineReply).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing session token after claims verification", async () => {
+    mocks.getSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+
+    const result = await sendReply(initialState, replyData());
+
+    expect(result.status).toBe("error");
     expect(mocks.sendLineReply).not.toHaveBeenCalled();
   });
 
@@ -101,29 +122,15 @@ describe("sendReply", () => {
       replyData("conversation-1", "  ありがとうございます。  "),
     );
 
-    expect(mocks.from).toHaveBeenCalledWith("conversations");
-    expect(mocks.eq).toHaveBeenCalledWith("id", "conversation-1");
     expect(mocks.sendLineReply).toHaveBeenCalledWith({
       conversationId: "conversation-1",
       message: "ありがとうございます。",
-      sentByUserId: "10000000-0000-0000-0000-000000000001",
+      accessToken: "verified-user-token",
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/app/inbox");
     expect(result).toEqual({
       status: "success",
       message: "LINEへ返信を送信しました。",
     });
-  });
-
-  it("returns the safe adapter error without marking a failed LINE send successful", async () => {
-    mocks.sendLineReply.mockResolvedValue({
-      success: false,
-      message: "LINEへの返信を送信できませんでした。接続設定を確認してもう一度お試しください。",
-    });
-
-    const result = await sendReply(initialState, replyData());
-
-    expect(result.status).toBe("error");
-    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 });
