@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import {
   getProviderConfig,
   type OAuthProvider,
-} from "../../../../../lib/integrations/oauth/providers";
-import { createClient } from "../../../../../lib/supabase/server";
+} from "../../../../lib/integrations/oauth/providers";
+import { createClient } from "../../../../lib/supabase/server";
 
 const OAUTH_PROVIDERS: OAuthProvider[] = ["instagram", "x", "google"];
 
