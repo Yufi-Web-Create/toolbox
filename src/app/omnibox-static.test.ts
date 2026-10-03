@@ -29,6 +29,13 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain('id="view-analytics"');
   });
 
+  it("requires Cmd+Enter on Mac or Ctrl+Enter on Windows to send", () => {
+    expect(html).toContain("Enterで改行 / ⌘+Enter・Ctrl+Enterで送信");
+    expect(html).toContain("(e.metaKey || e.ctrlKey)");
+    expect(html).toContain("!e.isComposing");
+    expect(html).not.toContain("e.key === 'Enter' && !e.shiftKey");
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
