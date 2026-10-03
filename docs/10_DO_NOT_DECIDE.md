@@ -1,7 +1,7 @@
 # Decisions Codex Must Not Make
 
 Status: ACTIVE
-Date: 2026-10-01
+Date: 2026-10-03
 
 This file lists decisions that require explicit approval from the project owner/reviewer.
 Codex must not select, change, or infer these choices on its own.
@@ -14,14 +14,15 @@ Codex must not:
 - introduce an ORM
 - introduce a global state-management library
 - introduce Redis, queues, caches, or background-job infrastructure
-- introduce a separate backend framework or API server
+- introduce a separate general-purpose backend framework or API server
+- expand the owner-approved Render provider bridge beyond the provider/task scope documented in D-025 without a new approved task
 
 ## Authentication and security
 Codex must not:
 - create custom authentication
 - change session strategy
 - weaken or bypass RLS
-- use service-role credentials to solve authorization failures
+- use elevated Supabase credentials to solve ordinary browser/user authorization failures
 - place server secrets in browser-accessible environment variables
 - create SECURITY DEFINER database functions as a permission workaround
 - use user-editable metadata for authorization
@@ -52,8 +53,9 @@ Codex must not:
 Codex must not:
 - switch providers
 - change OAuth scopes
-- add new third-party integrations
-- invent retry, queue, webhook, or token-storage strategies without an approved design
+- add new third-party integrations outside an approved task
+- invent retry, queue, or token-storage strategies without an approved design
+- expose provider or bridge secrets to browser code
 
 ## Workflow
 Codex must not:

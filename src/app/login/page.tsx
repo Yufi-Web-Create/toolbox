@@ -1,5 +1,6 @@
 import { LoginForm } from "./login-form";
 import { getCallbackErrorMessage, getSafeNextPath } from "./validation";
+import styles from "./page.module.css";
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -20,12 +21,18 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const nextPath = getSafeNextPath(getSingleValue(params.next));
 
   return (
-    <main>
-      <h1>Log in</h1>
-      <LoginForm
-        callbackErrorMessage={callbackErrorMessage}
-        nextPath={nextPath}
-      />
+    <main className={styles.page}>
+      <section className={styles.portal}>
+        <div className={styles.hero}>
+          <div className={styles.logoMark}>◫</div>
+          <h1>OmniBox ポータル</h1>
+          <p>複数SNSのメッセージ一元管理 &amp; 予約投稿ハブ</p>
+        </div>
+        <LoginForm
+          callbackErrorMessage={callbackErrorMessage}
+          nextPath={nextPath}
+        />
+      </section>
     </main>
   );
 }

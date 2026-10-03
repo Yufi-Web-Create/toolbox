@@ -1,33 +1,34 @@
 import { redirect } from "next/navigation";
 
+import { getVisibleOrganizationStatus } from "../../lib/organizations/server";
 import { createClient } from "../../lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-const LOGIN_REDIRECT = "/login?next=/app";
-
 export default async function ApplicationPage() {
-  let claims = null;
+  let authenticated = false;
 
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.getClaims();
-
-    if (!error) {
-      claims = data?.claims ?? null;
-    }
+    authenticated = !error && Boolean(data?.claims);
   } catch {
-    claims = null;
+    authenticated = false;
   }
 
-  if (!claims) {
-    redirect(LOGIN_REDIRECT);
+  if (!authenticated) {
+    redirect("/login?next=/app/inbox");
   }
 
-  return (
-    <main>
-      <h1>Application</h1>
-      <p>You are signed in.</p>
-    </main>
-  );
+  const organizationStatus = await getVisibleOrganizationStatus();
+
+  if (!organizationStatus.success) {
+    redirect("/app/inbox");
+  }
+
+  if (!organizationStatus.hasOrganization) {
+    redirect("/app/onboarding");
+  }
+
+  redirect("/app/inbox");
 }

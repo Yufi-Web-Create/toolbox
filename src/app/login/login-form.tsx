@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { login, type LoginState } from "./actions";
+import styles from "./page.module.css";
 
 const initialState: LoginState = {
   status: "idle",
@@ -17,50 +18,79 @@ type LoginFormProps = {
 
 export function LoginForm({ callbackErrorMessage, nextPath }: LoginFormProps) {
   const [state, formAction, isPending] = useActionState(login, initialState);
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <>
-      {callbackErrorMessage ? <p role="alert">{callbackErrorMessage}</p> : null}
+    <div className={styles.body}>
+      <div className={styles.tabs} aria-label="認証メニュー">
+        <span className={styles.tabActive}>ログイン</span>
+        <Link href="/signup" className={styles.tab}>スタッフ新規登録</Link>
+      </div>
 
-      <form action={formAction}>
+      {callbackErrorMessage ? (
+        <p className={styles.error} role="alert">{callbackErrorMessage}</p>
+      ) : null}
+
+      <form action={formAction} className={styles.form}>
         <input name="next" type="hidden" value={nextPath} />
 
-        <div>
-          <label htmlFor="email">Email</label>
+        <label className={styles.field}>
+          <span>メールアドレス（社内・店舗アカウント）</span>
           <input
             autoComplete="email"
             id="email"
             name="email"
             required
             type="email"
+            placeholder="yamada@company.com"
           />
+        </label>
+
+        <label className={styles.field}>
+          <div className={styles.labelRow}>
+            <span>パスワード</span>
+            <Link href="/forgot-password">パスワードをお忘れですか？</Link>
+          </div>
+          <div className={styles.passwordWrap}>
+            <input
+              autoComplete="current-password"
+              id="password"
+              name="password"
+              required
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••••••"
+            />
+            <button
+              type="button"
+              className={styles.eyeButton}
+              onClick={() => setShowPassword((value) => !value)}
+              aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
+            >
+              {showPassword ? "非表示" : "表示"}
+            </button>
+          </div>
+        </label>
+
+        <div className={styles.metaRow}>
+          <label className={styles.remember}>
+            <input type="checkbox" defaultChecked readOnly />
+            <span>ログイン状態を保持する</span>
+          </label>
+          <span className={styles.secure}>SSL暗号化通信</span>
         </div>
 
-        <div>
-          <label htmlFor="password">Password</label>
-          <input
-            autoComplete="current-password"
-            id="password"
-            name="password"
-            required
-            type="password"
-          />
-        </div>
-
-        <button disabled={isPending} type="submit">
-          {isPending ? "Logging in…" : "Log in"}
+        <button className={styles.submit} disabled={isPending} type="submit">
+          {isPending ? "認証中..." : "ログインして業務を開始"}
         </button>
 
         {state.message ? (
-          <p aria-live="polite" role="alert">
+          <p className={styles.error} aria-live="polite" role="alert">
             {state.message}
           </p>
         ) : null}
       </form>
 
-      <p>
-        Need an account? <Link href="/signup">Create one</Link>
-      </p>
-    </>
+      <div className={styles.footer}>© 2026 OmniBox Cloud Services.</div>
+    </div>
   );
 }
