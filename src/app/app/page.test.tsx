@@ -1,4 +1,3 @@
-import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import ApplicationPage from "./page";
@@ -37,21 +36,15 @@ describe("/app", () => {
     });
   });
 
-  it("renders the minimal shell only when authenticated claims exist", async () => {
+  it("routes authenticated organization members into the OmniBox inbox", async () => {
     mocks.getClaims.mockResolvedValue({
       data: { claims: { sub: "authenticated-user" } },
       error: null,
     });
 
-    const html = renderToStaticMarkup(await ApplicationPage());
-
-    expect(mocks.getClaims).toHaveBeenCalledOnce();
+    await expect(ApplicationPage()).rejects.toThrow("redirect:/app/inbox");
     expect(mocks.getVisibleOrganizationStatus).toHaveBeenCalledOnce();
-    expect(mocks.redirect).not.toHaveBeenCalled();
-    expect(html).toContain("<h1>Application</h1>");
-    expect(html).toContain("You are signed in.");
-    expect(html).toContain('href="/app/inbox"');
-    expect(html).toContain("LINE受信箱を開く");
+    expect(mocks.redirect).toHaveBeenCalledWith("/app/inbox");
   });
 
   it("redirects an authenticated user without organizations to onboarding", async () => {
@@ -64,30 +57,22 @@ describe("/app", () => {
       hasOrganization: false,
     });
 
-    await expect(ApplicationPage()).rejects.toThrow(
-      "redirect:/app/onboarding",
-    );
+    await expect(ApplicationPage()).rejects.toThrow("redirect:/app/onboarding");
     expect(mocks.redirect).toHaveBeenCalledWith("/app/onboarding");
   });
 
-  it("fails closed with a safe message when organization lookup fails", async () => {
-    const rawError = "raw Supabase error containing tenant details";
+  it("routes organization lookup failures to the inbox safe-error boundary", async () => {
     mocks.getClaims.mockResolvedValue({
       data: { claims: { sub: "authenticated-user" } },
       error: null,
     });
     mocks.getVisibleOrganizationStatus.mockResolvedValue({
       success: false,
-      message: "We could not load your workspace. Please try again.",
-      rawError,
+      message: "safe error",
     });
 
-    const html = renderToStaticMarkup(await ApplicationPage());
-
-    expect(mocks.redirect).not.toHaveBeenCalledWith("/app/onboarding");
-    expect(html).toContain("Application unavailable");
-    expect(html).toContain("We could not load your workspace. Please try again.");
-    expect(html).not.toContain(rawError);
+    await expect(ApplicationPage()).rejects.toThrow("redirect:/app/inbox");
+    expect(mocks.redirect).toHaveBeenCalledWith("/app/inbox");
   });
 
   it.each([
@@ -97,35 +82,28 @@ describe("/app", () => {
     mocks.getClaims.mockResolvedValue(claimsResult);
 
     await expect(ApplicationPage()).rejects.toThrow(
-      "redirect:/login?next=/app",
+      "redirect:/login?next=/app/inbox",
     );
-    expect(mocks.redirect).toHaveBeenCalledWith("/login?next=/app");
+    expect(mocks.redirect).toHaveBeenCalledWith("/login?next=/app/inbox");
     expect(mocks.getVisibleOrganizationStatus).not.toHaveBeenCalled();
   });
 
   it("fails closed when the auth provider returns an error", async () => {
     mocks.getClaims.mockResolvedValue({
       data: null,
-      error: { message: "raw provider error containing token details" },
+      error: { message: "raw provider error" },
     });
 
     await expect(ApplicationPage()).rejects.toThrow(
-      "redirect:/login?next=/app",
-    );
-    expect(mocks.redirect).toHaveBeenCalledWith("/login?next=/app");
-    expect(mocks.redirect).not.toHaveBeenCalledWith(
-      expect.stringContaining("raw provider error"),
+      "redirect:/login?next=/app/inbox",
     );
   });
 
   it("fails closed when claims lookup throws", async () => {
-    mocks.getClaims.mockRejectedValue(
-      new Error("raw exception containing cookie details"),
-    );
+    mocks.getClaims.mockRejectedValue(new Error("raw exception"));
 
     await expect(ApplicationPage()).rejects.toThrow(
-      "redirect:/login?next=/app",
+      "redirect:/login?next=/app/inbox",
     );
-    expect(mocks.redirect).toHaveBeenCalledWith("/login?next=/app");
   });
 });
