@@ -50,6 +50,7 @@ export async function getInboxSnapshot(
       .select(
         "id, organization_id, provider, provider_thread_id, customer_external_id, customer_display_name, status, last_message_preview, last_message_at, created_at, updated_at",
       )
+      .eq("organization_id", organizationId)
       .order("last_message_at", { ascending: false })
       .limit(100);
 
