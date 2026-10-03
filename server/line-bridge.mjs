@@ -694,8 +694,45 @@ export function startLineBridge(options = {}) {
   const server = createLineBridgeServer(options);
   const port = getBridgeConfiguration(env).port;
 
-  server.listen(port, () => {
+  server.listen(port, async () => {
     console.log(`LINE bridge listening on port ${port}`);
+
+    try {
+      const config = getBridgeConfiguration(env);
+      if (!config.configured) {
+        console.log("LINE startup check: bridge core configuration incomplete");
+        return;
+      }
+
+      const providerConfig = await loadProviderConfig(globalThis.fetch, config, true);
+      if (!providerConfig) {
+        console.log("LINE startup check: provider not connected");
+        return;
+      }
+
+      const accessToken = await issueStatelessLineToken(globalThis.fetch, providerConfig);
+      const infoResponse = await globalThis.fetch(
+        "https://api.line.me/v2/bot/channel/webhook/endpoint",
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (!infoResponse.ok) {
+        console.log("LINE startup check: credentials accepted but webhook info unavailable");
+        return;
+      }
+
+      const info = await infoResponse.json();
+      console.log(
+        `LINE startup check: connected=true active=${info?.active === true} endpointMatch=${info?.endpoint === WEBHOOK_URL}`,
+      );
+    } catch {
+      console.log("LINE startup check: connection verification failed");
+    }
   });
 
   return server;
