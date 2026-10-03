@@ -55,6 +55,16 @@
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased h-screen flex flex-col overflow-hidden">
 
+  <!-- セッション確認中。認証状態が確定するまでログインフォームを見せない -->
+  <div id="session-loading-overlay" class="fixed inset-0 bg-slate-50 z-[70] flex items-center justify-center">
+    <div class="text-center">
+      <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center text-white shadow-md">
+        <i data-lucide="layers" class="w-7 h-7"></i>
+      </div>
+      <p class="mt-3 text-xs font-semibold text-slate-600">OmniBoxを確認しています...</p>
+    </div>
+  </div>
+
   <!-- グローバルヘッダー -->
   <header class="h-16 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between z-20 shrink-0">
     <div class="flex items-center space-x-3">
@@ -127,11 +137,19 @@
             <span class="text-xs font-bold text-slate-800 block truncate" id="dropdown-user-name">山田 太郎</span>
             <span class="text-[11px] text-slate-500 font-mono block truncate" id="dropdown-user-email">yamada@company.com</span>
           </div>
-          <button onclick="switchView('channels')" class="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2">
+          <button id="menu-organization-settings" onclick="openSettings('organization')" class="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2 hidden">
+            <i data-lucide="building-2" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>組織設定</span>
+          </button>
+          <button onclick="openSettings('account')" class="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2">
+            <i data-lucide="user-cog" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>アカウント設定</span>
+          </button>
+          <button onclick="switchView('channels'); document.getElementById('user-menu-dropdown').classList.add('hidden')" class="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2">
             <i data-lucide="link-2" class="w-3.5 h-3.5 text-slate-400"></i>
             <span>SNS連携設定</span>
           </button>
-          <button onclick="handleLogout()" class="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 mt-1">
+          <button onclick="handleLogout()" class="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 mt-1 border-t border-slate-100 pt-2">
             <i data-lucide="log-out" class="w-3.5 h-3.5 text-red-500"></i>
             <span>ログアウト</span>
           </button>
@@ -599,6 +617,108 @@
       </div>
     </div>
 
+    <!-- ==============================================
+         VIEW 6: 設定 (SETTINGS VIEW)
+         ============================================== -->
+    <div id="view-settings" class="view-panel w-full h-full p-4 md:p-6 overflow-y-auto hidden">
+      <div class="max-w-4xl mx-auto space-y-6">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900">設定</h2>
+            <p class="text-sm text-slate-500 mt-1">OmniBoxの組織情報とログインアカウントを管理します。</p>
+          </div>
+          <span id="settings-role-label" class="text-[11px] px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-semibold">従業員</span>
+        </div>
+
+        <div class="flex gap-2 border-b border-slate-200">
+          <button id="settings-tab-organization" onclick="switchSettingsTab('organization')" class="hidden px-4 py-2.5 text-xs font-bold border-b-2 border-teal-600 text-teal-700">
+            組織設定
+          </button>
+          <button id="settings-tab-account" onclick="switchSettingsTab('account')" class="px-4 py-2.5 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+            アカウント設定
+          </button>
+        </div>
+
+        <section id="settings-panel-organization" class="hidden space-y-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-xs">
+            <div class="flex items-start gap-3 mb-5">
+              <div class="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
+                <i data-lucide="building-2" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">組織情報</h3>
+                <p class="text-xs text-slate-500 mt-1">この項目は管理者アカウントだけが変更できます。</p>
+              </div>
+            </div>
+            <form onsubmit="saveOrganizationSettings(event)" class="space-y-4">
+              <div>
+                <label class="text-xs font-bold text-slate-600 block mb-1.5">組織名</label>
+                <input id="settings-organization-name" type="text" maxlength="120" required class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="組織名を入力">
+              </div>
+              <div>
+                <label class="text-xs font-bold text-slate-600 block mb-1.5">組織ID</label>
+                <input id="settings-organization-id" type="text" readonly class="w-full max-w-xl text-xs font-mono px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-500">
+              </div>
+              <button type="submit" class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition">
+                組織設定を保存
+              </button>
+            </form>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-xs">
+            <h3 class="text-sm font-bold text-slate-800">管理者メニュー</h3>
+            <p class="text-xs text-slate-500 mt-1 mb-4">組織全体に関わる設定です。従業員アカウントには表示されません。</p>
+            <button onclick="switchView('channels')" class="text-xs font-semibold text-teal-700 hover:text-teal-800 flex items-center gap-2">
+              <i data-lucide="link-2" class="w-4 h-4"></i>
+              SNS・LINE連携設定を開く
+            </button>
+          </div>
+        </section>
+
+        <section id="settings-panel-account" class="space-y-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-xs">
+            <div class="flex items-start gap-3 mb-5">
+              <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                <i data-lucide="user-cog" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">アカウント情報</h3>
+                <p class="text-xs text-slate-500 mt-1">この設定は各スタッフが自分のアカウントだけ変更できます。</p>
+              </div>
+            </div>
+            <form onsubmit="saveAccountSettings(event)" class="space-y-4">
+              <div>
+                <label class="text-xs font-bold text-slate-600 block mb-1.5">表示名</label>
+                <input id="settings-account-name" type="text" maxlength="100" required class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500">
+              </div>
+              <div>
+                <label class="text-xs font-bold text-slate-600 block mb-1.5">メールアドレス</label>
+                <input id="settings-account-email" type="email" readonly class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-500">
+                <p class="text-[10px] text-slate-400 mt-1">メールアドレス変更は確認メール対応を追加する段階で有効化します。</p>
+              </div>
+              <div>
+                <label class="text-xs font-bold text-slate-600 block mb-1.5">新しいパスワード</label>
+                <input id="settings-account-password" type="password" minlength="8" class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="変更しない場合は空欄">
+                <p class="text-[10px] text-slate-400 mt-1">変更する場合のみ8文字以上で入力してください。</p>
+              </div>
+              <button type="submit" class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition">
+                アカウント設定を保存
+              </button>
+            </form>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-red-100 p-5 md:p-6 shadow-xs">
+            <h3 class="text-sm font-bold text-slate-800">ログインセッション</h3>
+            <p class="text-xs text-slate-500 mt-1 mb-4">この端末でOmniBoxからログアウトします。</p>
+            <button onclick="handleLogout()" class="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-xs font-bold transition flex items-center gap-2">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+              ログアウト
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+
   </main>
 
   <!-- ==============================================
@@ -879,7 +999,7 @@
   </div>
 
   <!-- 利用者向け 統合ログイン & 新規登録ポータル -->
-  <div id="auth-portal-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+  <div id="auth-portal-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 hidden items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden">
       <div class="bg-gradient-to-br from-teal-700 via-teal-600 to-emerald-500 p-6 text-white text-center relative">
         <div class="w-12 h-12 mx-auto rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center mb-3 shadow-inner">
@@ -992,6 +1112,7 @@
 
     let currentAuthMode = 'login';
     let loggedInUser = null;
+    let currentOrganization = null;
 
     let threads = [];
     let connectedAccounts = [];
@@ -1265,12 +1386,15 @@
           loggedInUser = {
             name: session.user.name || session.user.email?.split('@')[0] || 'スタッフ',
             email: session.user.email || '',
-            role: session.user.role || 'スタッフ',
+            role: session.user.role || '従業員',
+            roleKey: session.user.roleKey || 'member',
             avatar: (session.user.name || session.user.email || '担').slice(0, 1)
           };
+          currentOrganization = session.organization || null;
           await loadLiveInbox();
         } else {
           loggedInUser = null;
+          currentOrganization = null;
           onDataUpdated();
         }
       } catch (err) {
@@ -1282,6 +1406,7 @@
       }
 
       checkExistingSession();
+      document.getElementById('session-loading-overlay')?.classList.add('hidden');
     }
 
     function subscribeToCloudData() {
@@ -2603,8 +2728,10 @@
       const portal = document.getElementById('auth-portal-overlay');
       if (!loggedInUser) {
         portal.classList.remove('hidden');
+        portal.classList.add('flex');
       } else {
         portal.classList.add('hidden');
+        portal.classList.remove('flex');
         updateHeaderUserUI();
       }
     }
@@ -2687,14 +2814,28 @@
           return;
         }
 
-        loggedInUser = {
-          name: result.user?.name || name,
-          email: result.user?.email || email,
-          role: result.user?.role || 'スタッフ',
-          avatar: (result.user?.name || name).slice(0, 1)
-        };
+        const sessionResponse = await fetch('/api/omnibox/session', {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const session = await sessionResponse.json();
 
-        document.getElementById('auth-portal-overlay').classList.add('hidden');
+        if (!session.authenticated || !session.user) {
+          throw new Error('ログインセッションを確認できませんでした');
+        }
+
+        loggedInUser = {
+          name: session.user.name || name,
+          email: session.user.email || email,
+          role: session.user.role || '従業員',
+          roleKey: session.user.roleKey || 'member',
+          avatar: (session.user.name || name).slice(0, 1)
+        };
+        currentOrganization = session.organization || null;
+
+        const portal = document.getElementById('auth-portal-overlay');
+        portal.classList.add('hidden');
+        portal.classList.remove('flex');
         updateHeaderUserUI();
         await loadLiveInbox();
         showToast(`ようこそ、${loggedInUser.name}さん！OmniBoxへログインしました`);
@@ -2721,7 +2862,118 @@
 
       document.getElementById('dropdown-user-name').textContent = loggedInUser.name;
       document.getElementById('dropdown-user-email').textContent = loggedInUser.email;
+
+      const organizationMenu = document.getElementById('menu-organization-settings');
+      if (organizationMenu) {
+        organizationMenu.classList.toggle('hidden', loggedInUser.roleKey !== 'owner');
+      }
     }
+
+    window.openSettings = function(tab = 'account') {
+      document.getElementById('user-menu-dropdown')?.classList.add('hidden');
+      window.switchView('settings');
+
+      const isOwner = loggedInUser?.roleKey === 'owner';
+      const orgTab = document.getElementById('settings-tab-organization');
+      if (orgTab) orgTab.classList.toggle('hidden', !isOwner);
+
+      document.getElementById('settings-role-label').textContent = isOwner ? '管理者' : '従業員';
+      document.getElementById('settings-account-name').value = loggedInUser?.name || '';
+      document.getElementById('settings-account-email').value = loggedInUser?.email || '';
+      document.getElementById('settings-account-password').value = '';
+
+      if (isOwner && currentOrganization) {
+        document.getElementById('settings-organization-name').value = currentOrganization.name || '';
+        document.getElementById('settings-organization-id').value = currentOrganization.id || '';
+      }
+
+      window.switchSettingsTab(isOwner && tab === 'organization' ? 'organization' : 'account');
+    };
+
+    window.switchSettingsTab = function(tab) {
+      const isOwner = loggedInUser?.roleKey === 'owner';
+      const target = tab === 'organization' && isOwner ? 'organization' : 'account';
+
+      document.getElementById('settings-panel-organization').classList.toggle('hidden', target !== 'organization');
+      document.getElementById('settings-panel-account').classList.toggle('hidden', target !== 'account');
+
+      const orgTab = document.getElementById('settings-tab-organization');
+      const accountTab = document.getElementById('settings-tab-account');
+
+      if (orgTab) {
+        orgTab.classList.toggle('border-teal-600', target === 'organization');
+        orgTab.classList.toggle('text-teal-700', target === 'organization');
+        orgTab.classList.toggle('border-transparent', target !== 'organization');
+        orgTab.classList.toggle('text-slate-500', target !== 'organization');
+      }
+      if (accountTab) {
+        accountTab.classList.toggle('border-teal-600', target === 'account');
+        accountTab.classList.toggle('text-teal-700', target === 'account');
+        accountTab.classList.toggle('border-transparent', target !== 'account');
+        accountTab.classList.toggle('text-slate-500', target !== 'account');
+      }
+      lucide.createIcons();
+    };
+
+    window.saveAccountSettings = async function(e) {
+      e.preventDefault();
+      const name = document.getElementById('settings-account-name').value.trim();
+      const password = document.getElementById('settings-account-password').value;
+
+      try {
+        const response = await fetch('/api/omnibox/settings/account', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, password })
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'アカウント設定を更新できませんでした');
+        }
+
+        loggedInUser.name = result.name;
+        loggedInUser.avatar = result.name.slice(0, 1);
+        document.getElementById('settings-account-password').value = '';
+        updateHeaderUserUI();
+        showToast('アカウント設定を保存しました');
+      } catch (error) {
+        showToast(error.message || 'アカウント設定を更新できませんでした');
+      }
+    };
+
+    window.saveOrganizationSettings = async function(e) {
+      e.preventDefault();
+
+      if (loggedInUser?.roleKey !== 'owner') {
+        showToast('組織設定は管理者のみ変更できます');
+        return;
+      }
+
+      const name = document.getElementById('settings-organization-name').value.trim();
+
+      try {
+        const response = await fetch('/api/omnibox/settings/organization', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || '組織設定を更新できませんでした');
+        }
+
+        currentOrganization = result.organization;
+        document.getElementById('settings-organization-name').value = currentOrganization.name;
+        document.getElementById('settings-organization-id').value = currentOrganization.id;
+        showToast('組織設定を保存しました');
+      } catch (error) {
+        showToast(error.message || '組織設定を更新できませんでした');
+      }
+    };
 
     window.toggleUserDropdown = function() {
       const menu = document.getElementById('user-menu-dropdown');
@@ -2744,11 +2996,16 @@
         });
       } finally {
         loggedInUser = null;
+        currentOrganization = null;
         threads = [];
         connectedAccounts = [];
         currentThreadId = null;
         document.getElementById('user-menu-dropdown').classList.add('hidden');
-        document.getElementById('auth-portal-overlay').classList.remove('hidden');
+        const portal = document.getElementById('auth-portal-overlay');
+        portal.classList.remove('hidden');
+        portal.classList.add('flex');
+        document.getElementById('auth-input-email').value = '';
+        document.getElementById('auth-input-password').value = '';
         onDataUpdated();
         showToast('ログアウトしました');
       }
