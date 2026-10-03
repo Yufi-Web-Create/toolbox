@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import {
+  createOrganizationWithOwner,
+  getVisibleOrganizationStatus,
+} from "../../../../lib/organizations/server";
 import { createClient } from "../../../../lib/supabase/server";
 
 export async function GET() {
@@ -10,6 +14,12 @@ export async function GET() {
 
     if (!claims || typeof claims.sub !== "string") {
       return NextResponse.json({ authenticated: false });
+    }
+
+    const organizationStatus = await getVisibleOrganizationStatus();
+
+    if (organizationStatus.success && !organizationStatus.hasOrganization) {
+      await createOrganizationWithOwner("OmniBox Workspace");
     }
 
     const email = typeof claims.email === "string" ? claims.email : "";
