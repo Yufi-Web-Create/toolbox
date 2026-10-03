@@ -87,7 +87,11 @@ describe("OmniBox login API", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true });
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      roleKey: "member",
+      loginType: "employee",
+    });
     expect(mocks.signOut).not.toHaveBeenCalled();
   });
 
@@ -105,7 +109,7 @@ describe("OmniBox login API", () => {
     expect(mocks.signOut).toHaveBeenCalledTimes(1);
   });
 
-  it("prevents member accounts from using administrator login", async () => {
+  it("auto-detects a member even when the UI submits administrator mode", async () => {
     const response = await POST(
       request({
         loginType: "admin",
@@ -114,9 +118,12 @@ describe("OmniBox login API", () => {
       }),
     );
 
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body.message).toContain("従業員ログイン");
-    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      roleKey: "member",
+      loginType: "employee",
+    });
+    expect(mocks.signOut).not.toHaveBeenCalled();
   });
 });
