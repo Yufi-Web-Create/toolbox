@@ -10,7 +10,7 @@ Aligned the repository index migration filename with the version recorded by the
 `codex/supa-003`
 
 ## Pull request
-Pending.
+[Draft PR #30](https://github.com/Yufi-Web-Create/toolbox/pull/30), targeting `main`.
 
 ## Changed files
 - `supabase/migrations/20261003004241_add_organization_members_creator_index.sql` (renamed)
