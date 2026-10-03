@@ -13,6 +13,8 @@ export async function POST(request: Request) {
       typeof payload?.channelId === "string" ? payload.channelId.trim() : "";
     const channelSecret =
       typeof payload?.channelSecret === "string" ? payload.channelSecret.trim() : "";
+    const accountName =
+      typeof payload?.accountName === "string" ? payload.accountName.trim() : "";
 
     if (!/^\d+$/.test(channelId) || channelSecret.length < 16) {
       return NextResponse.json(
@@ -65,6 +67,11 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ ok: false, message }, { status: 400 });
     }
+
+    await supabase.rpc("omnibox_update_line_connection_metadata", {
+      p_account_name: accountName || "LINE公式アカウント",
+      p_channel_id: channelId,
+    });
 
     return NextResponse.json({
       ok: true,
