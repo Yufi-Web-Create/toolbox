@@ -2,7 +2,10 @@
 
 import { redirect } from "next/navigation";
 
-import { createOrganizationWithOwner } from "../../../lib/organizations/server";
+import {
+  createOrganizationWithOwner,
+  getVisibleOrganizationStatus,
+} from "../../../lib/organizations/server";
 import { createClient } from "../../../lib/supabase/server";
 
 export type OnboardingState = {
@@ -13,6 +16,8 @@ export type OnboardingState = {
 const LOGIN_REDIRECT = "/login?next=/app/onboarding";
 const CREATE_ORGANIZATION_ERROR_MESSAGE =
   "We could not create your organization. Please try again.";
+const ORGANIZATION_LOOKUP_ERROR_MESSAGE =
+  "We could not load your workspace. Please try again.";
 
 function getOrganizationName(formData: FormData) {
   const value = formData.get("organizationName");
@@ -48,6 +53,19 @@ export async function createOrganization(
 
   if (!claims) {
     redirect(LOGIN_REDIRECT);
+  }
+
+  const organizationStatus = await getVisibleOrganizationStatus();
+
+  if (!organizationStatus.success) {
+    return {
+      status: "error",
+      message: ORGANIZATION_LOOKUP_ERROR_MESSAGE,
+    };
+  }
+
+  if (organizationStatus.hasOrganization) {
+    redirect("/app");
   }
 
   const result = await createOrganizationWithOwner(name);

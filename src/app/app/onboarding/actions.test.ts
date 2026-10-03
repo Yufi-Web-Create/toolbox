@@ -6,11 +6,13 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   createOrganizationWithOwner: vi.fn(),
   getClaims: vi.fn(),
+  getVisibleOrganizationStatus: vi.fn(),
   redirect: vi.fn(),
 }));
 
 vi.mock("../../../lib/organizations/server", () => ({
   createOrganizationWithOwner: mocks.createOrganizationWithOwner,
+  getVisibleOrganizationStatus: mocks.getVisibleOrganizationStatus,
 }));
 
 vi.mock("../../../lib/supabase/server", () => ({
@@ -45,6 +47,10 @@ describe("createOrganization", () => {
     mocks.getClaims.mockResolvedValue({
       data: { claims: { sub: "authenticated-user" } },
       error: null,
+    });
+    mocks.getVisibleOrganizationStatus.mockResolvedValue({
+      success: true,
+      hasOrganization: false,
     });
     mocks.redirect.mockImplementation((destination: string) => {
       throw new Error(`redirect:${destination}`);
@@ -82,6 +88,7 @@ describe("createOrganization", () => {
     ).rejects.toThrow("redirect:/app");
 
     expect(mocks.getClaims).toHaveBeenCalledOnce();
+    expect(mocks.getVisibleOrganizationStatus).toHaveBeenCalledOnce();
     expect(mocks.createOrganizationWithOwner).toHaveBeenCalledWith(
       "Organization A",
     );
@@ -108,6 +115,44 @@ describe("createOrganization", () => {
     expect(mocks.redirect).not.toHaveBeenCalledWith("/app");
   });
 
+  it("redirects an existing organization user without calling the wrapper", async () => {
+    mocks.getVisibleOrganizationStatus.mockResolvedValue({
+      success: true,
+      hasOrganization: true,
+    });
+
+    await expect(
+      createOrganization(
+        initialState,
+        createOnboardingData("Organization A"),
+      ),
+    ).rejects.toThrow("redirect:/app");
+
+    expect(mocks.getVisibleOrganizationStatus).toHaveBeenCalledOnce();
+    expect(mocks.redirect).toHaveBeenCalledWith("/app");
+    expect(mocks.createOrganizationWithOwner).not.toHaveBeenCalled();
+  });
+
+  it("returns a safe lookup error without calling the wrapper", async () => {
+    const rawError = "raw Supabase error containing tenant details";
+    mocks.getVisibleOrganizationStatus.mockResolvedValue({
+      success: false,
+      message: rawError,
+    });
+
+    const result = await createOrganization(
+      initialState,
+      createOnboardingData("Organization A"),
+    );
+
+    expect(result).toEqual({
+      status: "error",
+      message: "We could not load your workspace. Please try again.",
+    });
+    expect(JSON.stringify(result)).not.toContain(rawError);
+    expect(mocks.createOrganizationWithOwner).not.toHaveBeenCalled();
+  });
+
   it("redirects safely when trusted authentication claims are missing", async () => {
     mocks.getClaims.mockResolvedValue({ data: { claims: null }, error: null });
 
@@ -121,6 +166,7 @@ describe("createOrganization", () => {
     expect(mocks.redirect).toHaveBeenCalledWith(
       "/login?next=/app/onboarding",
     );
+    expect(mocks.getVisibleOrganizationStatus).not.toHaveBeenCalled();
     expect(mocks.createOrganizationWithOwner).not.toHaveBeenCalled();
   });
 });

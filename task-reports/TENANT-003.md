@@ -53,8 +53,10 @@ history change was made.
   button. Pending submission disables the button to reduce accidental duplicate
   submission.
 - The server action rejects blank input before any RPC call, rechecks trusted
-  claims, calls `createOrganizationWithOwner(name)`, and redirects to `/app` only
-  on success.
+  claims, and then rechecks organization visibility. Lookup failure returns a
+  safe error, an existing organization redirects to `/app`, and only a confirmed
+  zero-organization result can call `createOrganizationWithOwner(name)`.
+- Successful organization creation redirects to `/app`.
 - No current-organization concept, switcher, membership management, navigation
   redesign, or product module was introduced.
 
@@ -69,6 +71,10 @@ history change was made.
 - Blank names do not call the TENANT-002 wrapper.
 - Successful creation calls the wrapper and redirects to `/app`.
 - Failed creation returns a safe error without raw Supabase/database details.
+- The action redirects an existing-organization user to `/app` without calling
+  the creation wrapper.
+- An action-time organization lookup failure returns a safe error without
+  calling the creation wrapper.
 - The reusable lookup selects only `id`, limits results to one, reports
   zero/one correctly, and fails safely on errors or exceptions.
 
@@ -77,7 +83,7 @@ history change was made.
 - `npm ci`: PASS
 - `npm run lint`: PASS
 - `npm run typecheck`: PASS
-- `npm test`: PASS (16 files, 92 tests)
+- `npm test`: PASS (16 files, 94 tests)
 - `npm run build`: PASS
 - `git diff --check`: PASS
 
