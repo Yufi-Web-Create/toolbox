@@ -116,7 +116,7 @@
         <span>新規SNS投稿</span>
       </button>
       <div class="flex items-center pl-2 border-l border-slate-200 relative">
-        <div class="flex items-center gap-2 cursor-pointer group" onclick="toggleUserDropdown()">
+        <button type="button" id="user-menu-trigger" onclick="toggleUserDropdown()" class="flex items-center gap-2 cursor-pointer group px-2 py-1.5 rounded-xl hover:bg-slate-100 transition text-left">
           <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-xs border border-teal-200" id="current-user-avatar">
             担当
           </div>
@@ -128,7 +128,7 @@
             <span class="text-[10px] text-slate-400 font-mono block truncate max-w-[130px]" id="current-user-email-label">user@company.com</span>
           </div>
           <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition"></i>
-        </div>
+        </button>
 
         <!-- ユーザードロップダウンメニュー -->
         <div id="user-menu-dropdown" class="absolute right-0 top-12 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-50 hidden">
@@ -3202,7 +3202,7 @@
     document.addEventListener('click', (e) => {
       const dropdown = document.getElementById('user-menu-dropdown');
       if (dropdown && !dropdown.classList.contains('hidden')) {
-        const isTrigger = e.target.closest('#current-user-avatar') || e.target.closest('#current-user-name') || e.target.closest('#user-menu-dropdown');
+        const isTrigger = e.target.closest('#user-menu-trigger') || e.target.closest('#user-menu-dropdown');
         if (!isTrigger) dropdown.classList.add('hidden');
       }
     });
