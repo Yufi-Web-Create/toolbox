@@ -1504,6 +1504,7 @@
           if (isDemoSession) {
             threads = structuredClone(defaultThreads);
             connectedAccounts = structuredClone(defaultAccounts);
+            renderTemplates('all');
             onDataUpdated();
           } else if (requiresOrganizationSetup && loggedInUser.roleKey === 'owner') {
             onDataUpdated();
@@ -1514,6 +1515,7 @@
             onDataUpdated();
             showToast('所属組織を確認できません。管理者にアカウント設定をご確認ください');
           } else {
+            await loadTemplates();
             await loadLiveInbox();
           }
         } else {
@@ -3068,6 +3070,9 @@
       }
 
       if (viewName === 'analytics') updateAnalyticsView();
+      if (viewName === 'templates' && loggedInUser && !isDemoSession) {
+        loadTemplates();
+      }
       lucide.createIcons();
     };
 
@@ -3302,6 +3307,7 @@
           window.openSettings('organization');
           showToast('管理者アカウントの準備ができました。最初に組織設定を完了してください');
         } else {
+          if (!isDemoSession) await loadTemplates();
           await loadLiveInbox();
           window.switchView('inbox');
           showToast(`ようこそ、${loggedInUser.name}さん！OmniBoxへログインしました`);
