@@ -83,6 +83,44 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  if (payload.action === "store-config") {
+    const encryptedKey = String(payload.encryptedKey ?? "");
+    const encryptedPayload = String(payload.encryptedPayload ?? "");
+    const iv = String(payload.iv ?? "");
+    const authTag = String(payload.authTag ?? "");
+
+    if (!encryptedKey || !encryptedPayload || !iv || !authTag) {
+      return json(400, { ok: false, error: "invalid_config_payload" });
+    }
+
+    const { error } = await supabase.from("provider_connections").upsert({
+      organization_id: ALLOWED_ORGANIZATION_ID,
+      provider: "line",
+      encrypted_key: encryptedKey,
+      encrypted_payload: encryptedPayload,
+      iv,
+      auth_tag: authTag,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "organization_id,provider" });
+
+    if (error) return json(500, { ok: false, error: "config_store_failed" });
+    return json(200, { ok: true });
+  }
+
+  if (payload.action === "get-config") {
+    const { data, error } = await supabase
+      .from("provider_connections")
+      .select("encrypted_key, encrypted_payload, iv, auth_tag, updated_at")
+      .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+      .eq("provider", "line")
+      .maybeSingle();
+
+    if (error) return json(500, { ok: false, error: "config_lookup_failed" });
+    if (!data) return json(404, { ok: false, error: "config_not_found" });
+
+    return json(200, { ok: true, config: data });
+  }
+
   if (payload.action === "inbound") {
     const conversationPayload = {
       organization_id: ALLOWED_ORGANIZATION_ID,
