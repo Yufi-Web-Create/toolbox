@@ -108,6 +108,27 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("ログイン用組織ID");
   });
 
+  it("keeps alerts above the authentication portal", () => {
+    expect(html).toContain('id="toast"');
+    expect(html).toContain("z-[120]");
+    expect(html).toContain('id="auth-portal-overlay"');
+  });
+
+  it("uses real provider OAuth routes instead of simulated SNS connections", () => {
+    expect(html).toContain("/api/omnibox/oauth/");
+    expect(html).toContain("/api/omnibox/connections");
+    expect(html).toContain("loadProviderConnections");
+    expect(html).toContain("providerOAuthReadiness");
+    expect(html).not.toContain("このSNSの実OAuth連携は現在実装中です");
+  });
+
+  it("does not request Instagram, X, or Google passwords in the direct setup form", () => {
+    expect(html).toContain("LINE手動設定");
+    expect(html).toContain("LINE公式アカウント (Messaging API)");
+    expect(html).not.toContain("Instagram (ユーザーID & パスワード連携)");
+    expect(html).not.toContain("X (旧Twitter アカウント連携)</option>");
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
