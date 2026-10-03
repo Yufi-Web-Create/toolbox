@@ -2195,10 +2195,11 @@
         }
 
         input.value = '';
-        await loadLiveInbox(thread.liveConversationId);
-        const refreshed = threads.find(t => t.id === thread.id);
+        const refreshed = await loadConversationDetail(thread.id);
         if (refreshed) {
           updateActiveChatPane(refreshed);
+          renderThreadList();
+          updateBadges();
         }
         showToast('LINEへ返信を送信しました');
       } catch (error) {
