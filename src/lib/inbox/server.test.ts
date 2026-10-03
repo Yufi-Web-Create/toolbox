@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   from: vi.fn(),
   conversationSelect: vi.fn(),
+  conversationEq: vi.fn(),
   conversationOrder: vi.fn(),
   conversationLimit: vi.fn(),
   messageSelect: vi.fn(),
@@ -22,41 +23,28 @@ describe("getInboxSnapshot", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mocks.createClient.mockResolvedValue({
-      from: mocks.from,
-    });
+    mocks.createClient.mockResolvedValue({ from: mocks.from });
 
     mocks.from.mockImplementation((table: string) => {
-      if (table === "conversations") {
-        return { select: mocks.conversationSelect };
-      }
-
-      if (table === "messages") {
-        return { select: mocks.messageSelect };
-      }
-
+      if (table === "conversations") return { select: mocks.conversationSelect };
+      if (table === "messages") return { select: mocks.messageSelect };
       throw new Error(`unexpected table: ${table}`);
     });
 
-    mocks.conversationSelect.mockReturnValue({
-      order: mocks.conversationOrder,
-    });
-    mocks.conversationOrder.mockReturnValue({
-      limit: mocks.conversationLimit,
-    });
+    mocks.conversationSelect.mockReturnValue({ eq: mocks.conversationEq });
+    mocks.conversationEq.mockReturnValue({ order: mocks.conversationOrder });
+    mocks.conversationOrder.mockReturnValue({ limit: mocks.conversationLimit });
 
-    mocks.messageSelect.mockReturnValue({
+    const messageChain = {
       eq: mocks.messageEq,
-    });
-    mocks.messageEq.mockReturnValue({
       order: mocks.messageOrder,
-    });
-    mocks.messageOrder.mockReturnValue({
-      limit: mocks.messageLimit,
-    });
+    };
+    mocks.messageSelect.mockReturnValue(messageChain);
+    mocks.messageEq.mockReturnValue(messageChain);
+    mocks.messageOrder.mockReturnValue({ limit: mocks.messageLimit });
   });
 
-  it("loads RLS-visible conversations and messages for the selected conversation", async () => {
+  it("loads only conversations and messages for the active organization", async () => {
     const conversations = [
       {
         id: "conversation-a",
@@ -98,37 +86,36 @@ describe("getInboxSnapshot", () => {
       },
     ];
 
-    mocks.conversationLimit.mockResolvedValue({
-      data: conversations,
-      error: null,
-    });
-    mocks.messageLimit.mockResolvedValue({
-      data: messages,
-      error: null,
-    });
+    mocks.conversationLimit.mockResolvedValue({ data: conversations, error: null });
+    mocks.messageLimit.mockResolvedValue({ data: messages, error: null });
 
-    await expect(getInboxSnapshot("conversation-b")).resolves.toEqual({
+    await expect(
+      getInboxSnapshot("organization-a", "conversation-b"),
+    ).resolves.toEqual({
       success: true,
       conversations,
       selectedConversation: conversations[1],
       messages,
     });
 
-    expect(mocks.from).toHaveBeenNthCalledWith(1, "conversations");
-    expect(mocks.from).toHaveBeenNthCalledWith(2, "messages");
+    expect(mocks.conversationEq).toHaveBeenCalledWith(
+      "organization_id",
+      "organization-a",
+    );
+    expect(mocks.messageEq).toHaveBeenCalledWith(
+      "organization_id",
+      "organization-a",
+    );
     expect(mocks.messageEq).toHaveBeenCalledWith(
       "conversation_id",
       "conversation-b",
     );
   });
 
-  it("returns an empty snapshot without querying messages when there are no visible conversations", async () => {
-    mocks.conversationLimit.mockResolvedValue({
-      data: [],
-      error: null,
-    });
+  it("returns an empty snapshot without querying messages when the organization has no conversations", async () => {
+    mocks.conversationLimit.mockResolvedValue({ data: [], error: null });
 
-    await expect(getInboxSnapshot()).resolves.toEqual({
+    await expect(getInboxSnapshot("organization-a")).resolves.toEqual({
       success: true,
       conversations: [],
       selectedConversation: null,
@@ -138,7 +125,7 @@ describe("getInboxSnapshot", () => {
     expect(mocks.messageSelect).not.toHaveBeenCalled();
   });
 
-  it("falls back to the first RLS-visible conversation instead of trusting an arbitrary id", async () => {
+  it("falls back to the first visible conversation instead of trusting an arbitrary id", async () => {
     const conversation = {
       id: "conversation-a",
       organization_id: "organization-a",
@@ -153,16 +140,10 @@ describe("getInboxSnapshot", () => {
       updated_at: "2026-10-03T05:00:00.000Z",
     };
 
-    mocks.conversationLimit.mockResolvedValue({
-      data: [conversation],
-      error: null,
-    });
-    mocks.messageLimit.mockResolvedValue({
-      data: [],
-      error: null,
-    });
+    mocks.conversationLimit.mockResolvedValue({ data: [conversation], error: null });
+    mocks.messageLimit.mockResolvedValue({ data: [], error: null });
 
-    const result = await getInboxSnapshot("not-visible");
+    const result = await getInboxSnapshot("organization-a", "not-visible");
 
     expect(result).toMatchObject({
       success: true,
@@ -181,7 +162,7 @@ describe("getInboxSnapshot", () => {
       error: { message: rawError },
     });
 
-    const result = await getInboxSnapshot();
+    const result = await getInboxSnapshot("organization-a");
 
     expect(result).toEqual({
       success: false,
