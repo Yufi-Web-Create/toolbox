@@ -91,10 +91,14 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).not.toContain("meta.text");
   });
 
-  it("loads conversation detail without rebuilding the entire inbox list", () => {
+  it("loads conversation detail without rebuilding the entire inbox list on click", () => {
     expect(html).toContain("loadConversationDetail");
     expect(html).toContain("Conversation detail load failed");
-    expect(html).not.toContain("await loadLiveInbox(thread.liveConversationId)");
+    const start = html.indexOf("window.selectThread = async function(id)");
+    const end = html.indexOf("function updateActiveChatPane(thread)", start);
+    const selectThreadSource = html.slice(start, end);
+    expect(selectThreadSource).not.toContain("loadLiveInbox");
+    expect(selectThreadSource).toContain("loadConversationDetail");
   });
 
   it("provides employee rename, password reset, and deletion controls", () => {
