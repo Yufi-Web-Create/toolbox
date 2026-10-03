@@ -717,6 +717,11 @@
               <div>
                 <h3 class="text-sm font-bold text-slate-800">従業員アカウント</h3>
                 <p class="text-xs text-slate-500 mt-1">従業員は「組織ID + メールアドレス + パスワード」でログインします。</p>
+                <div class="mt-2 inline-flex items-center gap-1.5 text-[11px] bg-teal-50 text-teal-800 border border-teal-100 px-2.5 py-1 rounded-lg">
+                  <i data-lucide="building-2" class="w-3 h-3"></i>
+                  ログイン用組織ID:
+                  <strong id="employee-login-org-id" class="font-mono">-</strong>
+                </div>
               </div>
               <span id="employee-count-badge" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full">0名</span>
             </div>
@@ -3378,6 +3383,8 @@
             ? ''
             : (currentOrganization.name || '');
         document.getElementById('settings-organization-id').value = currentOrganization.loginId || '';
+        const employeeOrgId = document.getElementById('employee-login-org-id');
+        if (employeeOrgId) employeeOrgId.textContent = currentOrganization.loginId || '未設定';
       }
 
       window.switchSettingsTab(isOwner && tab === 'organization' ? 'organization' : 'account');
@@ -3511,12 +3518,22 @@
         }
 
         list.innerHTML = employees.map(employee => `
-          <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
-            <div class="min-w-0">
-              <div class="text-xs font-bold text-slate-800 truncate">${employee.name}</div>
-              <div class="text-[11px] text-slate-500 font-mono truncate">${employee.email}</div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-slate-800 truncate">${escapeHtml(employee.name)}</div>
+                <div class="text-[11px] text-slate-500 font-mono truncate">${escapeHtml(employee.email)}</div>
+                <div class="text-[10px] text-slate-400 mt-1">
+                  ${employee.lastSignInAt ? '最終ログイン: ' + new Date(employee.lastSignInAt).toLocaleString('ja-JP') : 'まだログインしていません'}
+                </div>
+              </div>
+              <span class="text-[10px] px-2 py-1 rounded bg-white border border-slate-200 text-slate-500 shrink-0">従業員</span>
             </div>
-            <span class="text-[10px] px-2 py-1 rounded bg-white border border-slate-200 text-slate-500 shrink-0">従業員</span>
+            <div class="flex flex-wrap gap-1.5 mt-3">
+              <button onclick="renameEmployee('${employee.id}', decodeURIComponent('${encodeURIComponent(employee.name)}'))" class="text-[10px] px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:border-teal-300 hover:text-teal-700">名前変更</button>
+              <button onclick="resetEmployeePassword('${employee.id}')" class="text-[10px] px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:border-teal-300 hover:text-teal-700">パスワード再設定</button>
+              <button onclick="deleteEmployeeAccount('${employee.id}', decodeURIComponent('${encodeURIComponent(employee.name)}'))" class="text-[10px] px-2.5 py-1.5 rounded-lg bg-white border border-red-100 text-red-600 hover:bg-red-50">削除</button>
+            </div>
           </div>
         `).join('');
       } catch (error) {
@@ -3566,6 +3583,79 @@
         showToast(error.message || '従業員アカウントを作成できませんでした');
       } finally {
         button.disabled = false;
+      }
+    };
+
+    window.renameEmployee = async function(employeeId, currentName) {
+      const name = window.prompt('従業員の表示名を入力してください', currentName || '');
+      if (name === null) return;
+      const trimmed = name.trim();
+      if (!trimmed) {
+        showToast('表示名を入力してください');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/settings/employees', {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employeeId, name: trimmed })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || '従業員名を変更できませんでした');
+        }
+        await window.loadEmployees();
+        showToast('従業員名を変更しました');
+      } catch (error) {
+        showToast(error.message || '従業員名を変更できませんでした');
+      }
+    };
+
+    window.resetEmployeePassword = async function(employeeId) {
+      const password = window.prompt('新しいパスワードを入力してください（8文字以上）');
+      if (password === null) return;
+      if (password.length < 8) {
+        showToast('パスワードは8文字以上で入力してください');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/settings/employees', {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employeeId, password })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'パスワードを再設定できませんでした');
+        }
+        showToast('従業員のパスワードを再設定しました');
+      } catch (error) {
+        showToast(error.message || 'パスワードを再設定できませんでした');
+      }
+    };
+
+    window.deleteEmployeeAccount = async function(employeeId, name) {
+      if (!window.confirm(`「${name}」の従業員アカウントを削除しますか？\nこの操作は元に戻せません。`)) return;
+
+      try {
+        const response = await fetch('/api/omnibox/settings/employees', {
+          method: 'DELETE',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employeeId })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || '従業員アカウントを削除できませんでした');
+        }
+        await window.loadEmployees();
+        showToast('従業員アカウントを削除しました');
+      } catch (error) {
+        showToast(error.message || '従業員アカウントを削除できませんでした');
       }
     };
 
