@@ -36,6 +36,23 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).not.toContain("e.key === 'Enter' && !e.shiftKey");
   });
 
+  it("keeps login hidden until the real session check finishes", () => {
+    expect(html).toContain('id="session-loading-overlay"');
+    expect(html).toContain('id="auth-portal-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 hidden');
+    expect(html).toContain("session-loading-overlay')?.classList.add('hidden')");
+    expect(html).toContain("portal.classList.add('flex')");
+  });
+
+  it("provides role-aware organization and account settings", () => {
+    expect(html).toContain('id="view-settings"');
+    expect(html).toContain('id="menu-organization-settings"');
+    expect(html).toContain("loggedInUser.roleKey !== 'owner'");
+    expect(html).toContain("/api/omnibox/settings/account");
+    expect(html).toContain("/api/omnibox/settings/organization");
+    expect(html).toContain("組織設定は管理者のみ変更できます");
+    expect(html).toContain("ログアウト");
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
