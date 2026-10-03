@@ -40,6 +40,7 @@ export type InboxSnapshot =
 const INBOX_LOAD_ERROR = "受信箱を読み込めませんでした。もう一度お試しください。";
 
 export async function getInboxSnapshot(
+  organizationId: string,
   requestedConversationId?: string | null,
 ): Promise<InboxSnapshot> {
   try {
@@ -76,6 +77,7 @@ export async function getInboxSnapshot(
       .select(
         "id, organization_id, conversation_id, provider_message_id, direction, body, sent_by_user_id, created_at",
       )
+      .eq("organization_id", organizationId)
       .eq("conversation_id", selectedConversation.id)
       .order("created_at", { ascending: true })
       .limit(200);
