@@ -1,18 +1,16 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, createSign, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
-
-import { createClient } from "@supabase/supabase-js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_TEXT_LENGTH = 5000;
 const REQUIRED_ENV_KEYS = [
   "SUPABASE_URL",
-  "SUPABASE_SECRET_KEY",
+  "SUPABASE_PUBLISHABLE_KEY",
   "OMNIBOX_ORGANIZATION_ID",
+  "BRIDGE_SIGNING_PRIVATE_KEY_PEM",
   "LINE_CHANNEL_SECRET",
   "LINE_CHANNEL_ACCESS_TOKEN",
-  "LINE_BRIDGE_INTERNAL_KEY",
 ];
 
 function sendJson(response, statusCode, payload) {
@@ -24,17 +22,10 @@ function sendJson(response, statusCode, payload) {
 }
 
 function safeStringEqual(left, right) {
-  if (typeof left !== "string" || typeof right !== "string") {
-    return false;
-  }
-
+  if (typeof left !== "string" || typeof right !== "string") return false;
   const leftBuffer = Buffer.from(left);
   const rightBuffer = Buffer.from(right);
-
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false;
-  }
-
+  if (leftBuffer.length !== rightBuffer.length) return false;
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
@@ -92,11 +83,11 @@ export function getBridgeConfiguration(env = process.env) {
     configured: missing.length === 0,
     missing,
     supabaseUrl: env.SUPABASE_URL?.trim() ?? "",
-    supabaseSecretKey: env.SUPABASE_SECRET_KEY?.trim() ?? "",
+    supabasePublishableKey: env.SUPABASE_PUBLISHABLE_KEY?.trim() ?? "",
     organizationId: env.OMNIBOX_ORGANIZATION_ID?.trim() ?? "",
+    signingPrivateKey: env.BRIDGE_SIGNING_PRIVATE_KEY_PEM ?? "",
     lineChannelSecret: env.LINE_CHANNEL_SECRET?.trim() ?? "",
     lineAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN?.trim() ?? "",
-    internalKey: env.LINE_BRIDGE_INTERNAL_KEY?.trim() ?? "",
     port: Number.parseInt(env.PORT ?? "8787", 10) || 8787,
   };
 }
@@ -108,13 +99,11 @@ async function readRawBody(request) {
 
     request.on("data", (chunk) => {
       size += chunk.length;
-
       if (size > MAX_BODY_BYTES) {
         reject(new Error("request body too large"));
         request.destroy();
         return;
       }
-
       chunks.push(chunk);
     });
 
@@ -125,38 +114,61 @@ async function readRawBody(request) {
 
 async function readJsonBody(request) {
   const rawBody = await readRawBody(request);
-
-  if (rawBody.length === 0) {
-    throw new Error("empty body");
-  }
-
+  if (rawBody.length === 0) throw new Error("empty body");
   return JSON.parse(rawBody.toString("utf8"));
 }
 
-function createSupabaseAdmin(config) {
-  return createClient(config.supabaseUrl, config.supabaseSecretKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
+function getBearerToken(request) {
+  const authorization = request.headers.authorization;
+  if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) {
+    return "";
+  }
+  return authorization.slice("Bearer ".length);
+}
+
+function isUuid(value) {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
+async function postSignedPersistence(fetchImpl, config, payload) {
+  const body = JSON.stringify(payload);
+  const timestamp = String(Date.now());
+  const signer = createSign("RSA-SHA256");
+  signer.update(`${timestamp}.${body}`);
+  signer.end();
+  const signature = signer.sign(config.signingPrivateKey, "base64");
+
+  const response = await fetchImpl(
+    `${config.supabaseUrl}/functions/v1/omnibox-line-persist`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-omnibox-timestamp": timestamp,
+        "x-omnibox-signature": signature,
+      },
+      body,
     },
-  });
+  );
+
+  if (!response.ok) {
+    throw new Error("persistence failed");
+  }
+
+  return await response.json();
 }
 
 async function fetchLineProfile(fetchImpl, config, userId) {
   try {
     const response = await fetchImpl(
       `https://api.line.me/v2/bot/profile/${encodeURIComponent(userId)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${config.lineAccessToken}`,
-        },
-      },
+      { headers: { Authorization: `Bearer ${config.lineAccessToken}` } },
     );
 
-    if (!response.ok) {
-      return "LINE user";
-    }
-
+    if (!response.ok) return "LINE user";
     const profile = await response.json();
     return typeof profile?.displayName === "string" && profile.displayName.trim()
       ? profile.displayName.trim()
@@ -166,65 +178,40 @@ async function fetchLineProfile(fetchImpl, config, userId) {
   }
 }
 
-async function persistInboundEvent({
-  supabase,
-  config,
-  normalized,
-  customerDisplayName,
-}) {
-  const conversationPayload = {
-    organization_id: config.organizationId,
-    provider: "line",
-    provider_thread_id: normalized.providerThreadId,
-    customer_external_id: normalized.customerExternalId,
-    customer_display_name: customerDisplayName,
-    status: "unread",
-    last_message_preview: normalized.body.slice(0, 500),
-    last_message_at: normalized.occurredAt,
-    updated_at: normalized.occurredAt,
-  };
-
-  const { data: conversation, error: conversationError } = await supabase
-    .from("conversations")
-    .upsert(conversationPayload, {
-      onConflict: "organization_id,provider,provider_thread_id",
-    })
-    .select("id")
-    .single();
-
-  if (conversationError || !conversation?.id) {
-    throw new Error("conversation persistence failed");
-  }
-
-  const { error: messageError } = await supabase.from("messages").upsert(
-    {
-      organization_id: config.organizationId,
-      conversation_id: conversation.id,
-      provider_message_id: normalized.providerMessageId,
-      direction: "inbound",
-      body: normalized.body,
-      sent_by_user_id: null,
-      created_at: normalized.occurredAt,
+async function fetchAuthenticatedUser(fetchImpl, config, accessToken) {
+  const response = await fetchImpl(`${config.supabaseUrl}/auth/v1/user`, {
+    headers: {
+      apikey: config.supabasePublishableKey,
+      Authorization: `Bearer ${accessToken}`,
     },
-    {
-      onConflict: "organization_id,provider_message_id",
-      ignoreDuplicates: true,
-    },
-  );
+  });
 
-  if (messageError) {
-    throw new Error("message persistence failed");
-  }
+  if (!response.ok) return null;
+  const user = await response.json();
+  return isUuid(user?.id) ? user : null;
 }
 
-async function handleLineWebhook({
-  request,
-  response,
-  config,
-  supabase,
-  fetchImpl,
-}) {
-  if (!config.configured || !supabase) {
+async function fetchVisibleConversation(fetchImpl, config, accessToken, conversationId) {
+  const url = new URL("/rest/v1/conversations", config.supabaseUrl);
+  url.searchParams.set("select", "id,organization_id,customer_external_id");
+  url.searchParams.set("id", `eq.${conversationId}`);
+  url.searchParams.set("organization_id", `eq.${config.organizationId}`);
+  url.searchParams.set("limit", "1");
+
+  const response = await fetchImpl(url, {
+    headers: {
+      apikey: config.supabasePublishableKey,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) return null;
+  const rows = await response.json();
+  return Array.isArray(rows) && rows.length === 1 ? rows[0] : null;
+}
+
+async function handleLineWebhook({ request, response, config, fetchImpl }) {
+  if (!config.configured) {
     sendJson(response, 503, { ok: false, error: "bridge_not_configured" });
     return;
   }
@@ -244,7 +231,6 @@ async function handleLineWebhook({
   }
 
   let payload;
-
   try {
     payload = JSON.parse(rawBody.toString("utf8"));
   } catch {
@@ -256,10 +242,7 @@ async function handleLineWebhook({
 
   for (const event of events) {
     const normalized = normalizeLineTextEvent(event);
-
-    if (!normalized) {
-      continue;
-    }
+    if (!normalized) continue;
 
     const customerDisplayName = await fetchLineProfile(
       fetchImpl,
@@ -267,10 +250,10 @@ async function handleLineWebhook({
       normalized.customerExternalId,
     );
 
-    await persistInboundEvent({
-      supabase,
-      config,
-      normalized,
+    await postSignedPersistence(fetchImpl, config, {
+      action: "inbound",
+      organizationId: config.organizationId,
+      ...normalized,
       customerDisplayName,
     });
   }
@@ -278,44 +261,25 @@ async function handleLineWebhook({
   sendJson(response, 200, { ok: true });
 }
 
-function getBearerToken(request) {
-  const authorization = request.headers.authorization;
-
-  if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) {
-    return "";
-  }
-
-  return authorization.slice("Bearer ".length);
-}
-
-function isUuid(value) {
-  return (
-    typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      value,
-    )
-  );
-}
-
-async function handleLineReply({
-  request,
-  response,
-  config,
-  supabase,
-  fetchImpl,
-}) {
-  if (!config.configured || !supabase) {
+async function handleLineReply({ request, response, config, fetchImpl }) {
+  if (!config.configured) {
     sendJson(response, 503, { ok: false, error: "bridge_not_configured" });
     return;
   }
 
-  if (!safeStringEqual(getBearerToken(request), config.internalKey)) {
+  const accessToken = getBearerToken(request);
+  if (!accessToken) {
+    sendJson(response, 401, { ok: false, error: "unauthorized" });
+    return;
+  }
+
+  const user = await fetchAuthenticatedUser(fetchImpl, config, accessToken);
+  if (!user) {
     sendJson(response, 401, { ok: false, error: "unauthorized" });
     return;
   }
 
   let payload;
-
   try {
     payload = await readJsonBody(request);
   } catch {
@@ -324,50 +288,37 @@ async function handleLineReply({
   }
 
   const conversationId =
-    typeof payload?.conversationId === "string"
-      ? payload.conversationId.trim()
-      : "";
-  const message =
-    typeof payload?.message === "string" ? payload.message.trim() : "";
-  const sentByUserId =
-    typeof payload?.sentByUserId === "string" ? payload.sentByUserId.trim() : "";
+    typeof payload?.conversationId === "string" ? payload.conversationId.trim() : "";
+  const message = typeof payload?.message === "string" ? payload.message.trim() : "";
 
-  if (
-    !isUuid(conversationId) ||
-    !message ||
-    message.length > MAX_TEXT_LENGTH ||
-    !isUuid(sentByUserId)
-  ) {
+  if (!isUuid(conversationId) || !message || message.length > MAX_TEXT_LENGTH) {
     sendJson(response, 400, { ok: false, error: "invalid_request" });
     return;
   }
 
-  const { data: conversation, error: conversationError } = await supabase
-    .from("conversations")
-    .select("id, organization_id, customer_external_id")
-    .eq("id", conversationId)
-    .eq("organization_id", config.organizationId)
-    .maybeSingle();
+  const conversation = await fetchVisibleConversation(
+    fetchImpl,
+    config,
+    accessToken,
+    conversationId,
+  );
 
-  if (conversationError || !conversation) {
+  if (!conversation) {
     sendJson(response, 404, { ok: false, error: "conversation_not_found" });
     return;
   }
 
-  const lineResponse = await fetchImpl(
-    "https://api.line.me/v2/bot/message/push",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.lineAccessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        to: conversation.customer_external_id,
-        messages: [{ type: "text", text: message }],
-      }),
+  const lineResponse = await fetchImpl("https://api.line.me/v2/bot/message/push", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.lineAccessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      to: conversation.customer_external_id,
+      messages: [{ type: "text", text: message }],
+    }),
+  });
 
   if (!lineResponse.ok) {
     sendJson(response, 502, { ok: false, error: "line_send_failed" });
@@ -375,7 +326,6 @@ async function handleLineReply({
   }
 
   let providerMessageId = null;
-
   try {
     const lineResult = await lineResponse.json();
     providerMessageId =
@@ -386,37 +336,15 @@ async function handleLineReply({
     providerMessageId = null;
   }
 
-  const createdAt = new Date().toISOString();
-  const { error: messageError } = await supabase.from("messages").insert({
-    organization_id: config.organizationId,
-    conversation_id: conversation.id,
-    provider_message_id: providerMessageId,
-    direction: "outbound",
+  await postSignedPersistence(fetchImpl, config, {
+    action: "outbound",
+    organizationId: config.organizationId,
+    conversationId,
     body: message,
-    sent_by_user_id: sentByUserId,
-    created_at: createdAt,
+    providerMessageId,
+    sentByUserId: user.id,
+    createdAt: new Date().toISOString(),
   });
-
-  if (messageError) {
-    sendJson(response, 500, { ok: false, error: "message_persistence_failed" });
-    return;
-  }
-
-  const { error: updateError } = await supabase
-    .from("conversations")
-    .update({
-      status: "in_progress",
-      last_message_preview: message.slice(0, 500),
-      last_message_at: createdAt,
-      updated_at: createdAt,
-    })
-    .eq("id", conversation.id)
-    .eq("organization_id", config.organizationId);
-
-  if (updateError) {
-    sendJson(response, 500, { ok: false, error: "conversation_update_failed" });
-    return;
-  }
 
   sendJson(response, 200, { ok: true });
 }
@@ -426,10 +354,6 @@ export function createLineBridgeServer({
   fetchImpl = globalThis.fetch,
 } = {}) {
   const config = getBridgeConfiguration(env);
-  const supabase =
-    config.supabaseUrl && config.supabaseSecretKey
-      ? createSupabaseAdmin(config)
-      : null;
 
   return createServer(async (request, response) => {
     try {
@@ -439,29 +363,18 @@ export function createLineBridgeServer({
         sendJson(response, 200, {
           ok: true,
           configured: config.configured,
+          missing: config.missing,
         });
         return;
       }
 
       if (request.method === "POST" && url.pathname === "/webhooks/line") {
-        await handleLineWebhook({
-          request,
-          response,
-          config,
-          supabase,
-          fetchImpl,
-        });
+        await handleLineWebhook({ request, response, config, fetchImpl });
         return;
       }
 
       if (request.method === "POST" && url.pathname === "/internal/line/reply") {
-        await handleLineReply({
-          request,
-          response,
-          config,
-          supabase,
-          fetchImpl,
-        });
+        await handleLineReply({ request, response, config, fetchImpl });
         return;
       }
 
@@ -489,9 +402,6 @@ export function startLineBridge(options = {}) {
   return server;
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   startLineBridge();
 }
