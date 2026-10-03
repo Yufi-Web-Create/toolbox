@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --exclude server/line-bridge.test.mjs",
     "test:bridge": "node --test server/line-bridge.test.mjs"
   },
   "dependencies": {
