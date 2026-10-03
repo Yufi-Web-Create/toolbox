@@ -1,7 +1,7 @@
 export type LineReplyInput = {
   conversationId: string;
   message: string;
-  sentByUserId: string;
+  accessToken: string;
 };
 
 export type LineReplyResult =
@@ -11,19 +11,13 @@ export type LineReplyResult =
 const LINE_REPLY_ERROR =
   "LINEへの返信を送信できませんでした。接続設定を確認してもう一度お試しください。";
 
-function getBridgeConfiguration() {
-  const bridgeUrl = process.env.LINE_BRIDGE_URL?.trim();
-  const internalKey = process.env.LINE_BRIDGE_INTERNAL_KEY?.trim();
-
-  if (!bridgeUrl || !internalKey) {
-    return null;
-  }
+function getBridgeUrl() {
+  const value =
+    process.env.LINE_BRIDGE_URL?.trim() ||
+    "https://omnibox-line-bridge.onrender.com";
 
   try {
-    return {
-      bridgeUrl: new URL(bridgeUrl),
-      internalKey,
-    };
+    return new URL(value);
   } catch {
     return null;
   }
@@ -32,24 +26,23 @@ function getBridgeConfiguration() {
 export async function sendLineReply(
   input: LineReplyInput,
 ): Promise<LineReplyResult> {
-  const config = getBridgeConfiguration();
+  const bridgeUrl = getBridgeUrl();
 
-  if (!config) {
+  if (!bridgeUrl || !input.accessToken) {
     return { success: false, message: LINE_REPLY_ERROR };
   }
 
   try {
-    const endpoint = new URL("/internal/line/reply", config.bridgeUrl);
+    const endpoint = new URL("/internal/line/reply", bridgeUrl);
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${config.internalKey}`,
+        Authorization: `Bearer ${input.accessToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         conversationId: input.conversationId,
         message: input.message,
-        sentByUserId: input.sentByUserId,
       }),
       cache: "no-store",
     });
