@@ -16,7 +16,7 @@ function bearer(req: Request) {
 }
 
 Deno.serve(async (req) => {
-  if (!["GET", "POST"].includes(req.method)) {
+  if (!["GET", "POST", "PATCH", "DELETE"].includes(req.method)) {
     return json(405, { ok: false, error: "method_not_allowed" });
   }
 
@@ -85,6 +85,7 @@ Deno.serve(async (req) => {
             ? user.user_metadata.full_name
             : user?.email?.split("@")[0] ?? "従業員",
         createdAt: member.created_at,
+        lastSignInAt: user?.last_sign_in_at ?? null,
       };
     });
 
@@ -98,55 +99,142 @@ Deno.serve(async (req) => {
     return json(400, { ok: false, error: "invalid_json" });
   }
 
-  const name = typeof payload.name === "string" ? payload.name.trim() : "";
-  const email =
-    typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
-  const password = typeof payload.password === "string" ? payload.password : "";
+  if (req.method === "POST") {
+    const name = typeof payload.name === "string" ? payload.name.trim() : "";
+    const email =
+      typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
+    const password = typeof payload.password === "string" ? payload.password : "";
 
-  if (!name || name.length > 100 || !EMAIL_PATTERN.test(email) || password.length < 8) {
-    return json(400, { ok: false, error: "invalid_employee" });
+    if (!name || name.length > 100 || !EMAIL_PATTERN.test(email) || password.length < 8) {
+      return json(400, { ok: false, error: "invalid_employee" });
+    }
+
+    const { data: created, error: createError } =
+      await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: name,
+          account_type: "member",
+        },
+      });
+
+    if (createError || !created.user) {
+      return json(400, {
+        ok: false,
+        error: createError?.message?.toLowerCase().includes("already")
+          ? "email_already_exists"
+          : "employee_create_failed",
+      });
+    }
+
+    const { error: insertError } = await admin
+      .from("organization_members")
+      .insert({
+        organization_id: organization.id,
+        organization_created_by: organization.created_by,
+        user_id: created.user.id,
+        role: "member",
+      });
+
+    if (insertError) {
+      await admin.auth.admin.deleteUser(created.user.id);
+      return json(500, { ok: false, error: "membership_create_failed" });
+    }
+
+    return json(200, {
+      ok: true,
+      employee: { id: created.user.id, email, name },
+    });
   }
 
-  const { data: created, error: createError } =
-    await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
+  const employeeId =
+    typeof payload.employeeId === "string" ? payload.employeeId.trim() : "";
+
+  if (!employeeId) {
+    return json(400, { ok: false, error: "employee_required" });
+  }
+
+  const { data: employeeMembership, error: employeeMembershipError } = await admin
+    .from("organization_members")
+    .select("user_id, role")
+    .eq("organization_id", organization.id)
+    .eq("user_id", employeeId)
+    .maybeSingle();
+
+  if (
+    employeeMembershipError ||
+    !employeeMembership ||
+    employeeMembership.role !== "member"
+  ) {
+    return json(404, { ok: false, error: "employee_not_found" });
+  }
+
+  if (req.method === "PATCH") {
+    const password = typeof payload.password === "string" ? payload.password : "";
+    const name = typeof payload.name === "string" ? payload.name.trim() : "";
+
+    if (password && password.length < 8) {
+      return json(400, { ok: false, error: "invalid_password" });
+    }
+    if (name && name.length > 100) {
+      return json(400, { ok: false, error: "invalid_name" });
+    }
+    if (!password && !name) {
+      return json(400, { ok: false, error: "no_changes" });
+    }
+
+    const attributes: Record<string, unknown> = {};
+    if (password) attributes.password = password;
+
+    if (name) {
+      const { data: currentUser, error: currentUserError } =
+        await admin.auth.admin.getUserById(employeeId);
+      if (currentUserError || !currentUser.user) {
+        return json(404, { ok: false, error: "employee_not_found" });
+      }
+      attributes.user_metadata = {
+        ...(currentUser.user.user_metadata ?? {}),
         full_name: name,
         account_type: "member",
+      };
+    }
+
+    const { data: updated, error: updateError } =
+      await admin.auth.admin.updateUserById(employeeId, attributes);
+
+    if (updateError || !updated.user) {
+      return json(500, { ok: false, error: "employee_update_failed" });
+    }
+
+    return json(200, {
+      ok: true,
+      employee: {
+        id: employeeId,
+        email: updated.user.email ?? "",
+        name:
+          typeof updated.user.user_metadata?.full_name === "string"
+            ? updated.user.user_metadata.full_name
+            : updated.user.email?.split("@")[0] ?? "従業員",
       },
     });
-
-  if (createError || !created.user) {
-    return json(400, {
-      ok: false,
-      error: createError?.message?.toLowerCase().includes("already")
-        ? "email_already_exists"
-        : "employee_create_failed",
-    });
   }
 
-  const { error: insertError } = await admin
+  const { error: membershipDeleteError } = await admin
     .from("organization_members")
-    .insert({
-      organization_id: organization.id,
-      organization_created_by: organization.created_by,
-      user_id: created.user.id,
-      role: "member",
-    });
+    .delete()
+    .eq("organization_id", organization.id)
+    .eq("user_id", employeeId);
 
-  if (insertError) {
-    await admin.auth.admin.deleteUser(created.user.id);
-    return json(500, { ok: false, error: "membership_create_failed" });
+  if (membershipDeleteError) {
+    return json(500, { ok: false, error: "membership_delete_failed" });
   }
 
-  return json(200, {
-    ok: true,
-    employee: {
-      id: created.user.id,
-      email,
-      name,
-    },
-  });
+  const { error: deleteError } = await admin.auth.admin.deleteUser(employeeId);
+  if (deleteError) {
+    return json(500, { ok: false, error: "employee_delete_failed" });
+  }
+
+  return json(200, { ok: true });
 });
