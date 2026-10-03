@@ -19,30 +19,63 @@ async function accessToken() {
   return sessionData.session?.access_token ?? null;
 }
 
+async function forward(method: "GET" | "POST" | "PATCH" | "DELETE", payload?: unknown) {
+  const endpoint = edgeUrl();
+  const token = await accessToken();
+
+  if (!endpoint || !token) {
+    return NextResponse.json(
+      { ok: false, message: "ログインが必要です。" },
+      { status: 401 },
+    );
+  }
+
+  const response = await fetch(endpoint, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(payload ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(payload ? { body: JSON.stringify(payload) } : {}),
+    cache: "no-store",
+  });
+
+  let result: Record<string, unknown> = {};
+  try {
+    result = await response.json();
+  } catch {}
+
+  if (!response.ok || result.ok !== true) {
+    const code = typeof result.error === "string" ? result.error : "";
+    const message =
+      code === "email_already_exists"
+        ? "そのメールアドレスはすでに使用されています。"
+        : code === "owner_required"
+          ? "従業員アカウントの管理は管理者のみ行えます。"
+          : code === "invalid_password"
+            ? "パスワードは8文字以上で入力してください。"
+            : code === "employee_not_found"
+              ? "従業員アカウントを確認できませんでした。"
+              : method === "GET"
+                ? "従業員一覧を読み込めませんでした。"
+                : method === "DELETE"
+                  ? "従業員アカウントを削除できませんでした。"
+                  : method === "PATCH"
+                    ? "従業員アカウントを更新できませんでした。"
+                    : "従業員アカウントを作成できませんでした。";
+
+    return NextResponse.json(
+      { ok: false, message },
+      { status: response.status >= 400 && response.status < 500 ? response.status : 500 },
+    );
+  }
+
+  return NextResponse.json(result);
+}
+
 export async function GET() {
   try {
-    const endpoint = edgeUrl();
-    const token = await accessToken();
-
-    if (!endpoint || !token) {
-      return NextResponse.json({ ok: false }, { status: 401 });
-    }
-
-    const response = await fetch(endpoint, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-
-    const result = await response.json();
-
-    if (!response.ok || result.ok !== true) {
-      return NextResponse.json(
-        { ok: false, message: "従業員一覧を読み込めませんでした。" },
-        { status: response.status === 403 ? 403 : 500 },
-      );
-    }
-
-    return NextResponse.json(result);
+    return await forward("GET");
   } catch {
     return NextResponse.json(
       { ok: false, message: "従業員一覧を読み込めませんでした。" },
@@ -53,48 +86,32 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const endpoint = edgeUrl();
-    const token = await accessToken();
-
-    if (!endpoint || !token) {
-      return NextResponse.json(
-        { ok: false, message: "ログインが必要です。" },
-        { status: 401 },
-      );
-    }
-
-    const payload = await request.json();
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      cache: "no-store",
-    });
-
-    const result = await response.json();
-
-    if (!response.ok || result.ok !== true) {
-      const code = typeof result.error === "string" ? result.error : "";
-      const message =
-        code === "email_already_exists"
-          ? "そのメールアドレスはすでに使用されています。"
-          : code === "owner_required"
-            ? "従業員アカウントの作成は管理者のみ行えます。"
-            : "従業員アカウントを作成できませんでした。";
-
-      return NextResponse.json(
-        { ok: false, message },
-        { status: response.status >= 400 && response.status < 500 ? response.status : 500 },
-      );
-    }
-
-    return NextResponse.json(result);
+    return await forward("POST", await request.json());
   } catch {
     return NextResponse.json(
       { ok: false, message: "従業員アカウントを作成できませんでした。" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    return await forward("PATCH", await request.json());
+  } catch {
+    return NextResponse.json(
+      { ok: false, message: "従業員アカウントを更新できませんでした。" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    return await forward("DELETE", await request.json());
+  } catch {
+    return NextResponse.json(
+      { ok: false, message: "従業員アカウントを削除できませんでした。" },
       { status: 500 },
     );
   }
