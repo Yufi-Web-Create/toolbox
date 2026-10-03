@@ -48,6 +48,13 @@ export async function sendReply(
       return { status: "error", message: AUTH_ERROR };
     }
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token ?? "";
+
+    if (!accessToken) {
+      return { status: "error", message: AUTH_ERROR };
+    }
+
     const { data: visibleConversations, error: conversationError } =
       await supabase
         .from("conversations")
@@ -66,7 +73,7 @@ export async function sendReply(
     const result = await sendLineReply({
       conversationId,
       message,
-      sentByUserId: userId,
+      accessToken,
     });
 
     if (!result.success) {
