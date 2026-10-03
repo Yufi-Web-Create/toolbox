@@ -58,7 +58,7 @@ export async function GET() {
     const ctx = await context();
     if (!ctx) return NextResponse.json({ ok: false }, { status: 401 });
 
-    let { data, error } = await ctx.supabase
+    const { data: initialData, error } = await ctx.supabase
       .from("reply_templates")
       .select("id, title, category, body, created_at")
       .eq("organization_id", ctx.organizationId)
@@ -70,6 +70,8 @@ export async function GET() {
         { status: 500 },
       );
     }
+
+    let data = initialData;
 
     if (!data || data.length === 0) {
       const rows = DEFAULT_TEMPLATES.map((template) => ({
