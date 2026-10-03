@@ -19,13 +19,22 @@ export async function POST(request: Request) {
 
     const supabase = await createClient();
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
-    const userId =
-      !claimsError && typeof claimsData?.claims?.sub === "string"
-        ? claimsData.claims.sub
-        : null;
 
-    if (!userId) {
-      return NextResponse.json({ ok: false, message: "ログインが必要です。" }, { status: 401 });
+    if (claimsError || typeof claimsData?.claims?.sub !== "string") {
+      return NextResponse.json(
+        { ok: false, message: "ログインが必要です。" },
+        { status: 401 },
+      );
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token ?? "";
+
+    if (!accessToken) {
+      return NextResponse.json(
+        { ok: false, message: "ログインが必要です。" },
+        { status: 401 },
+      );
     }
 
     const { data: conversations, error: conversationError } = await supabase
@@ -48,7 +57,7 @@ export async function POST(request: Request) {
     const result = await sendLineReply({
       conversationId,
       message,
-      sentByUserId: userId,
+      accessToken,
     });
 
     if (!result.success) {
