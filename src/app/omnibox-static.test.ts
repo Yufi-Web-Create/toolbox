@@ -8,7 +8,7 @@ describe("uploaded OmniBox application shell", () => {
   it("keeps the supplied OmniBox login and staff registration portal", () => {
     expect(html).toContain("OmniBox ポータル");
     expect(html).toContain("ログイン");
-    expect(html).toContain("スタッフ新規登録");
+    expect(html).toContain("管理者アカウント作成");
     expect(html).toContain("auth-input-name");
   });
 
@@ -43,14 +43,24 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("portal.classList.add('flex')");
   });
 
-  it("provides role-aware organization and account settings", () => {
+  it("provides administrator onboarding and role-aware settings", () => {
     expect(html).toContain('id="view-settings"');
     expect(html).toContain('id="menu-organization-settings"');
+    expect(html).toContain('id="settings-initial-organization-banner"');
+    expect(html).toContain("組織ID（従業員ログイン用）");
     expect(html).toContain("loggedInUser.roleKey !== 'owner'");
     expect(html).toContain("/api/omnibox/settings/account");
     expect(html).toContain("/api/omnibox/settings/organization");
+    expect(html).toContain("/api/omnibox/settings/employees");
     expect(html).toContain("組織設定は管理者のみ変更できます");
     expect(html).toContain("ログアウト");
+  });
+
+  it("supports employee login with organization ID", () => {
+    expect(html).toContain('id="auth-input-organization"');
+    expect(html).toContain("switchLoginType('employee')");
+    expect(html).toContain("organizationId");
+    expect(html).toContain("従業員としてログイン");
   });
 
   it("contains syntactically valid connected module JavaScript", () => {
