@@ -640,6 +640,15 @@
         </div>
 
         <section id="settings-panel-organization" class="hidden space-y-4">
+          <div id="settings-initial-organization-banner" class="hidden bg-teal-50 border border-teal-200 rounded-2xl p-4">
+            <div class="flex items-start gap-3">
+              <i data-lucide="sparkles" class="w-5 h-5 text-teal-700 mt-0.5"></i>
+              <div>
+                <h3 class="text-sm font-bold text-teal-900">最初に組織設定を完了してください</h3>
+                <p class="text-xs text-teal-800 mt-1 leading-relaxed">組織名と組織IDを設定するとOmniBoxの受信箱が利用でき、従業員アカウントを追加できるようになります。</p>
+              </div>
+            </div>
+          </div>
           <div class="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-xs">
             <div class="flex items-start gap-3 mb-5">
               <div class="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
@@ -656,13 +665,47 @@
                 <input id="settings-organization-name" type="text" maxlength="120" required class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="組織名を入力">
               </div>
               <div>
-                <label class="text-xs font-bold text-slate-600 block mb-1.5">組織ID</label>
-                <input id="settings-organization-id" type="text" readonly class="w-full max-w-xl text-xs font-mono px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-500">
+                <label class="text-xs font-bold text-slate-600 block mb-1.5">組織ID（従業員ログイン用）</label>
+                <input id="settings-organization-id" type="text" maxlength="32" required class="w-full max-w-xl text-sm font-mono uppercase px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="例: HAJIMARI_BEPPU">
+                <p class="text-[10px] text-slate-400 mt-1">3〜32文字の半角英数字・ハイフン・アンダースコア。従業員ログイン時に使用します。</p>
               </div>
               <button type="submit" class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition">
                 組織設定を保存
               </button>
             </form>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-xs">
+            <div class="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">従業員アカウント</h3>
+                <p class="text-xs text-slate-500 mt-1">従業員は「組織ID + メールアドレス + パスワード」でログインします。</p>
+              </div>
+              <span id="employee-count-badge" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full">0名</span>
+            </div>
+            <form onsubmit="createEmployeeAccount(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+              <div>
+                <label class="text-[11px] font-bold text-slate-600 block mb-1">表示名</label>
+                <input id="employee-create-name" type="text" maxlength="100" required class="w-full text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="例: 佐藤 美咲">
+              </div>
+              <div>
+                <label class="text-[11px] font-bold text-slate-600 block mb-1">メールアドレス</label>
+                <input id="employee-create-email" type="email" required class="w-full text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="staff@example.com">
+              </div>
+              <div>
+                <label class="text-[11px] font-bold text-slate-600 block mb-1">初期パスワード</label>
+                <input id="employee-create-password" type="password" minlength="8" required class="w-full text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="8文字以上">
+              </div>
+              <div class="md:col-span-3">
+                <button type="submit" id="employee-create-button" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-2">
+                  <i data-lucide="user-plus" class="w-4 h-4"></i>
+                  従業員アカウントを作成
+                </button>
+              </div>
+            </form>
+            <div id="employee-list" class="space-y-2">
+              <div class="text-xs text-slate-400 py-3">従業員アカウントはまだありません。</div>
+            </div>
           </div>
 
           <div class="bg-white rounded-2xl border border-slate-200 p-5 md:p-6 shadow-xs">
@@ -1017,13 +1060,36 @@
           </button>
           <button id="auth-tab-register" onclick="switchAuthTab('register')" class="flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition">
             <i data-lucide="user-plus" class="w-3.5 h-3.5 text-slate-500"></i>
-            <span>スタッフ新規登録</span>
+            <span>管理者アカウント作成</span>
           </button>
         </div>
 
         <form onsubmit="handleAuthSubmit(event)" class="space-y-3.5">
+          <div id="auth-login-type-group" class="space-y-2">
+            <label class="text-xs font-bold text-slate-600 block">ログイン種別</label>
+            <div class="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+              <button type="button" id="auth-login-type-admin" onclick="switchLoginType('admin')" class="py-2 rounded-lg bg-white text-slate-800 shadow-xs text-xs font-semibold flex items-center justify-center gap-1.5">
+                <i data-lucide="shield" class="w-3.5 h-3.5 text-teal-600"></i>
+                管理者
+              </button>
+              <button type="button" id="auth-login-type-employee" onclick="switchLoginType('employee')" class="py-2 rounded-lg text-slate-600 text-xs font-semibold flex items-center justify-center gap-1.5">
+                <i data-lucide="user" class="w-3.5 h-3.5"></i>
+                従業員
+              </button>
+            </div>
+          </div>
+
+          <div id="auth-organization-group" class="hidden">
+            <label class="text-xs font-bold text-slate-600 block mb-1">組織ID</label>
+            <div class="relative">
+              <i data-lucide="building-2" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+              <input type="text" id="auth-input-organization" maxlength="32" autocomplete="organization" placeholder="例: HAJIMARI_BEPPU" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition uppercase">
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">管理者から案内された組織IDを入力してください。</p>
+          </div>
+
           <div id="auth-name-group" class="hidden">
-            <label class="text-xs font-bold text-slate-600 block mb-1">お名前 (スタッフ表示名)</label>
+            <label class="text-xs font-bold text-slate-600 block mb-1">管理者名</label>
             <div class="relative">
               <i data-lucide="user" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
               <input type="text" id="auth-input-name" placeholder="例: 佐藤 美咲" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
@@ -1031,7 +1097,7 @@
           </div>
 
           <div>
-            <label class="text-xs font-bold text-slate-600 block mb-1">メールアドレス (社内・店舗アカウント)</label>
+            <label class="text-xs font-bold text-slate-600 block mb-1">メールアドレス</label>
             <div class="relative">
               <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
               <input type="email" id="auth-input-email" required placeholder="yamada@company.com" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
@@ -1052,11 +1118,7 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" id="auth-remember-me" checked class="rounded text-teal-600 focus:ring-teal-500">
-              <span>ログイン状態を保持する</span>
-            </label>
+          <div class="flex items-center justify-end text-xs text-slate-500 pt-0.5">
             <span class="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
               <i data-lucide="shield-check" class="w-3 h-3"></i>SSL暗号化通信
             </span>
@@ -1067,33 +1129,6 @@
             <span id="auth-submit-label">ログインして業務を開始</span>
           </button>
         </form>
-
-        <div class="relative flex items-center justify-center">
-          <div class="border-t border-slate-200 w-full"></div>
-          <span class="bg-white px-3 text-[10px] text-slate-400 uppercase tracking-wider font-semibold absolute">クイック体験・デモログイン</span>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2.5">
-          <button type="button" onclick="quickLoginDemo('admin')" class="p-2.5 rounded-xl border border-slate-200 hover:border-teal-500 hover:bg-teal-50/40 text-left transition group">
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] font-bold text-slate-800 group-hover:text-teal-700 flex items-center gap-1">
-                <i data-lucide="shield" class="w-3 h-3 text-teal-600"></i>管理者
-              </span>
-              <span class="text-[9px] bg-teal-100 text-teal-800 px-1 py-0.2 rounded font-mono">Owner</span>
-            </div>
-            <div class="text-[10px] text-slate-400 mt-0.5 truncate">山田 太郎 (全権限)</div>
-          </button>
-
-          <button type="button" onclick="quickLoginDemo('staff')" class="p-2.5 rounded-xl border border-slate-200 hover:border-teal-500 hover:bg-teal-50/40 text-left transition group">
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] font-bold text-slate-800 group-hover:text-teal-700 flex items-center gap-1">
-                <i data-lucide="user" class="w-3 h-3 text-slate-500"></i>店舗スタッフ
-              </span>
-              <span class="text-[9px] bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono">Staff</span>
-            </div>
-            <div class="text-[10px] text-slate-400 mt-0.5 truncate">佐藤 美咲 (現場対応)</div>
-          </button>
-        </div>
 
         <div class="text-center text-[10px] text-slate-400">
           © 2026 OmniBox Cloud Services. All rights reserved.
