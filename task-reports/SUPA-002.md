@@ -10,7 +10,7 @@ Aligned the repository TENANT-001 migration version with the already-applied Sup
 `codex/supa-002`
 
 ## Pull request
-Pending.
+[Draft PR #28](https://github.com/Yufi-Web-Create/toolbox/pull/28), targeting `main`.
 
 ## Changed files
 - `supabase/migrations/20261002160703_tenant_001_organization_membership_foundation.sql` (renamed)
