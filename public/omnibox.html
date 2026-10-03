@@ -391,8 +391,14 @@
               
               <div class="space-y-3 text-xs mb-6">
                 <div>
-                  <label class="text-slate-400 block text-[11px]">お名前</label>
-                  <p id="info-customer-name" class="font-medium text-slate-800 mt-0.5">-</p>
+                  <label class="text-slate-400 block text-[11px] mb-1">お名前</label>
+                  <div class="flex items-center gap-1.5">
+                    <input id="info-customer-name-input" type="text" maxlength="100" class="flex-1 min-w-0 text-xs font-medium text-slate-800 px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-teal-500" placeholder="お客様名">
+                    <button onclick="saveCustomerName()" class="p-1.5 rounded-lg bg-slate-100 hover:bg-teal-50 text-slate-500 hover:text-teal-700 transition" title="名前を保存">
+                      <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+                  <p class="text-[10px] text-slate-400 mt-1">OmniBox内でわかりやすい名前に変更できます。</p>
                 </div>
                 <div>
                   <label class="text-slate-400 block text-[11px]">流入チャネル</label>
@@ -1422,7 +1428,8 @@
             customerName: conversation.customer_display_name || 'LINEユーザー',
             customerHandle: conversation.customer_external_id || '',
             channel: 'line',
-            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+            avatar: conversation.customer_avatar_url || '',
+            customerNameSource: conversation.customer_name_source || 'provider',
             status: conversation.status === 'completed' ? 'resolved' : conversation.status,
             assignee: '未割り当て',
             lastMessage: conversation.last_message_preview || '',
@@ -1443,9 +1450,7 @@
         return true;
       } catch (error) {
         console.error('Live inbox load failed:', error);
-        threads = [];
-        connectedAccounts = [];
-        onDataUpdated();
+        if (threads.length === 0) onDataUpdated();
         showToast('受信箱を読み込めませんでした。接続設定をご確認ください');
         return false;
       }
@@ -1670,15 +1675,35 @@
     function getChannelMeta(channel) {
       switch(channel) {
         case 'line':
-          return { name: 'LINE公式', color: 'bg-emerald-500', text: 'LINE' };
+          return {
+            name: 'LINE公式',
+            color: 'bg-emerald-500',
+            icon: '<i data-lucide="message-circle" class="w-2.5 h-2.5 text-white stroke-[2.4]"></i>'
+          };
         case 'instagram':
-          return { name: 'Instagram', color: 'bg-pink-500', text: 'IG' };
+          return {
+            name: 'Instagram',
+            color: 'bg-pink-500',
+            icon: '<i data-lucide="instagram" class="w-2.5 h-2.5 text-white stroke-[2.2]"></i>'
+          };
         case 'x':
-          return { name: 'X', color: 'bg-slate-900', text: '𝕏' };
+          return {
+            name: 'X',
+            color: 'bg-slate-900',
+            icon: '<i data-lucide="badge-x" class="w-2.5 h-2.5 text-white stroke-[2.4]"></i>'
+          };
         case 'email':
-          return { name: 'メール', color: 'bg-blue-600', text: 'Mail' };
+          return {
+            name: 'メール',
+            color: 'bg-blue-600',
+            icon: '<i data-lucide="mail" class="w-2.5 h-2.5 text-white stroke-[2.2]"></i>'
+          };
         default:
-          return { name: 'Chat', color: 'bg-teal-500', text: '💬' };
+          return {
+            name: 'メッセージ',
+            color: 'bg-teal-500',
+            icon: '<i data-lucide="message-circle" class="w-2.5 h-2.5 text-white"></i>'
+          };
       }
     }
 
@@ -1808,9 +1833,9 @@
 
         item.innerHTML = `
           <div class="relative shrink-0">
-            <img src="${thread.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}" class="w-10 h-10 rounded-full object-cover">
+            <img src="${thread.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Crect width=%22100%22 height=%22100%22 rx=%2250%22 fill=%22%23e2e8f0%22/%3E%3Ccircle cx=%2250%22 cy=%2238%22 r=%2218%22 fill=%22%2394a3b8%22/%3E%3Cpath d=%22M18 92c4-21 17-31 32-31s28 10 32 31%22 fill=%22%2394a3b8%22/%3E%3C/svg%3E'}" class="w-10 h-10 rounded-full object-cover">
             <span class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] text-white font-bold ${meta.color}">
-              ${meta.text}
+              ${meta.icon}
             </span>
           </div>
           <div class="flex-1 min-w-0">
@@ -1844,20 +1869,105 @@
       lucide.createIcons();
     }
 
+    window.refreshCustomerProfile = async function(thread) {
+      if (
+        isDemoSession ||
+        !thread?.liveConversationId ||
+        thread.channel !== 'line'
+      ) return;
+
+      try {
+        const response = await fetch('/api/omnibox/customer/profile', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId: thread.liveConversationId })
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) return;
+
+        if (result.customerAvatarUrl) {
+          thread.avatar = result.customerAvatarUrl;
+        }
+        if (
+          thread.customerNameSource !== 'custom' &&
+          result.customerDisplayName
+        ) {
+          thread.customerName = result.customerDisplayName;
+        }
+
+        renderThreadList();
+        if (thread.id === currentThreadId) updateActiveChatPane(thread);
+      } catch {}
+    };
+
+    async function loadConversationDetail(id) {
+      const thread = threads.find(t => t.id === id);
+      if (!thread?.liveConversationId) return thread;
+
+      try {
+        const response = await fetch(
+          '/api/omnibox/inbox?conversation=' + encodeURIComponent(thread.liveConversationId),
+          {
+            credentials: 'same-origin',
+            cache: 'no-store'
+          }
+        );
+
+        if (!response.ok) throw new Error('conversation unavailable');
+
+        const payload = await response.json();
+        const conversation = payload.selectedConversation;
+        const messages = Array.isArray(payload.messages) ? payload.messages : [];
+
+        if (conversation) {
+          thread.customerName = conversation.customer_display_name || thread.customerName;
+          thread.customerNameSource = conversation.customer_name_source || thread.customerNameSource || 'provider';
+          thread.avatar = conversation.customer_avatar_url || thread.avatar || '';
+          thread.customerHandle = conversation.customer_external_id || thread.customerHandle;
+          thread.lastMessage = conversation.last_message_preview || thread.lastMessage;
+          thread.lastTime = formatLiveTime(conversation.last_message_at);
+          thread.status = conversation.status === 'completed' ? 'resolved' : conversation.status;
+        }
+
+        thread.messages = messages.map(message => ({
+          sender: message.direction === 'inbound' ? 'customer' : 'agent',
+          text: message.body,
+          time: formatLiveTime(message.created_at)
+        }));
+
+        updateActiveChatPane(thread);
+
+        if (!thread.avatar) {
+          await window.refreshCustomerProfile(thread);
+        }
+
+        return thread;
+      } catch (error) {
+        console.error('Conversation detail load failed:', error);
+        showToast('会話内容を読み込めませんでした');
+        return thread;
+      }
+    }
+
     window.selectThread = async function(id) {
       currentThreadId = id;
       let thread = threads.find(t => t.id === id);
       if (!thread) return;
 
-      if (thread.liveConversationId) {
-        await loadLiveInbox(thread.liveConversationId);
-        thread = threads.find(t => t.id === id) || thread;
-      }
-
       thread.unreadCount = 0;
       updateActiveChatPane(thread);
       renderThreadList();
       updateBadges();
+
+      if (thread.liveConversationId) {
+        thread = await loadConversationDetail(id) || thread;
+        thread.unreadCount = 0;
+        updateActiveChatPane(thread);
+        renderThreadList();
+        updateBadges();
+      }
     };
 
     function updateActiveChatPane(thread) {
@@ -1867,7 +1977,7 @@
       const meta = getChannelMeta(thread.channel);
       const acc = getAccountById(thread.accountId);
 
-      document.getElementById('chat-customer-avatar').src = thread.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100';
+      document.getElementById('chat-customer-avatar').src = thread.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22 viewBox=%220 0 100 100%22%3E%3Crect width=%22100%22 height=%22100%22 rx=%2250%22 fill=%22%23e2e8f0%22/%3E%3Ccircle cx=%2250%22 cy=%2238%22 r=%2218%22 fill=%22%2394a3b8%22/%3E%3Cpath d=%22M18 92c4-21 17-31 32-31s28 10 32 31%22 fill=%22%2394a3b8%22/%3E%3C/svg%3E';
       document.getElementById('chat-customer-name').textContent = thread.customerName;
       document.getElementById('chat-customer-handle').textContent = thread.customerHandle;
       
@@ -1879,7 +1989,7 @@
 
       const channelBadge = document.getElementById('chat-customer-channel-badge');
       channelBadge.className = `absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] text-white font-bold ${meta.color}`;
-      channelBadge.textContent = meta.text;
+      channelBadge.innerHTML = meta.icon;
 
       document.getElementById('chat-status-select').value = thread.status;
       document.getElementById('chat-assignee-select').value = thread.assignee || '未割り当て';
@@ -1891,7 +2001,8 @@
         <span>返信元: ${acc.accountName} (${meta.name})</span>
       `;
 
-      document.getElementById('info-customer-name').textContent = thread.customerName;
+      const customerNameInput = document.getElementById('info-customer-name-input');
+      if (customerNameInput) customerNameInput.value = thread.customerName || '';
       document.getElementById('info-customer-channel').textContent = `${meta.name} (${acc.accountName})`;
       document.getElementById('info-customer-contact').textContent = thread.customerHandle;
       
@@ -1904,6 +2015,51 @@
       renderMessages(thread);
       lucide.createIcons();
     }
+
+    window.saveCustomerName = async function() {
+      const thread = threads.find(t => t.id === currentThreadId);
+      const input = document.getElementById('info-customer-name-input');
+      const name = input?.value.trim() || '';
+
+      if (!thread || !name) {
+        showToast('お客様名を入力してください');
+        return;
+      }
+
+      if (isDemoSession || !thread.liveConversationId) {
+        thread.customerName = name;
+        thread.customerNameSource = 'custom';
+        updateActiveChatPane(thread);
+        renderThreadList();
+        showToast('デモ内のお客様名を変更しました');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/customer', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId: thread.liveConversationId,
+            name
+          })
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'お客様名を変更できませんでした');
+        }
+
+        thread.customerName = result.name;
+        thread.customerNameSource = 'custom';
+        updateActiveChatPane(thread);
+        renderThreadList();
+        showToast('お客様名を変更しました');
+      } catch (error) {
+        showToast(error.message || 'お客様名を変更できませんでした');
+      }
+    };
 
     function renderMessages(thread) {
       const container = document.getElementById('messages-container');
@@ -2234,7 +2390,7 @@
             <div class="flex items-start justify-between">
               <div class="flex items-center gap-3">
                 <div class="w-11 h-11 rounded-xl ${meta.color} text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
-                  ${meta.text}
+                  ${meta.icon}
                 </div>
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
