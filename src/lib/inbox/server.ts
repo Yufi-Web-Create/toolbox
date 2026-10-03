@@ -7,6 +7,8 @@ export type InboxConversation = {
   provider_thread_id: string;
   customer_external_id: string;
   customer_display_name: string;
+  customer_avatar_url: string | null;
+  customer_name_source: "provider" | "custom";
   status: "unread" | "in_progress" | "completed";
   last_message_preview: string;
   last_message_at: string;
@@ -48,7 +50,7 @@ export async function getInboxSnapshot(
     const { data: conversationData, error: conversationError } = await supabase
       .from("conversations")
       .select(
-        "id, organization_id, provider, provider_thread_id, customer_external_id, customer_display_name, status, last_message_preview, last_message_at, created_at, updated_at",
+        "id, organization_id, provider, provider_thread_id, customer_external_id, customer_display_name, customer_avatar_url, customer_name_source, status, last_message_preview, last_message_at, created_at, updated_at",
       )
       .eq("organization_id", organizationId)
       .order("last_message_at", { ascending: false })
