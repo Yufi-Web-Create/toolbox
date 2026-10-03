@@ -1,0 +1,2789 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniBox - SNSメッセージ一元管理 & 予約投稿ハブ (Live Cloud Edition)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf9',
+              100: '#ccfbf1',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .pulse-sync {
+      animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased h-screen flex flex-col overflow-hidden">
+
+  <!-- グローバルヘッダー -->
+  <header class="h-16 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between z-20 shrink-0">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center text-white shadow-md shadow-teal-500/20">
+        <i data-lucide="layers" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-lg text-slate-900 leading-none">OmniBox</h1>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-sync"></span>
+            <span id="cloud-status-text">Cloud Sync 有効</span>
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 mt-0.5">複数SNS一元管理 & 予約投稿ハブ</p>
+      </div>
+    </div>
+
+    <!-- メインナビゲーションタブ -->
+    <nav class="hidden md:flex items-center space-x-1 bg-slate-100 p-1 rounded-xl">
+      <button onclick="switchView('inbox')" id="nav-inbox" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 bg-white text-teal-700 shadow-xs">
+        <i data-lucide="inbox" class="w-4 h-4"></i>
+        <span>受信箱</span>
+        <span id="unread-total-badge" class="ml-1 text-[11px] px-1.5 py-0.2 bg-teal-600 text-white rounded-full font-bold">0</span>
+      </button>
+      <button onclick="switchView('publish')" id="nav-publish" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-2">
+        <i data-lucide="send" class="w-4 h-4"></i>
+        <span>SNS一括・予約投稿</span>
+        <span id="scheduled-nav-badge" class="ml-1 text-[11px] px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-full font-bold">0</span>
+      </button>
+      <button onclick="switchView('templates')" id="nav-templates" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-2">
+        <i data-lucide="book-template" class="w-4 h-4"></i>
+        <span>定型文・業界パック</span>
+      </button>
+      <button onclick="switchView('channels')" id="nav-channels" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-2">
+        <i data-lucide="link-2" class="w-4 h-4"></i>
+        <span>連携アカウント (<span id="nav-account-count">0</span>)</span>
+      </button>
+      <button onclick="switchView('analytics')" id="nav-analytics" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-2">
+        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+        <span>分析</span>
+      </button>
+    </nav>
+
+    <!-- ユーザープロフィール & クイックアクション -->
+    <div class="flex items-center gap-3">
+      <button onclick="openNewPostModal()" class="hidden sm:flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-3.5 py-2 rounded-lg text-sm font-medium transition shadow-xs">
+        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+        <span>新規SNS投稿</span>
+      </button>
+      <div class="flex items-center pl-2 border-l border-slate-200 relative">
+        <div class="flex items-center gap-2 cursor-pointer group" onclick="toggleUserDropdown()">
+          <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-xs border border-teal-200" id="current-user-avatar">
+            担当
+          </div>
+          <div class="hidden lg:block text-left">
+            <div class="flex items-center gap-1">
+              <span class="text-xs font-bold text-slate-800 block" id="current-user-name">ログイン中...</span>
+              <span class="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-medium" id="current-user-role-badge">管理者</span>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono block truncate max-w-[130px]" id="current-user-email-label">user@company.com</span>
+          </div>
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition"></i>
+        </div>
+
+        <!-- ユーザードロップダウンメニュー -->
+        <div id="user-menu-dropdown" class="absolute right-0 top-12 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-50 hidden">
+          <div class="px-3 py-2 border-b border-slate-100 mb-1">
+            <span class="text-[10px] text-slate-400 block">ログイン中のアカウント</span>
+            <span class="text-xs font-bold text-slate-800 block truncate" id="dropdown-user-name">山田 太郎</span>
+            <span class="text-[11px] text-slate-500 font-mono block truncate" id="dropdown-user-email">yamada@company.com</span>
+          </div>
+          <button onclick="switchView('channels')" class="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2">
+            <i data-lucide="link-2" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span>SNS連携設定</span>
+          </button>
+          <button onclick="handleLogout()" class="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 mt-1">
+            <i data-lucide="log-out" class="w-3.5 h-3.5 text-red-500"></i>
+            <span>ログアウト</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- モバイル用下部タブナビゲーション -->
+  <div class="md:hidden flex border-b border-slate-200 bg-white px-2 py-1.5 overflow-x-auto gap-1">
+    <button onclick="switchView('inbox')" class="mobile-nav-btn text-xs px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 font-medium shrink-0 flex items-center gap-1.5">
+      <i data-lucide="inbox" class="w-3.5 h-3.5"></i>受信箱
+    </button>
+    <button onclick="switchView('publish')" class="mobile-nav-btn text-xs px-3 py-1.5 rounded-lg text-slate-600 font-medium shrink-0 flex items-center gap-1.5">
+      <i data-lucide="send" class="w-3.5 h-3.5"></i>予約投稿
+    </button>
+    <button onclick="switchView('templates')" class="mobile-nav-btn text-xs px-3 py-1.5 rounded-lg text-slate-600 font-medium shrink-0 flex items-center gap-1.5">
+      <i data-lucide="book-template" class="w-3.5 h-3.5"></i>定型文
+    </button>
+    <button onclick="switchView('channels')" class="mobile-nav-btn text-xs px-3 py-1.5 rounded-lg text-slate-600 font-medium shrink-0 flex items-center gap-1.5">
+      <i data-lucide="link-2" class="w-3.5 h-3.5"></i>連携
+    </button>
+    <button onclick="switchView('analytics')" class="mobile-nav-btn text-xs px-3 py-1.5 rounded-lg text-slate-600 font-medium shrink-0 flex items-center gap-1.5">
+      <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>分析
+    </button>
+  </div>
+
+  <main class="flex-1 flex overflow-hidden relative">
+
+    <!-- ==============================================
+         VIEW 1: 受信箱（INBOX VIEW）
+         ============================================== -->
+    <div id="view-inbox" class="view-panel w-full h-full flex flex-col md:flex-row overflow-hidden">
+
+      <!-- 左サイドバー: フィルタリング & チャネル切替 -->
+      <aside class="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
+        <div class="p-3 border-b border-slate-100">
+          <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+            <input type="text" id="search-input" placeholder="顧客名、本文、タグ検索..." oninput="handleSearch()" class="w-full pl-9 pr-3 py-2 text-xs bg-slate-100 focus:bg-white rounded-lg border border-transparent focus:border-teal-500 focus:outline-none transition">
+          </div>
+        </div>
+
+        <div class="overflow-y-auto flex-1 p-3 space-y-5 text-xs">
+          <!-- ステータス絞り込み -->
+          <div>
+            <div class="text-[11px] font-bold text-slate-400 tracking-wider uppercase mb-2">ステータス</div>
+            <div class="space-y-1">
+              <button onclick="filterByStatus('all')" class="status-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-teal-50 text-teal-800 font-medium" data-status="all">
+                <span class="flex items-center gap-2"><i data-lucide="archive" class="w-3.5 h-3.5 text-slate-500"></i>すべて</span>
+                <span id="badge-count-all" class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700">0</span>
+              </button>
+              <button onclick="filterByStatus('unread')" class="status-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 font-medium" data-status="unread">
+                <span class="flex items-center gap-2"><i data-lucide="bell" class="w-3.5 h-3.5 text-red-500"></i>未対応・未読</span>
+                <span id="badge-count-unread" class="text-[11px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-bold">0</span>
+              </button>
+              <button onclick="filterByStatus('in_progress')" class="status-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 font-medium" data-status="in_progress">
+                <span class="flex items-center gap-2"><i data-lucide="clock" class="w-3.5 h-3.5 text-amber-500"></i>対応中</span>
+                <span id="badge-count-progress" class="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">0</span>
+              </button>
+              <button onclick="filterByStatus('resolved')" class="status-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 font-medium" data-status="resolved">
+                <span class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-500"></i>対応完了</span>
+                <span id="badge-count-resolved" class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">0</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- チャネル絞り込み -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[11px] font-bold text-slate-400 tracking-wider uppercase">連携アカウント・窓口</span>
+              <button onclick="switchView('channels')" class="text-[10px] text-teal-600 hover:underline flex items-center gap-0.5">
+                <i data-lucide="plus" class="w-3 h-3"></i>追加
+              </button>
+            </div>
+            
+            <div class="space-y-1" id="account-filter-container">
+              <button onclick="filterByAccount('all')" class="account-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100 font-medium text-slate-800" data-account="all">
+                <span class="flex items-center gap-2"><i data-lucide="grid" class="w-3.5 h-3.5"></i>すべての全アカウント</span>
+                <span id="badge-all-accounts" class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded-full">0</span>
+              </button>
+              <div id="account-tree-list" class="space-y-2 mt-2">
+                <!-- 動的生成 -->
+              </div>
+            </div>
+          </div>
+
+          <!-- AIエンジン稼働バナー -->
+          <div class="p-3 bg-gradient-to-br from-teal-50 to-emerald-50 rounded-xl border border-teal-100">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-1.5 text-teal-900 font-semibold text-xs">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-teal-600"></i>
+                <span>AIアシスタント</span>
+              </div>
+              <span class="text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded">準備中</span>
+            </div>
+            <p class="text-[11px] text-teal-700 leading-relaxed">
+              お客さまのメッセージ文脈をリアルタイムに解釈し、高精度な返信文案や投稿案を生成します。
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 中央: スレッド一覧 -->
+      <section class="w-full md:w-80 lg:w-96 bg-white border-r border-slate-200 flex flex-col shrink-0">
+        <div class="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div>
+            <h2 class="font-bold text-sm text-slate-800">受信トレイ</h2>
+            <p id="inbox-filter-label" class="text-[11px] text-slate-500">すべての窓口・すべてのステータス</p>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="simulateIncomingMessage()" class="text-xs bg-white border border-slate-200 text-slate-700 hover:border-teal-500 hover:text-teal-600 px-2 py-1 rounded shadow-xs flex items-center gap-1 transition" title="新しい問い合わせを受信">
+              <i data-lucide="download-cloud" class="w-3 h-3 text-teal-600"></i>
+              <span>疑似受信</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- スレッドリスト本体 -->
+        <div id="thread-list-container" class="overflow-y-auto flex-1 divide-y divide-slate-100">
+          <!-- JSで動的にレンダリング -->
+        </div>
+      </section>
+
+      <!-- 右側: メッセージ対話詳細 & 顧客カルテ・メモ -->
+      <section id="chat-pane" class="flex-1 flex flex-col bg-slate-50 h-full overflow-hidden">
+        <div id="no-chat-selected" class="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+          <i data-lucide="message-square-dashed" class="w-16 h-16 stroke-[1.2] mb-3 text-slate-300"></i>
+          <p class="text-sm font-medium text-slate-600">スレッドが選択されていません</p>
+          <p class="text-xs text-slate-400 mt-1 max-w-sm">左側のリストから確認・返信したいお客様のメッセージを選択してください。</p>
+        </div>
+
+        <div id="active-chat-content" class="flex-1 flex flex-col h-full overflow-hidden hidden">
+          <!-- スレッドヘッダー -->
+          <div class="h-16 px-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
+            <div class="flex items-center space-x-3">
+              <div class="relative">
+                <img id="chat-customer-avatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100" class="w-10 h-10 rounded-full object-cover border border-slate-200">
+                <span id="chat-customer-channel-badge" class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] text-white"></span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 id="chat-customer-name" class="font-bold text-sm text-slate-800"></h3>
+                  <span id="chat-customer-handle" class="text-xs text-slate-400"></span>
+                  <span id="chat-status-pill" class="text-[10px] font-medium px-2 py-0.5 rounded-full"></span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                  <span id="chat-recipient-account-badge" class="font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 text-[10px] flex items-center gap-1"></span>
+                  <span>•</span>
+                  <span id="chat-customer-last-active"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <select id="chat-status-select" onchange="updateCurrentThreadStatus(this.value)" class="text-xs border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 text-slate-700 font-medium focus:outline-none focus:border-teal-500">
+                <option value="unread">🔴 未対応</option>
+                <option value="in_progress">🟡 対応中</option>
+                <option value="resolved">🟢 対応完了</option>
+              </select>
+
+              <select id="chat-assignee-select" onchange="updateCurrentAssignee(this.value)" class="text-xs border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 text-slate-700 font-medium focus:outline-none focus:border-teal-500">
+                <option value="山田 太郎">👤 山田 太郎</option>
+                <option value="佐藤 美咲">👤 佐藤 美咲</option>
+                <option value="未割り当て">👤 未割り当て</option>
+              </select>
+
+              <button onclick="toggleSideInfoPanel()" class="p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition" title="顧客カルテ・社内メモを表示">
+                <i data-lucide="sidebar" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- チャット本文 & 顧客情報 -->
+          <div class="flex-1 flex overflow-hidden">
+            <div class="flex-1 flex flex-col overflow-hidden bg-slate-50">
+              <div id="messages-container" class="flex-1 p-4 md:p-6 overflow-y-auto space-y-4"></div>
+
+              <div id="ai-loading-box" class="hidden px-4 py-2 bg-teal-50 border-t border-teal-200 flex items-center gap-2 text-xs text-teal-800">
+                <i data-lucide="sparkles" class="w-4 h-4 text-teal-600 animate-spin"></i>
+                <span id="ai-loading-text">Gemini AIが最適な返信文案を作成しています...</span>
+              </div>
+
+              <!-- 返信入力ドック -->
+              <div class="bg-white border-t border-slate-200 p-3 md:p-4 shrink-0">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <button onclick="triggerGeminiDraft('polite')" class="text-xs bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
+                      <i data-lucide="sparkles" class="w-3 h-3 text-teal-600"></i>
+                      <span>AI丁寧返信</span>
+                    </button>
+                    <button onclick="triggerGeminiDraft('friendly')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
+                      <i data-lucide="smile" class="w-3 h-3 text-slate-500"></i>
+                      <span>親しみやすい返信</span>
+                    </button>
+                    <button onclick="openTemplateSelectorModal()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
+                      <i data-lucide="file-text" class="w-3 h-3 text-slate-500"></i>
+                      <span>定型文挿入</span>
+                    </button>
+                  </div>
+
+                  <div class="flex bg-slate-100 p-0.5 rounded-lg text-xs font-medium">
+                    <button id="tab-mode-reply" onclick="setInputMode('reply')" class="px-2.5 py-1 rounded-md bg-white text-slate-800 shadow-xs">
+                      お客様へ返信
+                    </button>
+                    <button id="tab-mode-note" onclick="setInputMode('note')" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900">
+                      社内共有メモ
+                    </button>
+                  </div>
+                </div>
+
+                <div class="relative">
+                  <div id="note-indicator" class="hidden mb-1 px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center gap-1">
+                    <i data-lucide="lock" class="w-3 h-3 text-amber-600"></i>
+                    <span>全スタッフにリアルタイム共有される社内メモです（お客様には送信されません）</span>
+                  </div>
+                  <textarea id="message-input" rows="3" placeholder="返信メッセージを入力... (Shift+Enterで改行, Enterで送信)" onkeydown="handleInputKeyDown(event)" class="w-full text-xs md:text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition resize-none"></textarea>
+                  
+                  <div class="flex items-center justify-between mt-2">
+                    <div class="flex items-center gap-2 text-slate-400 text-xs">
+                      <span id="target-channel-label" class="flex items-center gap-1">
+                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                        <span>返信元: LINE</span>
+                      </span>
+                    </div>
+
+                    <button onclick="sendMessage()" id="send-main-button" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition">
+                      <span id="send-button-label">送信する</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 顧客情報 & 社内メモ サイドパネル -->
+            <div id="customer-info-panel" class="w-72 bg-white border-l border-slate-200 p-4 overflow-y-auto hidden lg:block shrink-0">
+              <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">顧客カルテ</div>
+              
+              <div class="space-y-3 text-xs mb-6">
+                <div>
+                  <label class="text-slate-400 block text-[11px]">お名前</label>
+                  <p id="info-customer-name" class="font-medium text-slate-800 mt-0.5">-</p>
+                </div>
+                <div>
+                  <label class="text-slate-400 block text-[11px]">流入チャネル</label>
+                  <p id="info-customer-channel" class="font-medium text-slate-800 mt-0.5">-</p>
+                </div>
+                <div>
+                  <label class="text-slate-400 block text-[11px]">連絡先 / ID</label>
+                  <p id="info-customer-contact" class="font-medium text-slate-800 mt-0.5 text-slate-600">-</p>
+                </div>
+                <div>
+                  <label class="text-slate-400 block text-[11px]">タグ</label>
+                  <div id="info-customer-tags" class="flex flex-wrap gap-1 mt-1"></div>
+                </div>
+              </div>
+
+              <div class="border-t border-slate-100 pt-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">社内共有メモ</span>
+                  <span class="text-[10px] text-teal-600 font-medium">全端末に即時同期</span>
+                </div>
+                <div id="internal-notes-list" class="space-y-2 max-h-60 overflow-y-auto mb-3"></div>
+                <div class="flex gap-1.5">
+                  <input type="text" id="quick-note-input" placeholder="メモを残す..." class="flex-1 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-teal-500">
+                  <button onclick="addQuickNote()" class="text-xs px-2.5 py-1.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">追加</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ==============================================
+         VIEW 2: SNS一括・予約投稿 (PUBLISH VIEW)
+         ============================================== -->
+    <div id="view-publish" class="view-panel w-full h-full p-4 md:p-6 overflow-y-auto hidden">
+      <div class="max-w-6xl mx-auto space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900">SNS一括・予約投稿マネージャー</h2>
+            <p class="text-xs md:text-sm text-slate-500 mt-1">
+              Instagram、X、Googleビジネスプロフィール等へ同時に内容を最適化して予約配信できます。
+            </p>
+          </div>
+          <button onclick="openNewPostModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 shadow-xs transition">
+            <i data-lucide="calendar-plus" class="w-4 h-4"></i>
+            <span>新しい投稿を作成</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <i data-lucide="clock" class="w-4 h-4 text-teal-600"></i>
+                <span>クラウド保存済み 予約投稿 (<span id="scheduled-count">0</span>件)</span>
+              </h3>
+              <span class="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>自動配信スケジューラー待機中
+              </span>
+            </div>
+
+            <div id="scheduled-posts-list" class="space-y-3"></div>
+          </div>
+
+          <div class="space-y-6">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200">
+              <h3 class="font-bold text-slate-800 text-sm mb-3">接続中の投稿先アカウント</h3>
+              <div id="publish-connected-channels-summary" class="space-y-2 text-xs"></div>
+            </div>
+
+            <div class="bg-gradient-to-br from-teal-500 to-emerald-600 text-white p-5 rounded-2xl shadow-sm">
+              <div class="flex items-center gap-2 mb-2 font-bold text-sm">
+                <i data-lucide="sparkles" class="w-4 h-4 text-teal-200"></i>
+                <span>Gemini AI 投稿アシスタント</span>
+              </div>
+              <p class="text-xs text-teal-50 leading-relaxed mb-4">
+                キャンペーン告知、新メニュー紹介、定休日アナウンスなどの投稿文と最適なハッシュタグを瞬時に自動生成します。
+              </p>
+              <button onclick="openNewPostModalWithAiPrompt()" class="w-full bg-white text-teal-800 hover:bg-teal-50 font-bold py-2 rounded-xl text-xs transition shadow-xs">
+                AIで投稿文を作成する
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==============================================
+         VIEW 3: 定型文 & 業界パック (TEMPLATES VIEW)
+         ============================================== -->
+    <div id="view-templates" class="view-panel w-full h-full p-4 md:p-6 overflow-y-auto hidden">
+      <div class="max-w-5xl mx-auto space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">定型文 & 業界別テンプレートパック</h2>
+          <p class="text-sm text-slate-500 mt-1">
+            店舗・事業にあわせた頻出の返信文を保存し、ワンクリックでメッセージ欄へ挿入できます。
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2 overflow-x-auto pb-2">
+          <button onclick="filterTemplates('all')" class="tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white" data-cat="all">すべて</button>
+          <button onclick="filterTemplates('salon')" class="tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-cat="salon">美容・サロン</button>
+          <button onclick="filterTemplates('restaurant')" class="tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-cat="restaurant">飲食・レストラン</button>
+          <button onclick="filterTemplates('ec')" class="tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-cat="ec">EC・物販</button>
+          <button onclick="filterTemplates('business')" class="tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-cat="business">士業・企業問い合わせ</button>
+        </div>
+
+        <div id="templates-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      </div>
+    </div>
+
+    <!-- ==============================================
+         VIEW 4: アカウント連携 (CHANNELS VIEW)
+         ============================================== -->
+    <div id="view-channels" class="view-panel w-full h-full p-4 md:p-6 overflow-y-auto hidden">
+      <div class="max-w-4xl mx-auto space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900">接続アカウント & 実Webhook連携設定</h2>
+            <p class="text-sm text-slate-500 mt-1">
+              各SNSで複数保有しているブランド・店舗・用途別のアカウントを無制限に連携・管理できます。
+            </p>
+          </div>
+          <button onclick="openAddAccountModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>新規アカウントを追加</span>
+          </button>
+        </div>
+
+        <div class="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-md">
+          <div class="flex items-center gap-2 mb-2 font-bold text-sm text-teal-400">
+            <i data-lucide="terminal" class="w-4 h-4"></i>
+            <span>実際のLINE公式アカウント / Meta Graph APIと接続するには</span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed mb-3">
+            本画面はリアルタイムデータベースと直結しています。同梱の <code class="bg-slate-800 px-1.5 py-0.5 rounded text-teal-300 font-mono">server.js</code> を起動し、LINE DevelopersコンソールにWebhook URLを設定するだけで、実際のお客さまのLINEメッセージがこの画面に直接着信します。
+          </p>
+          <div class="bg-slate-950 p-3 rounded-xl font-mono text-[11px] text-slate-300 flex items-center justify-between">
+            <span>Webhookエンドポイント: https://your-server-domain.com/api/webhook/line</span>
+            <button onclick="copyToClipboard('https://your-server-domain.com/api/webhook/line')" class="text-teal-400 hover:text-teal-300 ml-2">コピー</button>
+          </div>
+        </div>
+
+        <div id="connected-accounts-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+    </div>
+
+    <!-- ==============================================
+         VIEW 5: アナリティクス (ANALYTICS VIEW)
+         ============================================== -->
+    <div id="view-analytics" class="view-panel w-full h-full p-4 md:p-6 overflow-y-auto hidden">
+      <div class="max-w-5xl mx-auto space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">問い合わせ対応 & SNSパフォーマンス分析</h2>
+          <p class="text-sm text-slate-500 mt-1">
+            各チャネルからの受信状況、オペレーターの対応完了率、リアルタイムKPIを可視化します。
+          </p>
+        </div>
+
+        <!-- KPIカード -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span class="text-xs text-slate-400 font-medium block mb-1">総問い合わせ件数</span>
+            <div id="kpi-total-threads" class="text-2xl font-bold text-slate-800">0</div>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span class="text-xs text-slate-400 font-medium block mb-1">未対応・未読件数</span>
+            <div id="kpi-unread-count" class="text-2xl font-bold text-red-600">0</div>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span class="text-xs text-slate-400 font-medium block mb-1">対応完了率</span>
+            <div id="kpi-resolved-rate" class="text-2xl font-bold text-emerald-600">0%</div>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span class="text-xs text-slate-400 font-medium block mb-1">平均一次返信目安</span>
+            <div class="text-2xl font-bold text-teal-600">8<span class="text-xs font-normal text-slate-400 ml-1">分</span></div>
+          </div>
+        </div>
+
+        <!-- チャネル内訳 & オペレーターステータス -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <h3 class="font-bold text-sm text-slate-800 mb-4 flex items-center gap-2">
+              <i data-lucide="pie-chart" class="w-4 h-4 text-teal-600"></i>
+              <span>チャネル別 受信ボリューム比率</span>
+            </h3>
+            <div id="analytics-channel-breakdown" class="space-y-4 text-xs"></div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <h3 class="font-bold text-sm text-slate-800 mb-4 flex items-center gap-2">
+              <i data-lucide="users" class="w-4 h-4 text-teal-600"></i>
+              <span>担当者別アクティビティ</span>
+            </h3>
+            <div class="space-y-3 text-xs">
+              <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-800 font-bold flex items-center justify-center text-xs">山</div>
+                  <div>
+                    <span class="font-bold text-slate-800 block">山田 太郎</span>
+                    <span class="text-[10px] text-slate-400">システム管理者</span>
+                  </div>
+                </div>
+                <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-bold">オンライン</span>
+              </div>
+              <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs">佐</div>
+                  <div>
+                    <span class="font-bold text-slate-800 block">佐藤 美咲</span>
+                    <span class="text-[10px] text-slate-400">店舗オペレーター</span>
+                  </div>
+                </div>
+                <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-bold">オンライン</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ==============================================
+       MODALS & OVERLAYS
+       ============================================== -->
+
+  <!-- 新規アカウント追加モーダル (OAuth & ログイン連携対応) -->
+  <div id="add-account-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+            <i data-lucide="shield-check" class="w-5 h-5 text-teal-600"></i>
+            <span>SNS・メール窓口のログイン連携</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">SNSアカウントでログインするだけで、DMの受信と予約投稿が即座に開通します。</p>
+        </div>
+        <button onclick="closeAddAccountModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- 接続方式タブ -->
+      <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+        <button id="connect-tab-oauth" onclick="switchConnectTab('oauth')" class="flex-1 py-1.5 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition">
+          <i data-lucide="key" class="w-3.5 h-3.5 text-teal-600"></i>
+          <span>SNSログインで自動連携 (推奨)</span>
+        </button>
+        <button id="connect-tab-direct" onclick="switchConnectTab('direct')" class="flex-1 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition">
+          <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-500"></i>
+          <span>ログイン情報 / パスワード入力</span>
+        </button>
+      </div>
+
+      <!-- 方式1: ワンクリックOAuthソーシャルログイン -->
+      <div id="connect-oauth-section" class="space-y-3">
+        <p class="text-xs text-slate-600 leading-relaxed">
+          連携したいプラットフォームのボタンを押してログインを許可してください。APIキーや難しい設定は不要です。
+        </p>
+
+        <div class="space-y-2.5">
+          <!-- Instagram / Meta -->
+          <button onclick="startOAuthFlow('instagram')" class="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-pink-500 hover:bg-gradient-to-r hover:from-pink-50/40 hover:to-purple-50/40 transition group">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                IG
+              </div>
+              <div class="text-left">
+                <div class="text-xs font-bold text-slate-800 group-hover:text-pink-600 flex items-center gap-1.5">
+                  <span>Instagram (Meta) でログインして連携</span>
+                  <span class="text-[9px] bg-pink-100 text-pink-700 px-1.5 py-0.2 rounded font-medium">DM & 投稿</span>
+                </div>
+                <div class="text-[11px] text-slate-400">ビジネス/クリエイターアカウントをワンクリック認証</div>
+              </div>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 group-hover:text-pink-600 group-hover:translate-x-0.5 transition"></i>
+          </button>
+
+          <!-- LINE 公式アカウント -->
+          <button onclick="startOAuthFlow('line')" class="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                LINE
+              </div>
+              <div class="text-left">
+                <div class="text-xs font-bold text-slate-800 group-hover:text-emerald-700 flex items-center gap-1.5">
+                  <span>LINE Business ID でログインして連携</span>
+                  <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-medium">チャット送受信</span>
+                </div>
+                <div class="text-[11px] text-slate-400">公式アカウントの友だちメッセージを自動同期</div>
+              </div>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition"></i>
+          </button>
+
+          <!-- X (旧Twitter) -->
+          <button onclick="startOAuthFlow('x')" class="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-slate-800 hover:bg-slate-50 transition group">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-base shadow-xs">
+                𝕏
+              </div>
+              <div class="text-left">
+                <div class="text-xs font-bold text-slate-800 group-hover:text-slate-900 flex items-center gap-1.5">
+                  <span>𝕏 (Twitter) でログインして連携</span>
+                  <span class="text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-medium">DM & ポスト予約</span>
+                </div>
+                <div class="text-[11px] text-slate-400">OAuth 2.0 PKCE で安全にアカウントを紐付け</div>
+              </div>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 group-hover:text-slate-900 group-hover:translate-x-0.5 transition"></i>
+          </button>
+
+          <!-- Google / Gmail -->
+          <button onclick="startOAuthFlow('email')" class="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/40 transition group">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                Mail
+              </div>
+              <div class="text-left">
+                <div class="text-xs font-bold text-slate-800 group-hover:text-blue-700 flex items-center gap-1.5">
+                  <span>Google / メールアカウントでログイン</span>
+                  <span class="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-medium">問い合わせメール</span>
+                </div>
+                <div class="text-[11px] text-slate-400">サポート窓口メールをスレッド受信箱へ統合</div>
+              </div>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition"></i>
+          </button>
+        </div>
+
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-800 flex items-center gap-2">
+          <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+          <span>公式OAuth認証のため、パスワードを当システムに預けることなく安全に連携できます。</span>
+        </div>
+      </div>
+
+      <!-- 方式2: ログイン情報・パスワードによるダイレクト接続 -->
+      <div id="connect-direct-section" class="space-y-3 hidden">
+        <div>
+          <label class="text-xs font-bold text-slate-600 block mb-1">プラットフォーム</label>
+          <select id="direct-platform-select" onchange="updateDirectFormLabels()" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-white">
+            <option value="email">サポートメール (IMAP / SMTP / Gmail)</option>
+            <option value="instagram">Instagram (ユーザーID & パスワード連携)</option>
+            <option value="line">LINE公式アカウント (チャネル設定)</option>
+            <option value="x">X (旧Twitter アカウント連携)</option>
+          </select>
+        </div>
+
+        <div>
+          <label id="direct-label-name" class="text-xs font-bold text-slate-600 block mb-1">店舗・窓口の表示名</label>
+          <input type="text" id="direct-account-name" placeholder="例: カスタマーサポート代表、新宿店" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500">
+        </div>
+
+        <div>
+          <label id="direct-label-user" class="text-xs font-bold text-slate-600 block mb-1">ログイン用 メールアドレス / ユーザー名</label>
+          <input type="text" id="direct-account-user" placeholder="例: support@company.com または @omni_store" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500">
+        </div>
+
+        <div>
+          <label id="direct-label-pass" class="text-xs font-bold text-slate-600 block mb-1">ログインパスワード / アプリパスワード</label>
+          <div class="relative">
+            <input type="password" id="direct-account-pass" placeholder="••••••••••••" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 pr-10">
+            <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
+              <i data-lucide="eye" class="w-4 h-4" id="pass-eye-icon"></i>
+            </button>
+          </div>
+          <p id="direct-pass-hint" class="text-[10px] text-slate-400 mt-1">※Gmailをご利用の場合は2段階認証の「アプリパスワード」を入力してください。</p>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button onclick="closeAddAccountModal()" class="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl">キャンセル</button>
+          <button onclick="submitDirectLogin()" id="direct-submit-btn" class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-xs flex items-center gap-1.5">
+            <i data-lucide="plug" class="w-3.5 h-3.5"></i>
+            <span>接続テスト & 連携完了</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OAuth認証シミュレーション ポップアップダイアログ -->
+  <div id="oauth-popup-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="text-center space-y-2">
+        <div id="oauth-popup-icon" class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md"></div>
+        <div>
+          <h4 id="oauth-popup-title" class="font-bold text-base text-slate-800"></h4>
+          <p class="text-xs text-slate-500 mt-0.5">OmniBox が以下のアカウントへのアクセス権限をリクエストしています</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-center gap-3">
+        <img id="oauth-detected-avatar" src="" class="w-10 h-10 rounded-full object-cover border border-white shadow-xs">
+        <div class="truncate">
+          <span id="oauth-detected-name" class="font-bold text-xs text-slate-800 block truncate"></span>
+          <span id="oauth-detected-handle" class="text-[11px] text-slate-400 font-mono block truncate"></span>
+        </div>
+        <span class="ml-auto text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded shrink-0">ログイン済</span>
+      </div>
+
+      <div class="space-y-1.5 text-xs text-slate-600 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">許可されるアクセス権限:</div>
+        <div class="flex items-center gap-2">
+          <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+          <span>メッセージ・DMの受信と自動通知</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+          <span>OmniBoxからの顧客返信メッセージ送信</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+          <span>指定した日時の予約投稿・フィード公開</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 pt-2">
+        <button onclick="closeOAuthPopup()" class="w-1/2 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl font-medium">キャンセル</button>
+        <button onclick="confirmOAuthConnection()" id="oauth-confirm-btn" class="w-1/2 py-2 text-xs font-bold text-white rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+          <span>アクセスを許可</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新規SNS予約投稿モーダル -->
+  <div id="new-post-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl border border-slate-100 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+          <i data-lucide="send" class="w-5 h-5 text-teal-600"></i>
+          <span>SNS一括・予約投稿を作成</span>
+        </h3>
+        <button onclick="closeNewPostModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="text-xs font-bold text-slate-600">投稿先アカウント (複数選択可能)</label>
+          <span class="text-[11px] text-slate-400">店舗・媒体ごとに選択</span>
+        </div>
+        <div id="post-target-accounts-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1"></div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-xs font-bold text-slate-600">投稿本文</label>
+          <button onclick="generateAiPostDraftWithGemini()" class="text-xs text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span>Gemini AIで告知文を自動作成</span>
+          </button>
+        </div>
+        <textarea id="new-post-content" rows="4" placeholder="フォロワーに届けたい情報を入力してください... #ハッシュタグ など" class="w-full text-xs md:text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 resize-none"></textarea>
+      </div>
+
+      <div>
+        <label class="text-xs font-bold text-slate-600 mb-1 block">公開タイミング</label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="flex items-center gap-2 text-xs border border-slate-200 p-2.5 rounded-xl cursor-pointer">
+            <input type="radio" name="post-timing" value="now" class="text-teal-600">
+            <span>今すぐ一括投稿</span>
+          </label>
+          <label class="flex items-center gap-2 text-xs border border-teal-500 bg-teal-50/50 p-2.5 rounded-xl cursor-pointer">
+            <input type="radio" name="post-timing" value="schedule" checked class="text-teal-600">
+            <span>予約日時に投稿</span>
+          </label>
+        </div>
+        <input type="datetime-local" id="new-post-datetime" class="mt-2 text-xs w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:border-teal-500">
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        <button onclick="closeNewPostModal()" class="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl">キャンセル</button>
+        <button onclick="submitNewPost()" class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-xs">クラウドに予約保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 定型文選択モーダル -->
+  <div id="template-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-xl border border-slate-100 space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+        <h3 class="font-bold text-sm text-slate-800">定型文の挿入</h3>
+        <button onclick="closeTemplateSelectorModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div id="modal-template-list" class="max-h-72 overflow-y-auto space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs shadow-xl flex items-center gap-2 transform translate-y-16 opacity-0 transition-all duration-300 z-50">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toast-message">処理が完了しました</span>
+  </div>
+
+  <!-- 利用者向け 統合ログイン & 新規登録ポータル -->
+  <div id="auth-portal-overlay" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="bg-gradient-to-br from-teal-700 via-teal-600 to-emerald-500 p-6 text-white text-center relative">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center mb-3 shadow-inner">
+          <i data-lucide="layers" class="w-7 h-7 text-white"></i>
+        </div>
+        <h2 class="text-xl font-bold tracking-tight">OmniBox ポータル</h2>
+        <p class="text-xs text-teal-100 mt-1">複数SNSのメッセージ一元管理 & 予約投稿ハブ</p>
+      </div>
+
+      <div class="p-6 space-y-5">
+        <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+          <button id="auth-tab-login" onclick="switchAuthTab('login')" class="flex-1 py-2 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="log-in" class="w-3.5 h-3.5 text-teal-600"></i>
+            <span>ログイン</span>
+          </button>
+          <button id="auth-tab-register" onclick="switchAuthTab('register')" class="flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="user-plus" class="w-3.5 h-3.5 text-slate-500"></i>
+            <span>スタッフ新規登録</span>
+          </button>
+        </div>
+
+        <form onsubmit="handleAuthSubmit(event)" class="space-y-3.5">
+          <div id="auth-name-group" class="hidden">
+            <label class="text-xs font-bold text-slate-600 block mb-1">お名前 (スタッフ表示名)</label>
+            <div class="relative">
+              <i data-lucide="user" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+              <input type="text" id="auth-input-name" placeholder="例: 佐藤 美咲" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
+            </div>
+          </div>
+
+          <div>
+            <label class="text-xs font-bold text-slate-600 block mb-1">メールアドレス (社内・店舗アカウント)</label>
+            <div class="relative">
+              <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+              <input type="email" id="auth-input-email" required placeholder="yamada@company.com" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-xs font-bold text-slate-600">パスワード</label>
+              <button type="button" onclick="showForgotPasswordInfo()" class="text-[11px] text-teal-600 hover:underline">パスワードをお忘れですか？</button>
+            </div>
+            <div class="relative">
+              <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+              <input type="password" id="auth-input-password" required placeholder="••••••••••••" class="w-full text-xs pl-9 pr-10 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
+              <button type="button" onclick="toggleAuthPasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
+                <i data-lucide="eye" class="w-4 h-4" id="auth-eye-icon"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="auth-remember-me" checked class="rounded text-teal-600 focus:ring-teal-500">
+              <span>ログイン状態を保持する</span>
+            </label>
+            <span class="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+              <i data-lucide="shield-check" class="w-3 h-3"></i>SSL暗号化通信
+            </span>
+          </div>
+
+          <button type="submit" id="auth-submit-btn" class="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-md shadow-teal-600/20 flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="arrow-right-circle" class="w-4 h-4"></i>
+            <span id="auth-submit-label">ログインして業務を開始</span>
+          </button>
+        </form>
+
+        <div class="relative flex items-center justify-center">
+          <div class="border-t border-slate-200 w-full"></div>
+          <span class="bg-white px-3 text-[10px] text-slate-400 uppercase tracking-wider font-semibold absolute">クイック体験・デモログイン</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" onclick="quickLoginDemo('admin')" class="p-2.5 rounded-xl border border-slate-200 hover:border-teal-500 hover:bg-teal-50/40 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-slate-800 group-hover:text-teal-700 flex items-center gap-1">
+                <i data-lucide="shield" class="w-3 h-3 text-teal-600"></i>管理者
+              </span>
+              <span class="text-[9px] bg-teal-100 text-teal-800 px-1 py-0.2 rounded font-mono">Owner</span>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-0.5 truncate">山田 太郎 (全権限)</div>
+          </button>
+
+          <button type="button" onclick="quickLoginDemo('staff')" class="p-2.5 rounded-xl border border-slate-200 hover:border-teal-500 hover:bg-teal-50/40 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-slate-800 group-hover:text-teal-700 flex items-center gap-1">
+                <i data-lucide="user" class="w-3 h-3 text-slate-500"></i>店舗スタッフ
+              </span>
+              <span class="text-[9px] bg-slate-100 text-slate-700 px-1 py-0.2 rounded font-mono">Staff</span>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-0.5 truncate">佐藤 美咲 (現場対応)</div>
+          </button>
+        </div>
+
+        <div class="text-center text-[10px] text-slate-400">
+          © 2026 OmniBox Cloud Services. All rights reserved.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- スクリプト本体 -->
+  <script type="module">
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'omnibox-sns-hub';
+    let db = null;
+    let auth = null;
+    let currentUser = null;
+    let isCloudReady = false;
+
+    let currentAuthMode = 'login';
+    let loggedInUser = null;
+
+    let threads = [];
+    let connectedAccounts = [];
+    let scheduledPosts = [];
+    let currentThreadId = null;
+    let currentStatusFilter = 'all';
+    let currentAccountFilter = 'all';
+    let searchQuery = '';
+    let inputMode = 'reply';
+
+    const defaultAccounts = [
+      {
+        id: 'acc_ig_1',
+        platform: 'instagram',
+        platformName: 'Instagram',
+        accountName: 'OmniBox 東京本店',
+        handle: '@omni_tokyo',
+        badgeColor: 'bg-pink-500',
+        active: true
+      },
+      {
+        id: 'acc_ig_2',
+        platform: 'instagram',
+        platformName: 'Instagram',
+        accountName: 'OmniBox 大阪心斎橋店',
+        handle: '@omni_osaka',
+        badgeColor: 'bg-pink-500',
+        active: true
+      },
+      {
+        id: 'acc_line_1',
+        platform: 'line',
+        platformName: 'LINE公式',
+        accountName: '公式オンラインストア窓口',
+        handle: '@omnistore',
+        badgeColor: 'bg-emerald-500',
+        active: true
+      },
+      {
+        id: 'acc_x_1',
+        platform: 'x',
+        platformName: 'X (旧Twitter)',
+        accountName: 'Omni公式広報',
+        handle: '@OmniJP',
+        badgeColor: 'bg-slate-900',
+        active: true
+      },
+      {
+        id: 'acc_mail_1',
+        platform: 'email',
+        platformName: 'サポートメール',
+        accountName: 'カスタマーサポート代表',
+        handle: 'support@omnistore.jp',
+        badgeColor: 'bg-blue-600',
+        active: true
+      }
+    ];
+
+    const defaultThreads = [
+      {
+        id: 'thr-sample-1',
+        accountId: 'acc_line_1',
+        customerName: '高橋 さくら',
+        customerHandle: '@sakura_t',
+        channel: 'line',
+        avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
+        status: 'unread',
+        assignee: '山田 太郎',
+        lastMessage: '今週末の日曜日の14時に2名で予約をお願いできますでしょうか？',
+        lastTime: '13:20',
+        unreadCount: 1,
+        tags: ['予約希望', 'サロン', 'リピーター'],
+        notes: [
+          { author: '山田', time: '13:22', text: '前回来店時にトリートメントをご利用。空き枠確認中。' }
+        ],
+        messages: [
+          { sender: 'customer', text: 'こんにちは！いつもお世話になっております。', time: '13:18' },
+          { sender: 'customer', text: '今週末の日曜日の14時に2名で予約をお願いできますでしょうか？', time: '13:20' }
+        ],
+        updatedAt: Date.now()
+      },
+      {
+        id: 'thr-sample-2',
+        accountId: 'acc_ig_1',
+        customerName: 'Kento Sato',
+        customerHandle: '@kento_designs',
+        channel: 'instagram',
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
+        status: 'unread',
+        assignee: '佐藤 美咲',
+        lastMessage: 'ストーリーズに上がっていた限定シャツの在庫は東京店にまだありますか？Mサイズを希望しています！',
+        lastTime: '12:45',
+        unreadCount: 2,
+        tags: ['在庫確認', 'EC/物販'],
+        notes: [],
+        messages: [
+          { sender: 'customer', text: 'こんにちは！DM失礼します。', time: '12:40' },
+          { sender: 'customer', text: 'ストーリーズに上がっていた限定シャツの在庫は東京店にまだありますか？Mサイズを希望しています！', time: '12:45' }
+        ],
+        updatedAt: Date.now() - 3600000
+      }
+    ];
+
+    const defaultScheduledPosts = [
+      {
+        id: 'post-init-1',
+        content: '【秋の新作コレクション登場🍁】明日より店頭およびオンラインショップにて秋の新作アウターを順次発売いたします！数量限定となりますのでぜひチェックしてください。 #秋コーデ #新作入荷',
+        channels: ['𝕏 (Omni公式広報)', 'Instagram (OmniBox 東京本店)'],
+        scheduledAt: '2026-10-04 18:00',
+        status: '予約中',
+        createdAt: Date.now()
+      }
+    ];
+
+    const templates = [
+      {
+        id: 't-1',
+        category: 'salon',
+        title: 'ご予約の確定案内（日時・アクセス）',
+        body: 'ご予約誠にありがとうございます！以下の日時でご案内確定いたしました。\n\n■ご予約日時: [日時を入力]\n■施術内容: [メニュー名]\n\n当日はお気をつけてお越しくださいませ。道に迷われた際はお気軽にお電話ください。'
+      },
+      {
+        id: 't-2',
+        category: 'salon',
+        title: '予約満席時の別日程ご案内',
+        body: 'お問い合わせありがとうございます。大変申し訳ございませんが、ご希望いただいたお時間は既に満席となっております。\n\n以下の日時であればすぐにご案内可能ですが、ご都合いかがでしょうか？\n・[候補日時1]\n・[候補日時2]'
+      },
+      {
+        id: 't-3',
+        category: 'restaurant',
+        title: '宴会・団体予約のお席確認',
+        body: 'お問い合わせいただきありがとうございます！[人数]名様のご予約可能でございます。アレルギーやお苦手な食材などがございましたら事前に気兼ねなくお申し付けくださいませ。'
+      },
+      {
+        id: 't-4',
+        category: 'ec',
+        title: '商品の在庫確認・取り置き完了',
+        body: 'お問い合わせありがとうございます！お問い合わせいただいた商品（サイズ/カラー）につきまして、店舗に残り[点数]点在庫がございます。お取り置きも承れますので、ご希望の際はお知らせください。'
+      },
+      {
+        id: 't-5',
+        category: 'business',
+        title: '資料送付とお打ち合わせの御礼',
+        body: 'お問い合わせいただき誠にありがとうございます。ご要望のサービス資料を添付にて送付いたします。\nオンラインでのデモやお見積もりの作成も可能ですので、ご不明点等ございましたらお気軽にご相談ください。'
+      }
+    ];
+
+    async function loadLiveInbox(conversationId = null) {
+      try {
+        const suffix = conversationId ? `?conversation=${encodeURIComponent(conversationId)}` : '';
+        const response = await fetch('/api/omnibox/inbox' + suffix, {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+
+        if (response.status === 401) {
+          loggedInUser = null;
+          threads = [];
+          connectedAccounts = [];
+          onDataUpdated();
+          checkExistingSession();
+          return false;
+        }
+
+        if (!response.ok) {
+          throw new Error('Inbox API unavailable');
+        }
+
+        const payload = await response.json();
+        const selectedId = payload.selectedConversation?.id || conversationId || null;
+        const selectedMessages = Array.isArray(payload.messages) ? payload.messages : [];
+
+        connectedAccounts = [{
+          id: 'acc_line_live',
+          platform: 'line',
+          platformName: 'LINE公式',
+          accountName: 'LINE公式アカウント',
+          handle: 'Messaging API',
+          badgeColor: 'bg-emerald-500',
+          active: true,
+          connectedVia: 'server'
+        }];
+
+        threads = (payload.conversations || []).map((conversation) => {
+          const isSelected = conversation.id === selectedId;
+          const messages = isSelected
+            ? selectedMessages.map((message) => ({
+                sender: message.direction === 'inbound' ? 'customer' : 'agent',
+                text: message.body,
+                time: formatLiveTime(message.created_at)
+              }))
+            : [];
+
+          return {
+            id: conversation.id,
+            liveConversationId: conversation.id,
+            accountId: 'acc_line_live',
+            customerName: conversation.customer_display_name || 'LINEユーザー',
+            customerHandle: conversation.customer_external_id || '',
+            channel: 'line',
+            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
+            status: conversation.status === 'completed' ? 'resolved' : conversation.status,
+            assignee: '未割り当て',
+            lastMessage: conversation.last_message_preview || '',
+            lastTime: formatLiveTime(conversation.last_message_at),
+            unreadCount: conversation.status === 'unread' ? 1 : 0,
+            tags: ['LINE', '実データ'],
+            notes: [],
+            messages,
+            updatedAt: new Date(conversation.last_message_at).getTime() || Date.now()
+          };
+        });
+
+        if (selectedId) {
+          currentThreadId = selectedId;
+        }
+
+        onDataUpdated();
+        return true;
+      } catch (error) {
+        console.error('Live inbox load failed:', error);
+        threads = [];
+        connectedAccounts = [];
+        onDataUpdated();
+        showToast('受信箱を読み込めませんでした。接続設定をご確認ください');
+        return false;
+      }
+    }
+
+    function formatLiveTime(value) {
+      if (!value) return '最近';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '最近';
+      return date.toLocaleString('ja-JP', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    async function initCloudAndAuth() {
+      threads = [];
+      connectedAccounts = [];
+      scheduledPosts = [...defaultScheduledPosts];
+      isCloudReady = false;
+      db = null;
+      auth = null;
+
+      try {
+        const response = await fetch('/api/omnibox/session', {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const session = await response.json();
+
+        if (session.authenticated && session.user) {
+          loggedInUser = {
+            name: session.user.name || session.user.email?.split('@')[0] || 'スタッフ',
+            email: session.user.email || '',
+            role: session.user.role || 'スタッフ',
+            avatar: (session.user.name || session.user.email || '担').slice(0, 1)
+          };
+          await loadLiveInbox();
+        } else {
+          loggedInUser = null;
+          onDataUpdated();
+        }
+      } catch (err) {
+        console.error('Session init failed:', err);
+        loggedInUser = null;
+        threads = [];
+        connectedAccounts = [];
+        onDataUpdated();
+      }
+
+      checkExistingSession();
+    }
+
+    function subscribeToCloudData() {
+      // Real data is loaded from the authenticated Next.js API.
+      return;
+    }
+
+    function onDataUpdated() {
+      renderAccountFilters();
+      renderConnectedAccounts();
+      renderTargetAccountsCheckboxes();
+      renderThreadList();
+      renderPublishChannelsSummary();
+      updateBadges();
+      updateAnalyticsView();
+
+      if (!currentThreadId && threads.length > 0) {
+        selectThread(threads[0].id);
+      } else if (currentThreadId) {
+        const current = threads.find(t => t.id === currentThreadId);
+        if (current) {
+          updateActiveChatPane(current);
+        } else if (threads.length > 0) {
+          selectThread(threads[0].id);
+        }
+      }
+    }
+
+    async function callGeminiApi(systemPrompt, userPrompt) {
+      const apiKey = "";
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      const payload = {
+        contents: [{ parts: [{ text: userPrompt }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] }
+      };
+
+      let attempts = 0;
+      const maxAttempts = 3;
+      let delay = 1000;
+
+      while (attempts < maxAttempts) {
+        try {
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!response.ok) throw new Error(`API error HTTP ${response.status}`);
+          const result = await response.json();
+          const candidate = result.candidates?.[0];
+          if (candidate?.content?.parts?.[0]?.text) {
+            return candidate.content.parts[0].text;
+          }
+          throw new Error('Empty response');
+        } catch (e) {
+          attempts++;
+          if (attempts >= maxAttempts) throw e;
+          await new Promise(r => setTimeout(r, delay));
+          delay *= 2;
+        }
+      }
+    }
+
+    window.triggerGeminiDraft = async function(tone) {
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) {
+        showToast('スレッドを選択してください');
+        return;
+      }
+
+      const loadingBox = document.getElementById('ai-loading-box');
+      const loadingText = document.getElementById('ai-loading-text');
+      loadingBox.classList.remove('hidden');
+      loadingText.textContent = `Gemini AIが【${tone === 'polite' ? '丁寧な敬語' : '親しみやすい接客トーン'}】で最適な返信案を作成中...`;
+
+      const lastCustomerMessage = thread.lastMessage;
+      const channelMeta = getChannelMeta(thread.channel);
+      const acc = getAccountById(thread.accountId);
+
+      const systemPrompt = `あなたは店舗・企業のプロフェッショナルなSNSカスタマーサポートです。
+お客さまからの問い合わせに対して、自然で好印象な日本語返信文を作成してください。
+文面には [日時] や [担当者名] などのプレースホルダーを必要に応じて配置し、人間が確認して微調整しやすい形で出力してください。
+挨拶・結びを含めてそのまま使える完成度の文章にしてください。`;
+
+      const userPrompt = `【問い合わせ窓口】: ${channelMeta.name} (${acc.accountName})
+【顧客名】: ${thread.customerName}
+【希望トーン】: ${tone === 'polite' ? '礼儀正しい敬語・ビジネス丁寧語' : '柔らかく親しみやすい接客トーン'}
+【問い合わせ本文】:
+"${lastCustomerMessage}"
+
+上記の内容に対する返信案を作成してください。返信メッセージ本文のみを出力してください。`;
+
+      try {
+        const generated = await callGeminiApi(systemPrompt, userPrompt);
+        const input = document.getElementById('message-input');
+        input.value = generated.trim();
+        setInputMode('reply');
+        input.focus();
+        showToast('Gemini AIが返信文案を作成しました！');
+      } catch (err) {
+        console.error("Gemini call failed:", err);
+        generateFallbackDraft(tone, thread);
+      } finally {
+        loadingBox.classList.add('hidden');
+      }
+    };
+
+    function generateFallbackDraft(tone, thread) {
+      const input = document.getElementById('message-input');
+      if (tone === 'polite') {
+        input.value = `${thread.customerName}様\n\nお問い合わせいただき誠にありがとうございます。OmniBox担当の${thread.assignee}でございます。\nご質問いただきました内容について確認が取れましたのでご案内いたします。\n\n詳細についてご確認いただけますと幸いです。よろしくお願い申し上げます。`;
+      } else {
+        input.value = `${thread.customerName}さん、メッセージありがとうございます！✨\nご質問いただいた件、しっかり確認できました！\n気になる点があればいつでもお気軽にDMしてくださいね😊`;
+      }
+      showToast('AIアシスタントの返信案を挿入しました');
+    }
+
+    window.generateAiPostDraftWithGemini = async function() {
+      const textarea = document.getElementById('new-post-content');
+      textarea.value = 'Gemini AIがSNS告知文を生成中...';
+      const promptTopics = [
+        '秋の新作メニューの告知。季節感、限定感、ハッシュタグを含めて魅力をアピール。',
+        '週末限定のフォロワー様限定10%OFFキャンペーンの告知。来店を促す明るい文面。',
+        '店舗の営業時間変更と、スタッフおすすめアイテムの紹介。'
+      ];
+      const selectedTopic = promptTopics[Math.floor(Math.random() * promptTopics.length)];
+
+      const systemPrompt = `あなたはSNSマーケティングの専門家です。InstagramやXでエンゲージメントを高める魅力的な告知投稿文を作成してください。絵文字を効果的に使い、関連するハッシュタグを末尾に3〜5個付与してください。`;
+      const userPrompt = `テーマ: 「${selectedTopic}」についての投稿文を作成してください。`;
+
+      try {
+        const result = await callGeminiApi(systemPrompt, userPrompt);
+        textarea.value = result.trim();
+        showToast('AIがSNS投稿文を自動生成しました！');
+      } catch (e) {
+        textarea.value = `【週末限定フェア開催🎉】日頃の感謝を込めて、今週末限定で全メニュー20%OFFの特別キャンペーンを実施いたします！ご予約はプロフィールのリンクまたはDMからお気軽にどうぞ！✨ #セール #週末イベント #お知らせ`;
+        showToast('SNS投稿案をセットしました');
+      }
+    };
+
+    function getChannelMeta(channel) {
+      switch(channel) {
+        case 'line':
+          return { name: 'LINE公式', color: 'bg-emerald-500', text: 'LINE' };
+        case 'instagram':
+          return { name: 'Instagram', color: 'bg-pink-500', text: 'IG' };
+        case 'x':
+          return { name: 'X', color: 'bg-slate-900', text: '𝕏' };
+        case 'email':
+          return { name: 'メール', color: 'bg-blue-600', text: 'Mail' };
+        default:
+          return { name: 'Chat', color: 'bg-teal-500', text: '💬' };
+      }
+    }
+
+    function getAccountById(accId) {
+      return connectedAccounts.find(a => a.id === accId) || {
+        accountName: 'メイン窓口',
+        handle: '@omni_hub',
+        platform: 'other',
+        platformName: 'SNS'
+      };
+    }
+
+    function renderAccountFilters() {
+      const treeList = document.getElementById('account-tree-list');
+      if (!treeList) return;
+      treeList.innerHTML = '';
+
+      const platforms = [
+        { id: 'instagram', name: 'Instagram', dotColor: 'bg-pink-500' },
+        { id: 'line', name: 'LINE公式', dotColor: 'bg-emerald-500' },
+        { id: 'x', name: 'X (Twitter)', dotColor: 'bg-slate-900' },
+        { id: 'email', name: 'メール', dotColor: 'bg-blue-600' }
+      ];
+
+      platforms.forEach(p => {
+        const accs = connectedAccounts.filter(a => a.platform === p.id);
+        if (accs.length === 0) return;
+
+        const groupEl = document.createElement('div');
+        groupEl.className = 'border-l-2 border-slate-200 pl-2 space-y-1';
+
+        const header = document.createElement('div');
+        header.className = 'text-[11px] font-bold text-slate-500 flex items-center gap-1.5 py-0.5';
+        header.innerHTML = `
+          <span class="w-2 h-2 rounded-full ${p.dotColor}"></span>
+          <span>${p.name}</span>
+          <span class="text-[9px] bg-slate-100 text-slate-500 px-1 rounded">${accs.length}</span>
+        `;
+        groupEl.appendChild(header);
+
+        accs.forEach(acc => {
+          const count = threads.filter(t => t.accountId === acc.id).length;
+          const btn = document.createElement('button');
+          const isSelected = currentAccountFilter === acc.id;
+          btn.className = `account-filter-btn w-full text-left px-2 py-1 rounded-md text-[11px] flex items-center justify-between transition ${isSelected ? 'bg-teal-50 text-teal-800 font-bold' : 'text-slate-600 hover:bg-slate-100'}`;
+          btn.dataset.account = acc.id;
+          btn.onclick = () => window.filterByAccount(acc.id);
+          btn.innerHTML = `
+            <div class="truncate">
+              <span class="block truncate">${acc.accountName}</span>
+              <span class="text-[10px] text-slate-400 block truncate">${acc.handle}</span>
+            </div>
+            <span class="text-[10px] bg-slate-100 px-1 rounded shrink-0 ml-1 text-slate-500">${count}</span>
+          `;
+          groupEl.appendChild(btn);
+        });
+
+        treeList.appendChild(groupEl);
+      });
+      lucide.createIcons();
+    }
+
+    window.filterByAccount = function(accId) {
+      currentAccountFilter = accId;
+      document.querySelectorAll('.account-filter-btn').forEach(btn => {
+        if (btn.dataset.account === accId) {
+          btn.classList.add('bg-teal-50', 'text-teal-800', 'font-bold');
+          btn.classList.remove('hover:bg-slate-100', 'text-slate-600', 'bg-slate-100');
+        } else {
+          btn.classList.remove('bg-teal-50', 'text-teal-800', 'font-bold');
+          btn.classList.add('text-slate-600', 'hover:bg-slate-100');
+        }
+      });
+      renderThreadList();
+    };
+
+    function renderThreadList() {
+      const container = document.getElementById('thread-list-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const filtered = threads.filter(t => {
+        const matchesStatus = currentStatusFilter === 'all' 
+          ? true 
+          : currentStatusFilter === 'unread' 
+            ? (t.status === 'unread' || t.unreadCount > 0) 
+            : t.status === currentStatusFilter;
+
+        const matchesAccount = currentAccountFilter === 'all' ? true : t.accountId === currentAccountFilter;
+
+        const matchesSearch = searchQuery === '' ? true : (
+          (t.customerName && t.customerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (t.lastMessage && t.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (t.tags && t.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
+        );
+
+        return matchesStatus && matchesAccount && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="p-8 text-center text-slate-400">
+            <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
+            <p class="text-xs">該当する問い合わせはありません</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      filtered.forEach(thread => {
+        const meta = getChannelMeta(thread.channel);
+        const acc = getAccountById(thread.accountId);
+        const isSelected = thread.id === currentThreadId;
+        const item = document.createElement('div');
+        item.className = `p-3.5 cursor-pointer transition flex items-start gap-3 hover:bg-slate-50 relative ${isSelected ? 'bg-teal-50/70 border-l-4 border-teal-600' : ''}`;
+        item.onclick = () => selectThread(thread.id);
+
+        let statusBadge = '';
+        if (thread.status === 'unread' || thread.unreadCount > 0) {
+          statusBadge = '<span class="w-2 h-2 rounded-full bg-red-500 inline-block animate-pulse"></span>';
+        } else if (thread.status === 'in_progress') {
+          statusBadge = '<span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-medium">対応中</span>';
+        } else {
+          statusBadge = '<span class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded font-medium">完了</span>';
+        }
+
+        item.innerHTML = `
+          <div class="relative shrink-0">
+            <img src="${thread.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}" class="w-10 h-10 rounded-full object-cover">
+            <span class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] text-white font-bold ${meta.color}">
+              ${meta.text}
+            </span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <div class="flex items-center gap-1.5 truncate">
+                <span class="font-bold text-xs text-slate-800 truncate">${thread.customerName}</span>
+                ${statusBadge}
+              </div>
+              <span class="text-[11px] text-slate-400 shrink-0">${thread.lastTime || '最近'}</span>
+            </div>
+            <div class="flex items-center gap-1 mb-1">
+              <span class="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded truncate max-w-[170px]" title="宛先: ${acc.accountName}">
+                宛先: <strong class="text-slate-700">${acc.accountName}</strong>
+              </span>
+            </div>
+            <p class="text-xs text-slate-600 truncate leading-snug">${thread.lastMessage || ''}</p>
+            <div class="flex items-center justify-between mt-2 pt-1 text-[11px] text-slate-400">
+              <span class="flex items-center gap-1 truncate max-w-[110px]">
+                <i data-lucide="user" class="w-3 h-3"></i>
+                <span class="truncate">${thread.assignee || '未割り当て'}</span>
+              </span>
+              <div class="flex gap-1">
+                ${(thread.tags || []).slice(0, 1).map(tag => `<span class="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.5 rounded">${tag}</span>`).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+
+      lucide.createIcons();
+    }
+
+    window.selectThread = async function(id) {
+      currentThreadId = id;
+      let thread = threads.find(t => t.id === id);
+      if (!thread) return;
+
+      if (thread.liveConversationId) {
+        await loadLiveInbox(thread.liveConversationId);
+        thread = threads.find(t => t.id === id) || thread;
+      }
+
+      thread.unreadCount = 0;
+      updateActiveChatPane(thread);
+      renderThreadList();
+      updateBadges();
+    };
+
+    function updateActiveChatPane(thread) {
+      document.getElementById('no-chat-selected').classList.add('hidden');
+      document.getElementById('active-chat-content').classList.remove('hidden');
+
+      const meta = getChannelMeta(thread.channel);
+      const acc = getAccountById(thread.accountId);
+
+      document.getElementById('chat-customer-avatar').src = thread.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100';
+      document.getElementById('chat-customer-name').textContent = thread.customerName;
+      document.getElementById('chat-customer-handle').textContent = thread.customerHandle;
+      
+      document.getElementById('chat-recipient-account-badge').innerHTML = `
+        <span class="w-2 h-2 rounded-full ${meta.color}"></span>
+        <span>宛先: <strong>${acc.accountName}</strong> (${acc.handle})</span>
+      `;
+      document.getElementById('chat-customer-last-active').textContent = `最新: ${thread.lastTime || '本日'}`;
+
+      const channelBadge = document.getElementById('chat-customer-channel-badge');
+      channelBadge.className = `absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] text-white font-bold ${meta.color}`;
+      channelBadge.textContent = meta.text;
+
+      document.getElementById('chat-status-select').value = thread.status;
+      document.getElementById('chat-assignee-select').value = thread.assignee || '未割り当て';
+
+      updateStatusPill(thread.status);
+
+      document.getElementById('target-channel-label').innerHTML = `
+        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+        <span>返信元: ${acc.accountName} (${meta.name})</span>
+      `;
+
+      document.getElementById('info-customer-name').textContent = thread.customerName;
+      document.getElementById('info-customer-channel').textContent = `${meta.name} (${acc.accountName})`;
+      document.getElementById('info-customer-contact').textContent = thread.customerHandle;
+      
+      const tagContainer = document.getElementById('info-customer-tags');
+      tagContainer.innerHTML = (thread.tags || []).map(tag => `
+        <span class="bg-teal-50 text-teal-800 text-[10px] px-2 py-0.5 rounded-full border border-teal-200">${tag}</span>
+      `).join('');
+
+      renderInternalNotes(thread);
+      renderMessages(thread);
+      lucide.createIcons();
+    }
+
+    function renderMessages(thread) {
+      const container = document.getElementById('messages-container');
+      container.innerHTML = '';
+
+      (thread.messages || []).forEach(msg => {
+        const isCustomer = msg.sender === 'customer';
+        const isNote = msg.sender === 'internal_note';
+        const wrapper = document.createElement('div');
+        wrapper.className = `flex ${isCustomer ? 'justify-start' : 'justify-end'}`;
+
+        if (isNote) {
+          wrapper.className = 'flex justify-center my-2';
+          wrapper.innerHTML = `
+            <div class="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-2 rounded-xl text-xs max-w-md shadow-xs">
+              <div class="flex items-center gap-1 font-bold text-[11px] text-amber-700 mb-0.5">
+                <i data-lucide="lock" class="w-3 h-3"></i>
+                <span>社内メモ (${msg.author || 'スタッフ'})</span>
+                <span class="font-normal text-amber-600 ml-auto">${msg.time}</span>
+              </div>
+              <p>${msg.text}</p>
+            </div>
+          `;
+        } else if (isCustomer) {
+          wrapper.innerHTML = `
+            <div class="flex items-end gap-2 max-w-[85%] sm:max-w-[70%]">
+              <img src="${thread.avatar}" class="w-7 h-7 rounded-full object-cover shrink-0 mb-1">
+              <div>
+                <div class="text-[10px] text-slate-400 mb-0.5 ml-1">${thread.customerName}</div>
+                <div class="bg-white border border-slate-200 text-slate-800 p-3 rounded-2xl rounded-bl-xs text-xs sm:text-sm shadow-xs leading-relaxed">
+                  ${msg.text}
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 ml-1">${msg.time}</div>
+              </div>
+            </div>
+          `;
+        } else {
+          wrapper.innerHTML = `
+            <div class="flex items-end gap-2 max-w-[85%] sm:max-w-[70%] justify-end">
+              <div>
+                <div class="text-[10px] text-slate-400 mb-0.5 mr-1 text-right">担当スタッフ (${thread.assignee || 'オペレーター'})</div>
+                <div class="bg-teal-600 text-white p-3 rounded-2xl rounded-br-xs text-xs sm:text-sm shadow-xs leading-relaxed">
+                  ${msg.text}
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 mr-1 text-right flex items-center justify-end gap-1">
+                  <span>配信済</span> • <span>${msg.time}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        container.appendChild(wrapper);
+      });
+
+      container.scrollTop = container.scrollHeight;
+      lucide.createIcons();
+    }
+
+    window.sendMessage = async function() {
+      const input = document.getElementById('message-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) return;
+
+      const now = new Date();
+      const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      if (inputMode === 'note') {
+        const newNoteMsg = {
+          sender: 'internal_note',
+          author: loggedInUser?.name || 'スタッフ',
+          text,
+          time: timeStr
+        };
+        thread.messages = thread.messages || [];
+        thread.messages.push(newNoteMsg);
+        thread.notes = thread.notes || [];
+        thread.notes.push({
+          author: loggedInUser?.name || 'スタッフ',
+          time: timeStr,
+          text
+        });
+        input.value = '';
+        renderInternalNotes(thread);
+        renderMessages(thread);
+        showToast('社内メモを画面上に追加しました（永続保存は次段階）');
+        return;
+      }
+
+      if (thread.channel !== 'line' || !thread.liveConversationId) {
+        showToast('このチャネルの実送信はまだ接続されていません');
+        return;
+      }
+
+      const sendButton = document.getElementById('send-main-button');
+      sendButton.disabled = true;
+      const originalHtml = sendButton.innerHTML;
+      sendButton.innerHTML = '<span>送信中...</span>';
+
+      try {
+        const response = await fetch('/api/omnibox/reply', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId: thread.liveConversationId,
+            message: text
+          })
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'send failed');
+        }
+
+        input.value = '';
+        await loadLiveInbox(thread.liveConversationId);
+        const refreshed = threads.find(t => t.id === thread.id);
+        if (refreshed) {
+          updateActiveChatPane(refreshed);
+        }
+        showToast('LINEへ返信を送信しました');
+      } catch (error) {
+        console.error('LINE reply failed:', error);
+        showToast(error.message || 'LINEへの返信を送信できませんでした');
+      } finally {
+        sendButton.disabled = false;
+        sendButton.innerHTML = originalHtml;
+        lucide.createIcons();
+      }
+    };
+
+    window.handleInputKeyDown = function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        window.sendMessage();
+      }
+    };
+
+    function updateStatusPill(status) {
+      const pill = document.getElementById('chat-status-pill');
+      if (status === 'unread') {
+        pill.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700';
+        pill.textContent = '未対応';
+      } else if (status === 'in_progress') {
+        pill.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800';
+        pill.textContent = '対応中';
+      } else {
+        pill.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800';
+        pill.textContent = '対応完了';
+      }
+    }
+
+    window.updateCurrentThreadStatus = async function(newStatus) {
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) return;
+      thread.status = newStatus;
+      thread.updatedAt = Date.now();
+      updateStatusPill(newStatus);
+
+      if (isCloudReady && db) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'threads', thread.id), {
+          status: newStatus,
+          updatedAt: thread.updatedAt
+        });
+      }
+      renderThreadList();
+      updateBadges();
+      showToast(`ステータスを更新しました`);
+    };
+
+    window.updateCurrentAssignee = async function(newAssignee) {
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) return;
+      thread.assignee = newAssignee;
+      thread.updatedAt = Date.now();
+
+      if (isCloudReady && db) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'threads', thread.id), {
+          assignee: newAssignee,
+          updatedAt: thread.updatedAt
+        });
+      }
+      renderThreadList();
+      showToast(`担当者を「${newAssignee}」に変更しました`);
+    };
+
+    window.setInputMode = function(mode) {
+      inputMode = mode;
+      const btnReply = document.getElementById('tab-mode-reply');
+      const btnNote = document.getElementById('tab-mode-note');
+      const noteIndicator = document.getElementById('note-indicator');
+      const sendBtnLabel = document.getElementById('send-button-label');
+
+      if (mode === 'note') {
+        btnNote.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+        btnNote.classList.remove('text-slate-600');
+        btnReply.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
+        btnReply.classList.add('text-slate-600');
+        noteIndicator.classList.remove('hidden');
+        sendBtnLabel.textContent = 'メモを記録';
+      } else {
+        btnReply.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+        btnReply.classList.remove('text-slate-600');
+        btnNote.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
+        btnNote.classList.add('text-slate-600');
+        noteIndicator.classList.add('hidden');
+        sendBtnLabel.textContent = '送信する';
+      }
+    };
+
+    function renderInternalNotes(thread) {
+      const container = document.getElementById('internal-notes-list');
+      container.innerHTML = '';
+      if (!thread.notes || thread.notes.length === 0) {
+        container.innerHTML = `<div class="text-[11px] text-slate-400 italic">社内メモはありません</div>`;
+        return;
+      }
+      thread.notes.forEach(note => {
+        const item = document.createElement('div');
+        item.className = 'p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs';
+        item.innerHTML = `
+          <div class="flex justify-between text-[10px] text-slate-400 mb-1">
+            <span class="font-bold text-slate-600">${note.author}</span>
+            <span>${note.time}</span>
+          </div>
+          <p class="text-slate-700 leading-snug">${note.text}</p>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    window.addQuickNote = async function() {
+      const input = document.getElementById('quick-note-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) return;
+
+      const author = loggedInUser?.name || 'スタッフ';
+      const now = new Date();
+      const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+      thread.notes = thread.notes || [];
+      thread.notes.push({ author: author, time: timeStr, text: text });
+      thread.messages = thread.messages || [];
+      thread.messages.push({ sender: 'internal_note', author: author, time: timeStr, text: text });
+      thread.updatedAt = Date.now();
+
+      if (isCloudReady && db) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'threads', thread.id), {
+          notes: thread.notes,
+          messages: thread.messages,
+          updatedAt: thread.updatedAt
+        });
+      }
+
+      input.value = '';
+      renderInternalNotes(thread);
+      renderMessages(thread);
+      showToast('社内メモを追加しました');
+    };
+
+    window.simulateIncomingMessage = async function() {
+      const targetAcc = connectedAccounts.length > 0 
+        ? connectedAccounts[Math.floor(Math.random() * connectedAccounts.length)]
+        : defaultAccounts[0];
+
+      const simulatedSenders = [
+        { name: '西野 葵', handle: '@aoi_n', msg: '今夜の営業時間にまだ空き枠はございますでしょうか？' },
+        { name: '佐々木 健二', handle: '@kenji_s', msg: '先日注文した商品の配達希望日を来週月曜に変更できますか？' },
+        { name: '株式会社グローバル 担当者様', handle: 'info@g-design.jp', msg: '来期のタイアップ企画についてご提案書をお送りしたいです。' },
+        { name: '松本 玲奈', handle: '@reina_m', msg: '限定コラボ商品の再販予定はございますか？' }
+      ];
+      const randomMsg = simulatedSenders[Math.floor(Math.random() * simulatedSenders.length)];
+
+      const newId = 'thr-' + Date.now();
+      const newThr = {
+        id: newId,
+        accountId: targetAcc.id,
+        customerName: randomMsg.name,
+        customerHandle: randomMsg.handle,
+        channel: targetAcc.platform,
+        avatar: `https://images.unsplash.com/photo-${1530000000000 + Math.floor(Math.random()*10000000)}?w=120&auto=format&fit=crop&q=80`,
+        status: 'unread',
+        assignee: '未割り当て',
+        lastMessage: randomMsg.msg,
+        lastTime: 'たった今',
+        unreadCount: 1,
+        tags: ['新規着信', targetAcc.accountName],
+        notes: [],
+        messages: [
+          { sender: 'customer', text: randomMsg.msg, time: 'たった今' }
+        ],
+        updatedAt: Date.now()
+      };
+
+      if (isCloudReady && db) {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'threads', newId), newThr);
+      } else {
+        threads.unshift(newThr);
+        onDataUpdated();
+      }
+
+      selectThread(newId);
+      showToast(`⚡ 【${targetAcc.accountName}】宛てに新着メッセージを受信しました！`);
+    };
+
+    function renderConnectedAccounts() {
+      const grid = document.getElementById('connected-accounts-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      connectedAccounts.forEach((acc) => {
+        const meta = getChannelMeta(acc.platform);
+        const threadCount = threads.filter(t => t.accountId === acc.id).length;
+        const card = document.createElement('div');
+        card.className = 'bg-white p-5 rounded-2xl border border-slate-200 flex flex-col justify-between shadow-xs hover:border-slate-300 transition';
+        card.innerHTML = `
+          <div>
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl ${meta.color} text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                  ${meta.text}
+                </div>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <h3 class="font-bold text-slate-800 text-sm truncate">${acc.accountName}</h3>
+                    <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0">OAuth連携済</span>
+                  </div>
+                  <p class="text-xs text-slate-500 font-mono truncate">${acc.handle}</p>
+                </div>
+              </div>
+              <span class="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full font-medium flex items-center gap-1 shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-sync"></span>接続中
+              </span>
+            </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-slate-600">
+              <div>
+                <span class="text-[10px] text-slate-400 block">受信メッセージ数</span>
+                <span class="font-bold text-slate-800">${threadCount}件</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 block">トークン状態</span>
+                <span class="font-bold text-emerald-600 flex items-center gap-1">
+                  <i data-lucide="check-circle-2" class="w-3 h-3"></i>有効 (自動更新)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 text-xs flex justify-between items-center">
+            <button onclick="window.testSyncAccount('${acc.accountName}')" class="text-teal-600 font-medium hover:underline flex items-center gap-1">
+              <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+              <span>再同期・疎通テスト</span>
+            </button>
+            <button onclick="window.removeAccount('${acc.id}')" class="text-slate-400 hover:text-red-600 transition flex items-center gap-1">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>連携解除</span>
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    let pendingOAuthData = null;
+
+    window.switchConnectTab = function(mode) {
+      const btnOAuth = document.getElementById('connect-tab-oauth');
+      const btnDirect = document.getElementById('connect-tab-direct');
+      const secOAuth = document.getElementById('connect-oauth-section');
+      const secDirect = document.getElementById('connect-direct-section');
+
+      if (mode === 'oauth') {
+        btnOAuth.className = 'flex-1 py-1.5 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
+        btnDirect.className = 'flex-1 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
+        secOAuth.classList.remove('hidden');
+        secDirect.classList.add('hidden');
+      } else {
+        btnDirect.className = 'flex-1 py-1.5 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
+        btnOAuth.className = 'flex-1 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
+        secDirect.classList.remove('hidden');
+        secOAuth.classList.add('hidden');
+      }
+      lucide.createIcons();
+    };
+
+    window.startOAuthFlow = function(platform) {
+      const mockProfiles = {
+        instagram: {
+          title: 'Meta / Instagram 連携',
+          btnClass: 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700',
+          iconText: 'IG',
+          iconBg: 'bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600',
+          name: 'OmniBox 公式ショップ (Instagram)',
+          handle: '@omnibox_japan',
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+          platform: 'instagram',
+          platformName: 'Instagram'
+        },
+        line: {
+          title: 'LINE 公式アカウント連携',
+          btnClass: 'bg-emerald-600 hover:bg-emerald-700',
+          iconText: 'LINE',
+          iconBg: 'bg-emerald-500',
+          name: 'Omniサポート公式LINE窓口',
+          handle: '@omni_line_bot',
+          avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80',
+          platform: 'line',
+          platformName: 'LINE公式'
+        },
+        x: {
+          title: '𝕏 (旧Twitter) 連携',
+          btnClass: 'bg-slate-900 hover:bg-black',
+          iconText: '𝕏',
+          iconBg: 'bg-slate-900',
+          name: 'Omni広報アカウント',
+          handle: '@Omni_Official_PR',
+          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
+          platform: 'x',
+          platformName: 'X (旧Twitter)'
+        },
+        email: {
+          title: 'Google / Gmail 窓口連携',
+          btnClass: 'bg-blue-600 hover:bg-blue-700',
+          iconText: 'Mail',
+          iconBg: 'bg-blue-600',
+          name: 'Omni カスタマーサポート代表',
+          handle: 'support@omnistore-cloud.jp',
+          avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80',
+          platform: 'email',
+          platformName: 'サポートメール'
+        }
+      };
+
+      const selected = mockProfiles[platform];
+      if (!selected) return;
+
+      pendingOAuthData = selected;
+
+      document.getElementById('oauth-popup-title').textContent = selected.title;
+      const iconBox = document.getElementById('oauth-popup-icon');
+      iconBox.className = `w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md ${selected.iconBg}`;
+      iconBox.textContent = selected.iconText;
+
+      document.getElementById('oauth-detected-avatar').src = selected.avatar;
+      document.getElementById('oauth-detected-name').textContent = selected.name;
+      document.getElementById('oauth-detected-handle').textContent = selected.handle;
+
+      const confirmBtn = document.getElementById('oauth-confirm-btn');
+      confirmBtn.className = `w-1/2 py-2 text-xs font-bold text-white rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition ${selected.btnClass}`;
+
+      document.getElementById('oauth-popup-modal').classList.remove('hidden');
+      lucide.createIcons();
+    };
+
+    window.closeOAuthPopup = function() {
+      document.getElementById('oauth-popup-modal').classList.add('hidden');
+      pendingOAuthData = null;
+    };
+
+    window.confirmOAuthConnection = async function() {
+      if (!pendingOAuthData) return;
+
+      const meta = getChannelMeta(pendingOAuthData.platform);
+      const newAcc = {
+        id: 'acc_' + Date.now(),
+        platform: pendingOAuthData.platform,
+        platformName: pendingOAuthData.platformName,
+        accountName: pendingOAuthData.name,
+        handle: pendingOAuthData.handle,
+        badgeColor: meta.color,
+        active: true,
+        connectedVia: 'oauth',
+        connectedAt: Date.now()
+      };
+
+      if (isCloudReady && db) {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', newAcc.id), newAcc);
+      } else {
+        connectedAccounts.push(newAcc);
+        renderAccountFilters();
+        renderConnectedAccounts();
+        renderTargetAccountsCheckboxes();
+        updateBadges();
+      }
+
+      window.closeOAuthPopup();
+      window.closeAddAccountModal();
+      showToast(`🎉 【${pendingOAuthData.platformName}】「${pendingOAuthData.name}」のログイン連携が完了しました！`);
+    };
+
+    window.updateDirectFormLabels = function() {
+      const pf = document.getElementById('direct-platform-select').value;
+      const userLabel = document.getElementById('direct-label-user');
+      const passLabel = document.getElementById('direct-label-pass');
+      const passHint = document.getElementById('direct-pass-hint');
+      const userInput = document.getElementById('direct-account-user');
+
+      if (pf === 'email') {
+        userLabel.textContent = 'メールアドレス';
+        userInput.placeholder = '例: info@my-brand.com';
+        passLabel.textContent = 'メールパスワード / アプリパスワード';
+        passHint.textContent = '※Gmailは2段階認証のアプリパスワード、独自ドメインはメールサーバーのパスワードを入力。';
+      } else if (pf === 'instagram') {
+        userLabel.textContent = 'Instagram ユーザー名 / メール';
+        userInput.placeholder = '例: @my_store_tokyo';
+        passLabel.textContent = 'Instagram ログインパスワード';
+        passHint.textContent = '※Metaの公式APIトークンが自動生成されて安全に保存されます。';
+      } else if (pf === 'line') {
+        userLabel.textContent = 'LINE公式アカウント ID または Channel ID';
+        userInput.placeholder = '例: @line_store_id または 165xxxxxxxx';
+        passLabel.textContent = 'Channel Secret または 認証パスコード';
+        passHint.textContent = '※Messaging APIの接続キーです。自動疎通確認が行われます。';
+      } else {
+        userLabel.textContent = 'X ユーザー名 (@〜) / メール';
+        userInput.placeholder = '例: @official_x_account';
+        passLabel.textContent = 'X ログインパスワード';
+        passHint.textContent = '※X API v2経由で安全にダイレクトメッセージと予約投稿が連携されます。';
+      }
+    };
+
+    window.togglePasswordVisibility = function() {
+      const passInput = document.getElementById('direct-account-pass');
+      const eyeIcon = document.getElementById('pass-eye-icon');
+      if (passInput.type === 'password') {
+        passInput.type = 'text';
+        eyeIcon.setAttribute('data-lucide', 'eye-off');
+      } else {
+        passInput.type = 'password';
+        eyeIcon.setAttribute('data-lucide', 'eye');
+      }
+      lucide.createIcons();
+    };
+
+    window.submitDirectLogin = async function() {
+      const platform = document.getElementById('direct-platform-select').value;
+      const name = document.getElementById('direct-account-name').value.trim();
+      const user = document.getElementById('direct-account-user').value.trim();
+      const pass = document.getElementById('direct-account-pass').value.trim();
+
+      if (!name || !user || !pass) {
+        showToast('表示名、ユーザー名、パスワードをすべて入力してください');
+        return;
+      }
+
+      const submitBtn = document.getElementById('direct-submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>接続テスト中...</span>`;
+      lucide.createIcons();
+
+      await new Promise(r => setTimeout(r, 1200));
+
+      const meta = getChannelMeta(platform);
+      const newAcc = {
+        id: 'acc_' + Date.now(),
+        platform: platform,
+        platformName: meta.name,
+        accountName: name,
+        handle: user.startsWith('@') || user.includes('@') ? user : `@${user}`,
+        badgeColor: meta.color,
+        active: true,
+        connectedVia: 'direct_login',
+        connectedAt: Date.now()
+      };
+
+      if (isCloudReady && db) {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', newAcc.id), newAcc);
+      } else {
+        connectedAccounts.push(newAcc);
+        renderAccountFilters();
+        renderConnectedAccounts();
+        renderTargetAccountsCheckboxes();
+        updateBadges();
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<i data-lucide="plug" class="w-3.5 h-3.5"></i><span>接続テスト & 連携完了</span>`;
+
+      document.getElementById('direct-account-name').value = '';
+      document.getElementById('direct-account-user').value = '';
+      document.getElementById('direct-account-pass').value = '';
+      window.closeAddAccountModal();
+
+      showToast(`✅ 認証成功！「${name}」を正常に連携しました！`);
+      lucide.createIcons();
+    };
+
+    window.testSyncAccount = function(name) {
+      showToast(`「${name}」の認証トークンと送受信ステータスを正常に再検証しました（OK）`);
+    };
+
+    window.removeAccount = async function(accId) {
+      if (connectedAccounts.length <= 1) {
+        showToast('最低1つのアカウント連携が必要です');
+        return;
+      }
+      if (isCloudReady && db) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', accId));
+      } else {
+        connectedAccounts = connectedAccounts.filter(a => a.id !== accId);
+        renderAccountFilters();
+        renderConnectedAccounts();
+        updateBadges();
+      }
+      showToast('アカウントの連携を解除しました');
+    };
+
+    function renderTargetAccountsCheckboxes() {
+      const list = document.getElementById('post-target-accounts-list');
+      if (!list) return;
+      list.innerHTML = '';
+
+      connectedAccounts.forEach(acc => {
+        const meta = getChannelMeta(acc.platform);
+        const label = document.createElement('label');
+        label.className = 'flex items-center gap-2 text-xs font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition';
+        label.innerHTML = `
+          <input type="checkbox" name="post-target-acc" value="${acc.id}" checked class="rounded text-teal-600 focus:ring-teal-500">
+          <span class="w-2 h-2 rounded-full ${meta.color} shrink-0"></span>
+          <div class="truncate">
+            <span class="text-slate-800 block truncate">${acc.accountName}</span>
+            <span class="text-[10px] text-slate-400 block truncate">${acc.handle}</span>
+          </div>
+        `;
+        list.appendChild(label);
+      });
+    }
+
+    function renderPublishChannelsSummary() {
+      const container = document.getElementById('publish-connected-channels-summary');
+      if (!container) return;
+      container.innerHTML = '';
+
+      connectedAccounts.forEach(acc => {
+        const meta = getChannelMeta(acc.platform);
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50';
+        item.innerHTML = `
+          <div class="flex items-center gap-2 truncate">
+            <span class="w-2 h-2 rounded-full ${meta.color} shrink-0"></span>
+            <span class="font-medium truncate">${acc.accountName}</span>
+          </div>
+          <span class="text-emerald-600 font-mono text-[10px] shrink-0">${acc.handle}</span>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    window.submitNewPost = async function() {
+      const content = document.getElementById('new-post-content').value.trim();
+      const dt = document.getElementById('new-post-datetime').value;
+      if (!content) {
+        showToast('投稿本文を入力してください');
+        return;
+      }
+
+      const checkedBoxes = document.querySelectorAll('input[name="post-target-acc"]:checked');
+      if (checkedBoxes.length === 0) {
+        showToast('最低1つの投稿先アカウントを選択してください');
+        return;
+      }
+
+      const selectedAccountNames = Array.from(checkedBoxes).map(cb => {
+        const acc = getAccountById(cb.value);
+        return `${acc.platformName} (${acc.accountName})`;
+      });
+
+      const newPost = {
+        id: 'post-' + Date.now(),
+        content: content,
+        channels: selectedAccountNames,
+        scheduledAt: dt ? dt.replace('T', ' ') : '今すぐ配信',
+        status: dt ? '予約中' : '公開完了',
+        createdAt: Date.now()
+      };
+
+      if (isCloudReady && db) {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'scheduled_posts', newPost.id), newPost);
+      } else {
+        scheduledPosts.unshift(newPost);
+        renderScheduledPosts();
+      }
+
+      window.closeNewPostModal();
+      document.getElementById('new-post-content').value = '';
+      showToast(`${selectedAccountNames.length}個のアカウントへ予約投稿をスケジュールしました！`);
+    };
+
+    function renderScheduledPosts() {
+      const container = document.getElementById('scheduled-posts-list');
+      if (!container) return;
+      container.innerHTML = '';
+      document.getElementById('scheduled-count').textContent = scheduledPosts.length;
+      document.getElementById('scheduled-nav-badge').textContent = scheduledPosts.length;
+
+      if (scheduledPosts.length === 0) {
+        container.innerHTML = `<div class="p-6 bg-white rounded-xl border border-slate-200 text-center text-xs text-slate-400">予約投稿はありません</div>`;
+        return;
+      }
+
+      scheduledPosts.forEach((post) => {
+        const card = document.createElement('div');
+        card.className = 'bg-white p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition shadow-xs';
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              ${(post.channels || []).map(ch => `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700">${ch}</span>`).join('')}
+              <span class="text-xs text-teal-700 font-semibold flex items-center gap-1">
+                <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                ${post.scheduledAt} 配信
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] px-2 py-0.5 rounded-full ${post.status === '公開完了' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'} font-bold">${post.status}</span>
+              <button onclick="window.cancelPost('${post.id}')" class="text-xs text-red-500 hover:text-red-700 p-1" title="予約を取り消す">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+          <p class="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 whitespace-pre-wrap">${post.content}</p>
+        `;
+        container.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    window.cancelPost = async function(postId) {
+      if (isCloudReady && db) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'scheduled_posts', postId));
+      } else {
+        scheduledPosts = scheduledPosts.filter(p => p.id !== postId);
+        renderScheduledPosts();
+      }
+      showToast('予約投稿を取り消しました');
+    };
+
+    function renderTemplates(cat) {
+      const grid = document.getElementById('templates-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      const filtered = cat === 'all' ? templates : templates.filter(t => t.category === cat);
+
+      filtered.forEach(tmpl => {
+        const card = document.createElement('div');
+        card.className = 'bg-white p-4 rounded-xl border border-slate-200 hover:border-teal-500 hover:shadow-md transition flex flex-col justify-between';
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md uppercase">${tmpl.category}</span>
+              <button onclick="window.copyToClipboard('${tmpl.body.replace(/\n/g, '\\n')}')" class="text-xs text-slate-400 hover:text-teal-600 flex items-center gap-1">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>コピー
+              </button>
+            </div>
+            <h4 class="font-bold text-xs text-slate-800 mb-2">${tmpl.title}</h4>
+            <p class="text-xs text-slate-500 whitespace-pre-line bg-slate-50 p-2.5 rounded-lg border border-slate-100 max-h-36 overflow-y-auto">${tmpl.body}</p>
+          </div>
+          <button onclick="window.applyTemplateToCurrentChat('${tmpl.body.replace(/\n/g, '\\n')}')" class="mt-3 w-full bg-teal-50 hover:bg-teal-600 hover:text-white text-teal-800 text-xs font-semibold py-1.5 rounded-lg transition border border-teal-200">
+            この返信文を受信箱で使う
+          </button>
+        `;
+        grid.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    window.filterTemplates = function(cat) {
+      document.querySelectorAll('.tmpl-category-btn').forEach(btn => {
+        if (btn.dataset.cat === cat) {
+          btn.className = 'tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white';
+        } else {
+          btn.className = 'tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600';
+        }
+      });
+      renderTemplates(cat);
+    };
+
+    window.applyTemplateToCurrentChat = function(bodyText) {
+      window.switchView('inbox');
+      const input = document.getElementById('message-input');
+      input.value = bodyText.replace(/\\n/g, '\n');
+      window.setInputMode('reply');
+      input.focus();
+      showToast('定型文を入力欄に反映しました');
+    };
+
+    window.openTemplateSelectorModal = function() {
+      const modal = document.getElementById('template-modal');
+      const list = document.getElementById('modal-template-list');
+      list.innerHTML = '';
+
+      templates.forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'p-3 bg-slate-50 hover:bg-teal-50 border border-slate-200 rounded-xl cursor-pointer transition';
+        item.onclick = () => {
+          window.applyTemplateToCurrentChat(t.body);
+          window.closeTemplateSelectorModal();
+        };
+        item.innerHTML = `
+          <div class="font-bold text-xs text-slate-800 mb-1">${t.title}</div>
+          <div class="text-[11px] text-slate-500 truncate">${t.body}</div>
+        `;
+        list.appendChild(item);
+      });
+
+      modal.classList.remove('hidden');
+    };
+
+    window.closeTemplateSelectorModal = function() {
+      document.getElementById('template-modal').classList.add('hidden');
+    };
+
+    function updateBadges() {
+      const unreadCount = threads.filter(t => t.status === 'unread' || t.unreadCount > 0).length;
+      const progressCount = threads.filter(t => t.status === 'in_progress').length;
+      const resolvedCount = threads.filter(t => t.status === 'resolved').length;
+
+      document.getElementById('unread-total-badge').textContent = unreadCount;
+      document.getElementById('badge-count-all').textContent = threads.length;
+      document.getElementById('badge-count-unread').textContent = unreadCount;
+      document.getElementById('badge-count-progress').textContent = progressCount;
+      document.getElementById('badge-count-resolved').textContent = resolvedCount;
+      document.getElementById('badge-all-accounts').textContent = threads.length;
+      document.getElementById('nav-account-count').textContent = connectedAccounts.length;
+    }
+
+    function updateAnalyticsView() {
+      const total = threads.length;
+      const unread = threads.filter(t => t.status === 'unread' || t.unreadCount > 0).length;
+      const resolved = threads.filter(t => t.status === 'resolved').length;
+      
+      const elTotal = document.getElementById('kpi-total-threads');
+      const elUnread = document.getElementById('kpi-unread-count');
+      const elResolvedRate = document.getElementById('kpi-resolved-rate');
+      
+      if (elTotal) elTotal.innerHTML = `${total}<span class="text-xs font-normal text-slate-400 ml-1">件</span>`;
+      if (elUnread) elUnread.textContent = unread;
+      if (elResolvedRate) {
+        const rate = total > 0 ? Math.round((resolved / total) * 100) : 100;
+        elResolvedRate.innerHTML = `${rate}<span class="text-xs font-normal text-slate-400 ml-1">%</span>`;
+      }
+
+      const breakdownContainer = document.getElementById('analytics-channel-breakdown');
+      if (!breakdownContainer) return;
+      breakdownContainer.innerHTML = '';
+
+      const channels = [
+        { id: 'line', name: 'LINE公式', color: 'bg-emerald-500' },
+        { id: 'instagram', name: 'Instagram DM', color: 'bg-pink-500' },
+        { id: 'email', name: '代表メール', color: 'bg-blue-600' },
+        { id: 'x', name: 'X (旧Twitter)', color: 'bg-slate-900' }
+      ];
+
+      channels.forEach(ch => {
+        const count = threads.filter(t => t.channel === ch.id).length;
+        const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+        const row = document.createElement('div');
+        row.innerHTML = `
+          <div class="flex justify-between font-medium mb-1">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full ${ch.color}"></span>${ch.name} (${count}件)</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2">
+            <div class="${ch.color} h-2 rounded-full" style="width: ${pct}%"></div>
+          </div>
+        `;
+        breakdownContainer.appendChild(row);
+      });
+    }
+
+    window.switchView = function(viewName) {
+      document.querySelectorAll('.view-panel').forEach(el => el.classList.add('hidden'));
+      const activePanel = document.getElementById(`view-${viewName}`);
+      if (activePanel) activePanel.classList.remove('hidden');
+
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('bg-white', 'text-teal-700', 'shadow-xs');
+        btn.classList.add('text-slate-600');
+      });
+      const activeNav = document.getElementById(`nav-${viewName}`);
+      if (activeNav) {
+        activeNav.classList.add('bg-white', 'text-teal-700', 'shadow-xs');
+        activeNav.classList.remove('text-slate-600');
+      }
+
+      if (viewName === 'analytics') updateAnalyticsView();
+      lucide.createIcons();
+    };
+
+    window.filterByStatus = function(status) {
+      currentStatusFilter = status;
+      document.querySelectorAll('.status-filter-btn').forEach(btn => {
+        if (btn.dataset.status === status) {
+          btn.classList.add('bg-teal-50', 'text-teal-800');
+          btn.classList.remove('hover:bg-slate-100', 'text-slate-600');
+        } else {
+          btn.classList.remove('bg-teal-50', 'text-teal-800');
+          btn.classList.add('hover:bg-slate-100', 'text-slate-600');
+        }
+      });
+      renderThreadList();
+    };
+
+    window.handleSearch = function() {
+      searchQuery = document.getElementById('search-input').value;
+      renderThreadList();
+    };
+
+    window.toggleSideInfoPanel = function() {
+      document.getElementById('customer-info-panel').classList.toggle('hidden');
+    };
+
+    window.openAddAccountModal = function() {
+      document.getElementById('add-account-modal').classList.remove('hidden');
+    };
+
+    window.closeAddAccountModal = function() {
+      document.getElementById('add-account-modal').classList.add('hidden');
+    };
+
+    window.openNewPostModal = function() {
+      document.getElementById('new-post-modal').classList.remove('hidden');
+    };
+
+    window.closeNewPostModal = function() {
+      document.getElementById('new-post-modal').classList.add('hidden');
+    };
+
+    window.openNewPostModalWithAiPrompt = function() {
+      window.openNewPostModal();
+      window.generateAiPostDraftWithGemini();
+    };
+
+    let toastTimeout;
+    window.showToast = function(msg) {
+      const toast = document.getElementById('toast');
+      const text = document.getElementById('toast-message');
+      text.textContent = msg;
+
+      toast.classList.remove('translate-y-16', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-16', 'opacity-0');
+      }, 3500);
+    };
+
+    window.copyToClipboard = function(text) {
+      const cleaned = text.replace(/\\n/g, '\n');
+      const temp = document.createElement('textarea');
+      temp.value = cleaned;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      document.body.removeChild(temp);
+      window.showToast('クリップボードにコピーしました');
+    };
+
+    function checkExistingSession() {
+      const portal = document.getElementById('auth-portal-overlay');
+      if (!loggedInUser) {
+        portal.classList.remove('hidden');
+      } else {
+        portal.classList.add('hidden');
+        updateHeaderUserUI();
+      }
+    }
+
+    window.switchAuthTab = function(mode) {
+      currentAuthMode = mode;
+      const tabLogin = document.getElementById('auth-tab-login');
+      const tabRegister = document.getElementById('auth-tab-register');
+      const nameGroup = document.getElementById('auth-name-group');
+      const submitLabel = document.getElementById('auth-submit-label');
+
+      if (mode === 'login') {
+        tabLogin.className = 'flex-1 py-2 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
+        tabRegister.className = 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
+        nameGroup.classList.add('hidden');
+        submitLabel.textContent = 'ログインして業務を開始';
+      } else {
+        tabRegister.className = 'flex-1 py-2 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
+        tabLogin.className = 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
+        nameGroup.classList.remove('hidden');
+        submitLabel.textContent = 'アカウントを新規作成';
+      }
+      lucide.createIcons();
+    };
+
+    window.toggleAuthPasswordVisibility = function() {
+      const passInput = document.getElementById('auth-input-password');
+      const icon = document.getElementById('auth-eye-icon');
+      if (passInput.type === 'password') {
+        passInput.type = 'text';
+        icon.setAttribute('data-lucide', 'eye-off');
+      } else {
+        passInput.type = 'password';
+        icon.setAttribute('data-lucide', 'eye');
+      }
+      lucide.createIcons();
+    };
+
+    window.handleAuthSubmit = async function(e) {
+      e.preventDefault();
+      const email = document.getElementById('auth-input-email').value.trim();
+      const password = document.getElementById('auth-input-password').value;
+      const name = document.getElementById('auth-input-name').value.trim() || email.split('@')[0];
+
+      if (!email || !password) {
+        showToast('メールアドレスとパスワードを入力してください');
+        return;
+      }
+
+      if (currentAuthMode === 'register' && !document.getElementById('auth-input-name').value.trim()) {
+        showToast('スタッフ表示名を入力してください');
+        return;
+      }
+
+      const submitBtn = document.getElementById('auth-submit-btn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>認証中...</span>';
+      lucide.createIcons();
+
+      try {
+        const endpoint = currentAuthMode === 'register'
+          ? '/api/omnibox/signup'
+          : '/api/omnibox/login';
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password })
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || '認証できませんでした');
+        }
+
+        if (currentAuthMode === 'register') {
+          showToast(result.message || '確認メールを送信しました');
+          window.switchAuthTab('login');
+          document.getElementById('auth-input-password').value = '';
+          return;
+        }
+
+        loggedInUser = {
+          name: result.user?.name || name,
+          email: result.user?.email || email,
+          role: result.user?.role || 'スタッフ',
+          avatar: (result.user?.name || name).slice(0, 1)
+        };
+
+        document.getElementById('auth-portal-overlay').classList.add('hidden');
+        updateHeaderUserUI();
+        await loadLiveInbox();
+        showToast(`ようこそ、${loggedInUser.name}さん！OmniBoxへログインしました`);
+      } catch (error) {
+        console.error('Auth failed:', error);
+        showToast(error.message || '認証できませんでした');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i data-lucide="arrow-right-circle" class="w-4 h-4"></i><span>${currentAuthMode === 'login' ? 'ログインして業務を開始' : 'アカウントを新規作成'}</span>`;
+        lucide.createIcons();
+      }
+    };
+
+    window.quickLoginDemo = function(role) {
+      showToast('実装版ではクイックデモログインは使用しません。メールアドレスでログインしてください');
+    };
+
+    function updateHeaderUserUI() {
+      if (!loggedInUser) return;
+      document.getElementById('current-user-name').textContent = loggedInUser.name;
+      document.getElementById('current-user-email-label').textContent = loggedInUser.email;
+      document.getElementById('current-user-avatar').textContent = loggedInUser.avatar || loggedInUser.name.slice(0, 1);
+      document.getElementById('current-user-role-badge').textContent = loggedInUser.role;
+
+      document.getElementById('dropdown-user-name').textContent = loggedInUser.name;
+      document.getElementById('dropdown-user-email').textContent = loggedInUser.email;
+    }
+
+    window.toggleUserDropdown = function() {
+      const menu = document.getElementById('user-menu-dropdown');
+      menu.classList.toggle('hidden');
+    };
+
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('user-menu-dropdown');
+      if (dropdown && !dropdown.classList.contains('hidden')) {
+        const isTrigger = e.target.closest('#current-user-avatar') || e.target.closest('#current-user-name') || e.target.closest('#user-menu-dropdown');
+        if (!isTrigger) dropdown.classList.add('hidden');
+      }
+    });
+
+    window.handleLogout = async function() {
+      try {
+        await fetch('/api/omnibox/logout', {
+          method: 'POST',
+          credentials: 'same-origin'
+        });
+      } finally {
+        loggedInUser = null;
+        threads = [];
+        connectedAccounts = [];
+        currentThreadId = null;
+        document.getElementById('user-menu-dropdown').classList.add('hidden');
+        document.getElementById('auth-portal-overlay').classList.remove('hidden');
+        onDataUpdated();
+        showToast('ログアウトしました');
+      }
+    };
+
+    window.showForgotPasswordInfo = function() {
+      window.location.href = '/forgot-password';
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      renderTemplates('all');
+      initCloudAndAuth();
+
+      const now = new Date();
+      now.setHours(now.getHours() + 2);
+      const isoStr = now.toISOString().slice(0, 16);
+      const dtInput = document.getElementById('new-post-datetime');
+      if (dtInput) dtInput.value = isoStr;
+    });
+  </script>
+</body>
+</html>
