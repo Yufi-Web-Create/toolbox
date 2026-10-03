@@ -834,15 +834,18 @@
         </button>
         <button id="connect-tab-direct" onclick="switchConnectTab('direct')" class="flex-1 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition">
           <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-500"></i>
-          <span>ログイン情報 / パスワード入力</span>
+          <span>LINE手動設定</span>
         </button>
       </div>
 
       <!-- 方式1: ワンクリックOAuthソーシャルログイン -->
       <div id="connect-oauth-section" class="space-y-3">
         <p class="text-xs text-slate-600 leading-relaxed">
-          連携したいプラットフォームのボタンを押してログインを許可してください。APIキーや難しい設定は不要です。
+          連携したいプラットフォームのボタンを押し、公式ログイン画面でOmniBoxへのアクセスを許可してください。
         </p>
+        <div id="oauth-provider-setup-status" class="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
+          OAuth接続状態を確認しています...
+        </div>
 
         <div class="space-y-2.5">
           <!-- Instagram / Meta -->
@@ -925,10 +928,7 @@
         <div>
           <label class="text-xs font-bold text-slate-600 block mb-1">プラットフォーム</label>
           <select id="direct-platform-select" onchange="updateDirectFormLabels()" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-white">
-            <option value="email">サポートメール (IMAP / SMTP / Gmail)</option>
-            <option value="instagram">Instagram (ユーザーID & パスワード連携)</option>
-            <option value="line">LINE公式アカウント (チャネル設定)</option>
-            <option value="x">X (旧Twitter アカウント連携)</option>
+            <option value="line">LINE公式アカウント (Messaging API)</option>
           </select>
         </div>
 
@@ -938,19 +938,19 @@
         </div>
 
         <div>
-          <label id="direct-label-user" class="text-xs font-bold text-slate-600 block mb-1">ログイン用 メールアドレス / ユーザー名</label>
-          <input type="text" id="direct-account-user" placeholder="例: support@company.com または @omni_store" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500">
+          <label id="direct-label-user" class="text-xs font-bold text-slate-600 block mb-1">Messaging API Channel ID</label>
+          <input type="text" id="direct-account-user" placeholder="例: 2001234567" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500">
         </div>
 
         <div>
-          <label id="direct-label-pass" class="text-xs font-bold text-slate-600 block mb-1">ログインパスワード / アプリパスワード</label>
+          <label id="direct-label-pass" class="text-xs font-bold text-slate-600 block mb-1">Channel Secret</label>
           <div class="relative">
             <input type="password" id="direct-account-pass" placeholder="••••••••••••" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 pr-10">
             <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
               <i data-lucide="eye" class="w-4 h-4" id="pass-eye-icon"></i>
             </button>
           </div>
-          <p id="direct-pass-hint" class="text-[10px] text-slate-400 mt-1">※Gmailをご利用の場合は2段階認証の「アプリパスワード」を入力してください。</p>
+          <p id="direct-pass-hint" class="text-[10px] text-slate-400 mt-1">※LINE Developers の Messaging APIチャネルにある Channel ID / Channel Secret を使用します。</p>
         </div>
 
         <div class="flex items-center justify-end gap-2 pt-2">
@@ -1220,6 +1220,7 @@
     let currentOrganization = null;
     let requiresOrganizationSetup = false;
     let isDemoSession = false;
+    let providerOAuthReadiness = {};
 
     let threads = [];
     let connectedAccounts = [];
@@ -1367,6 +1368,92 @@
       }
     ];
 
+    function updateOAuthProviderStatus() {
+      const container = document.getElementById('oauth-provider-setup-status');
+      if (!container) return;
+
+      const labels = {
+        instagram: 'Instagram',
+        x: 'X',
+        google: 'Google / Gmail'
+      };
+
+      const rows = Object.entries(labels).map(([provider, label]) => {
+        const configured = providerOAuthReadiness?.[provider]?.configured === true;
+        return `<div class="flex items-center justify-between gap-3 py-0.5">
+          <span>${label}</span>
+          <span class="${configured ? 'text-emerald-700' : 'text-amber-700'} font-semibold">
+            ${configured ? '接続可能' : 'OmniBox側のOAuth設定待ち'}
+          </span>
+        </div>`;
+      });
+
+      container.innerHTML = rows.join('');
+    }
+
+    async function loadProviderConnections() {
+      if (isDemoSession) {
+        connectedAccounts = structuredClone(defaultAccounts);
+        providerOAuthReadiness = {
+          instagram: { configured: true },
+          x: { configured: true },
+          google: { configured: true }
+        };
+        updateOAuthProviderStatus();
+        onDataUpdated();
+        return true;
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/connections', {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok || !Array.isArray(result.connections)) {
+          throw new Error(result.message || '連携アカウントを読み込めませんでした');
+        }
+
+        providerOAuthReadiness = result.providers || {};
+        connectedAccounts = result.connections.map(connection => {
+          const provider = connection.provider;
+          const platform = provider === 'google' ? 'email' : provider;
+          const platformName =
+            provider === 'instagram' ? 'Instagram'
+              : provider === 'x' ? 'X'
+                : provider === 'google' ? 'Google / Gmail'
+                  : 'LINE公式';
+
+          return {
+            id: provider === 'line' ? 'acc_line_live' : `conn_${connection.id}`,
+            providerConnectionId: connection.id,
+            platform,
+            provider,
+            platformName,
+            accountName: connection.account_name || platformName,
+            handle: connection.handle || '',
+            badgeColor: getChannelMeta(platform).color,
+            active: connection.status === 'active',
+            connectedVia: provider === 'line' ? 'secure_setup' : 'oauth',
+            scopes: connection.scopes || [],
+            avatar: connection.metadata?.avatar_url || null,
+            expiresAt: connection.token_expires_at || null
+          };
+        });
+
+        updateOAuthProviderStatus();
+        onDataUpdated();
+        return true;
+      } catch (error) {
+        console.error('Provider connections load failed:', error);
+        providerOAuthReadiness = {};
+        updateOAuthProviderStatus();
+        showToast(error.message || '連携アカウントを読み込めませんでした');
+        return false;
+      }
+    }
+
     async function loadLiveInbox(conversationId = null) {
       try {
         const suffix = conversationId ? `?conversation=${encodeURIComponent(conversationId)}` : '';
@@ -1392,29 +1479,6 @@
         const payload = await response.json();
         const selectedId = payload.selectedConversation?.id || conversationId || null;
         const selectedMessages = Array.isArray(payload.messages) ? payload.messages : [];
-
-        let lineConnected = false;
-        try {
-          const statusResponse = await fetch('/api/omnibox/line/status', {
-            credentials: 'same-origin',
-            cache: 'no-store'
-          });
-          if (statusResponse.ok) {
-            const status = await statusResponse.json();
-            lineConnected = status.lineConnected === true;
-          }
-        } catch {}
-
-        connectedAccounts = lineConnected ? [{
-          id: 'acc_line_live',
-          platform: 'line',
-          platformName: 'LINE公式',
-          accountName: 'LINE公式アカウント',
-          handle: 'Messaging API',
-          badgeColor: 'bg-emerald-500',
-          active: true,
-          connectedVia: 'secure_setup'
-        }] : [];
 
         threads = (payload.conversations || []).map((conversation) => {
           const isSelected = conversation.id === selectedId;
@@ -1526,6 +1590,7 @@
             showToast('所属組織を確認できません。管理者にアカウント設定をご確認ください');
           } else {
             await loadTemplates();
+            await loadProviderConnections();
             await loadLiveInbox();
           }
         } else {
@@ -2417,7 +2482,7 @@
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
                     <h3 class="font-bold text-slate-800 text-sm truncate">${acc.accountName}</h3>
-                    <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0">OAuth連携済</span>
+                    <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0">${acc.connectedVia === 'oauth' ? 'OAuth連携済' : 'API連携済'}</span>
                   </div>
                   <p class="text-xs text-slate-500 font-mono truncate">${acc.handle}</p>
                 </div>
@@ -2480,6 +2545,11 @@
     };
 
     window.startOAuthFlow = function(platform) {
+      if (loggedInUser?.roleKey !== 'owner') {
+        showToast('SNSアカウントの連携は管理者のみ行えます');
+        return;
+      }
+
       if (platform === 'line') {
         window.switchConnectTab('direct');
         const select = document.getElementById('direct-platform-select');
@@ -2491,7 +2561,18 @@
         return;
       }
 
-      showToast('このSNSの実OAuth連携は現在実装中です。LINE連携から先に利用できます');
+      const provider = platform === 'email' ? 'google' : platform;
+      if (!['instagram', 'x', 'google'].includes(provider)) {
+        showToast('この連携方式には対応していません');
+        return;
+      }
+
+      if (providerOAuthReadiness?.[provider]?.configured !== true) {
+        showToast('OmniBox側のOAuthアプリ設定がまだ完了していません');
+        return;
+      }
+
+      window.location.href = `/api/omnibox/oauth/${provider}/start`;
     };
 
     window.closeOAuthPopup = function() {
@@ -2531,33 +2612,15 @@
     };
 
     window.updateDirectFormLabels = function() {
-      const pf = document.getElementById('direct-platform-select').value;
       const userLabel = document.getElementById('direct-label-user');
       const passLabel = document.getElementById('direct-label-pass');
       const passHint = document.getElementById('direct-pass-hint');
       const userInput = document.getElementById('direct-account-user');
 
-      if (pf === 'email') {
-        userLabel.textContent = 'メールアドレス';
-        userInput.placeholder = '例: info@my-brand.com';
-        passLabel.textContent = 'メールパスワード / アプリパスワード';
-        passHint.textContent = '※Gmailは2段階認証のアプリパスワード、独自ドメインはメールサーバーのパスワードを入力。';
-      } else if (pf === 'instagram') {
-        userLabel.textContent = 'Instagram ユーザー名 / メール';
-        userInput.placeholder = '例: @my_store_tokyo';
-        passLabel.textContent = 'Instagram ログインパスワード';
-        passHint.textContent = '※Metaの公式APIトークンが自動生成されて安全に保存されます。';
-      } else if (pf === 'line') {
-        userLabel.textContent = 'Messaging API Channel ID';
-        userInput.placeholder = '例: 2001234567';
-        passLabel.textContent = 'Channel Secret';
-        passHint.textContent = '※LINE Developers > Messaging APIチャネルの基本設定にあるChannel ID / Channel Secretを使用します。アクセストークンとWebhook URLはOmniBoxが自動設定します。';
-      } else {
-        userLabel.textContent = 'X ユーザー名 (@〜) / メール';
-        userInput.placeholder = '例: @official_x_account';
-        passLabel.textContent = 'X ログインパスワード';
-        passHint.textContent = '※X API v2経由で安全にダイレクトメッセージと予約投稿が連携されます。';
-      }
+      userLabel.textContent = 'Messaging API Channel ID';
+      userInput.placeholder = '例: 2001234567';
+      passLabel.textContent = 'Channel Secret';
+      passHint.textContent = '※LINE Developers > Messaging APIチャネルの基本設定にあるChannel ID / Channel Secretを使用します。アクセストークンとWebhook URLはOmniBoxが自動設定します。';
     };
 
     window.togglePasswordVisibility = function() {
@@ -2600,6 +2663,7 @@
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            accountName: name,
             channelId: user,
             channelSecret: pass
           })
@@ -2612,22 +2676,7 @@
 
         document.getElementById('direct-account-pass').value = '';
 
-        connectedAccounts = [{
-          id: 'acc_line_live',
-          platform: 'line',
-          platformName: 'LINE公式',
-          accountName: name,
-          handle: 'Channel ID: ' + user,
-          badgeColor: 'bg-emerald-500',
-          active: result.webhookActive === true,
-          connectedVia: 'secure_setup'
-        }];
-
-        renderAccountFilters();
-        renderConnectedAccounts();
-        renderTargetAccountsCheckboxes();
-        renderPublishChannelsSummary();
-        updateBadges();
+        await loadProviderConnections();
 
         window.closeAddAccountModal();
 
@@ -2648,24 +2697,52 @@
       }
     };
 
-    window.testSyncAccount = function(name) {
-      showToast(`「${name}」の認証トークンと送受信ステータスを正常に再検証しました（OK）`);
+    window.testSyncAccount = async function(name) {
+      await loadProviderConnections();
+      showToast(`「${name}」の連携状態を更新しました`);
     };
 
     window.removeAccount = async function(accId) {
-      if (connectedAccounts.length <= 1) {
-        showToast('最低1つのアカウント連携が必要です');
+      const account = connectedAccounts.find(item => item.id === accId);
+      if (!account) return;
+
+      if (isDemoSession) {
+        connectedAccounts = connectedAccounts.filter(item => item.id !== accId);
+        onDataUpdated();
+        showToast('デモ内の連携を解除しました');
         return;
       }
-      if (isCloudReady && db) {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', accId));
-      } else {
-        connectedAccounts = connectedAccounts.filter(a => a.id !== accId);
-        renderAccountFilters();
-        renderConnectedAccounts();
-        updateBadges();
+
+      if (loggedInUser?.roleKey !== 'owner') {
+        showToast('SNSアカウントの連携解除は管理者のみ行えます');
+        return;
       }
-      showToast('アカウントの連携を解除しました');
+
+      if (!account.providerConnectionId) {
+        showToast('連携情報を確認できませんでした');
+        return;
+      }
+
+      if (!window.confirm(`「${account.accountName}」の連携を解除しますか？`)) return;
+
+      try {
+        const response = await fetch('/api/omnibox/connections', {
+          method: 'DELETE',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connectionId: account.providerConnectionId })
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || '連携を解除できませんでした');
+        }
+
+        await loadProviderConnections();
+        showToast('アカウントの連携を解除しました');
+      } catch (error) {
+        showToast(error.message || '連携を解除できませんでした');
+      }
     };
 
     function renderTargetAccountsCheckboxes() {
@@ -3088,6 +3165,9 @@
       if (viewName === 'templates' && loggedInUser && !isDemoSession) {
         loadTemplates();
       }
+      if (viewName === 'channels' && loggedInUser && !isDemoSession) {
+        loadProviderConnections();
+      }
       lucide.createIcons();
     };
 
@@ -3317,7 +3397,10 @@
           window.openSettings('organization');
           showToast('管理者アカウントの準備ができました。最初に組織設定を完了してください');
         } else {
-          if (!isDemoSession) await loadTemplates();
+          if (!isDemoSession) {
+            await loadTemplates();
+            await loadProviderConnections();
+          }
           await loadLiveInbox();
           window.switchView('inbox');
           showToast(`ようこそ、${loggedInUser.name}さん！OmniBoxへログインしました`);
@@ -3719,10 +3802,49 @@
       window.location.href = '/forgot-password';
     };
 
-    window.addEventListener('DOMContentLoaded', () => {
+    function handleOAuthReturnStatus() {
+      const params = new URLSearchParams(window.location.search);
+      const connected = params.get('oauth') === 'connected';
+      const error = params.get('oauth_error');
+      const provider = params.get('provider');
+      const labels = {
+        instagram: 'Instagram',
+        x: 'X',
+        google: 'Google / Gmail'
+      };
+
+      if (connected) {
+        showToast(`${labels[provider] || 'SNS'}の連携が完了しました`);
+        window.switchView('channels');
+        loadProviderConnections();
+      } else if (error) {
+        const message =
+          error === 'provider_not_configured'
+            ? 'OmniBox側のOAuthアプリ設定が未完了です'
+            : error === 'owner_required'
+              ? 'SNS連携は管理者のみ行えます'
+              : error === 'authorization_denied'
+                ? 'SNS側で連携がキャンセルされました'
+                : 'SNS連携を完了できませんでした';
+        showToast(message);
+      }
+
+      if (connected || error) {
+        params.delete('oauth');
+        params.delete('oauth_error');
+        params.delete('provider');
+        const next = window.location.pathname +
+          (params.toString() ? '?' + params.toString() : '') +
+          window.location.hash;
+        window.history.replaceState({}, '', next);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
       lucide.createIcons();
       renderTemplates('all');
-      initCloudAndAuth();
+      await initCloudAndAuth();
+      handleOAuthReturnStatus();
 
       const now = new Date();
       now.setHours(now.getHours() + 2);
