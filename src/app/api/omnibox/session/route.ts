@@ -41,6 +41,7 @@ export async function GET() {
         : {};
     const accountType =
       metadata.account_type === "member" ? "member" : "owner";
+    const isDemo = metadata.demo_account === true;
 
     let membership = await getMembership(supabase, claims.sub);
 
@@ -97,6 +98,7 @@ export async function GET() {
       organization,
       requiresOrganizationSetup,
       membershipReady: Boolean(membership),
+      isDemo,
     });
   } catch {
     return NextResponse.json({ authenticated: false });
