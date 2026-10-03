@@ -54,6 +54,8 @@ None.
 - `npm run typecheck`: PASS
 - `npm test`: PASS (13 test files, 71 tests)
 - `npm run build`: PASS
+- GitHub Actions quality gate: PASS
+- Vercel Preview: PASS
 
 ## Remote Supabase changes
 None. The migration was not applied and migration history was not modified directly.
