@@ -11,12 +11,12 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("Home", () => {
-  it("routes visitors to the OmniBox login portal", () => {
+  it("routes visitors to the uploaded OmniBox application shell", () => {
     mocks.redirect.mockImplementation((destination: string) => {
       throw new Error(`redirect:${destination}`);
     });
 
-    expect(() => Home()).toThrow("redirect:/login");
-    expect(mocks.redirect).toHaveBeenCalledWith("/login");
+    expect(() => Home()).toThrow("redirect:/omnibox.html");
+    expect(mocks.redirect).toHaveBeenCalledWith("/omnibox.html");
   });
 });
