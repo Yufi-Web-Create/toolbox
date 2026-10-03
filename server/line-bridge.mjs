@@ -340,13 +340,23 @@ async function fetchLineProfile(fetchImpl, accessToken, userId) {
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
 
-    if (!response.ok) return "LINE user";
+    if (!response.ok) {
+      return { displayName: "LINE user", pictureUrl: null };
+    }
+
     const profile = await response.json();
-    return typeof profile?.displayName === "string" && profile.displayName.trim()
-      ? profile.displayName.trim()
-      : "LINE user";
+    return {
+      displayName:
+        typeof profile?.displayName === "string" && profile.displayName.trim()
+          ? profile.displayName.trim()
+          : "LINE user",
+      pictureUrl:
+        typeof profile?.pictureUrl === "string" && profile.pictureUrl.trim()
+          ? profile.pictureUrl.trim()
+          : null,
+    };
   } catch {
-    return "LINE user";
+    return { displayName: "LINE user", pictureUrl: null };
   }
 }
 
@@ -530,7 +540,7 @@ async function handleLineWebhook({ request, response, config, fetchImpl }) {
     const normalized = normalizeLineTextEvent(event);
     if (!normalized) continue;
 
-    const customerDisplayName = await fetchLineProfile(
+    const profile = await fetchLineProfile(
       fetchImpl,
       lineAccessToken,
       normalized.customerExternalId,
@@ -540,13 +550,93 @@ async function handleLineWebhook({ request, response, config, fetchImpl }) {
       action: "inbound",
       organizationId: config.organizationId,
       ...normalized,
-      customerDisplayName,
+      customerDisplayName: profile.displayName,
+      customerAvatarUrl: profile.pictureUrl,
     });
 
     if (!persistResponse.ok) throw new Error("inbound persistence failed");
   }
 
   sendJson(response, 200, { ok: true });
+}
+
+async function handleLineProfile({ request, response, config, fetchImpl }) {
+  if (!config.configured) {
+    sendJson(response, 503, { ok: false, error: "bridge_not_configured" });
+    return;
+  }
+
+  const userAccessToken = getBearerToken(request);
+  if (!userAccessToken) {
+    sendJson(response, 401, { ok: false, error: "unauthorized" });
+    return;
+  }
+
+  const user = await fetchAuthenticatedUser(fetchImpl, config, userAccessToken);
+  if (!user) {
+    sendJson(response, 401, { ok: false, error: "unauthorized" });
+    return;
+  }
+
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch {
+    sendJson(response, 400, { ok: false, error: "invalid_json" });
+    return;
+  }
+
+  const conversationId =
+    typeof payload?.conversationId === "string" ? payload.conversationId.trim() : "";
+
+  if (!isUuid(conversationId)) {
+    sendJson(response, 400, { ok: false, error: "invalid_request" });
+    return;
+  }
+
+  const conversation = await fetchVisibleConversation(
+    fetchImpl,
+    config,
+    userAccessToken,
+    conversationId,
+  );
+
+  if (!conversation) {
+    sendJson(response, 404, { ok: false, error: "conversation_not_found" });
+    return;
+  }
+
+  const providerConfig = await loadProviderConfig(fetchImpl, config);
+  if (!providerConfig) {
+    sendJson(response, 503, { ok: false, error: "line_not_connected" });
+    return;
+  }
+
+  const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig);
+  const profile = await fetchLineProfile(
+    fetchImpl,
+    lineAccessToken,
+    conversation.customer_external_id,
+  );
+
+  const { response: persistResponse } = await signedEdgeRequest(fetchImpl, config, {
+    action: "profile",
+    organizationId: config.organizationId,
+    conversationId,
+    customerDisplayName: profile.displayName,
+    customerAvatarUrl: profile.pictureUrl,
+  });
+
+  if (!persistResponse.ok) {
+    sendJson(response, 500, { ok: false, error: "profile_persistence_failed" });
+    return;
+  }
+
+  sendJson(response, 200, {
+    ok: true,
+    customerDisplayName: profile.displayName,
+    customerAvatarUrl: profile.pictureUrl,
+  });
 }
 
 async function handleLineReply({ request, response, config, fetchImpl }) {
@@ -669,6 +759,11 @@ export function createLineBridgeServer({
 
       if (request.method === "POST" && url.pathname === "/webhooks/line") {
         await handleLineWebhook({ request, response, config, fetchImpl });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/line/profile") {
+        await handleLineProfile({ request, response, config, fetchImpl });
         return;
       }
 
