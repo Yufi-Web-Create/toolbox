@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 
-import { getVisibleOrganizationStatus } from "../../lib/organizations/server";
-import { createClient } from "../../lib/supabase/server";
+import { getVisibleOrganizationStatus } from "../../../lib/organizations/server";
+import { createClient } from "../../../lib/supabase/server";
+import { OnboardingForm } from "./onboarding-form";
 
 export const dynamic = "force-dynamic";
 
-const LOGIN_REDIRECT = "/login?next=/app";
+const LOGIN_REDIRECT = "/login?next=/app/onboarding";
 
-export default async function ApplicationPage() {
+export default async function OnboardingPage() {
   let claims = null;
 
   try {
@@ -30,20 +31,21 @@ export default async function ApplicationPage() {
   if (!organizationStatus.success) {
     return (
       <main>
-        <h1>Application unavailable</h1>
+        <h1>Workspace setup unavailable</h1>
         <p>{organizationStatus.message}</p>
       </main>
     );
   }
 
-  if (!organizationStatus.hasOrganization) {
-    redirect("/app/onboarding");
+  if (organizationStatus.hasOrganization) {
+    redirect("/app");
   }
 
   return (
     <main>
-      <h1>Application</h1>
-      <p>You are signed in.</p>
+      <h1>Set up your workspace</h1>
+      <p>Enter an organization name to create your workspace.</p>
+      <OnboardingForm />
     </main>
   );
 }
