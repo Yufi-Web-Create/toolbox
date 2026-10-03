@@ -1452,6 +1452,16 @@
         }
 
         onDataUpdated();
+
+        if (!conversationId && !isDemoSession) {
+          setTimeout(() => {
+            threads
+              .filter(thread => thread.channel === 'line' && thread.liveConversationId && !thread.avatar)
+              .slice(0, 10)
+              .forEach(thread => window.refreshCustomerProfile(thread));
+          }, 0);
+        }
+
         return true;
       } catch (error) {
         console.error('Live inbox load failed:', error);
