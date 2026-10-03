@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     return json(500, { ok: false, error: "demo_setup_failed" });
   }
 
-  let { data: organization, error: organizationError } = await admin
+  const { data: existingOrganization, error: organizationError } = await admin
     .from("organizations")
     .select("id, created_by")
     .eq("login_id", "DEMO")
@@ -79,6 +79,8 @@ Deno.serve(async (req) => {
   if (organizationError) {
     return json(500, { ok: false, error: "demo_setup_failed" });
   }
+
+  let organization = existingOrganization;
 
   if (!organization) {
     const created = await admin
