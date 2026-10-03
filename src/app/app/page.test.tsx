@@ -6,7 +6,12 @@ import ApplicationPage from "./page";
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   getClaims: vi.fn(),
+  getVisibleOrganizationStatus: vi.fn(),
   redirect: vi.fn(),
+}));
+
+vi.mock("../../lib/organizations/server", () => ({
+  getVisibleOrganizationStatus: mocks.getVisibleOrganizationStatus,
 }));
 
 vi.mock("../../lib/supabase/server", () => ({
@@ -23,6 +28,10 @@ describe("/app", () => {
     mocks.createClient.mockResolvedValue({
       auth: { getClaims: mocks.getClaims },
     });
+    mocks.getVisibleOrganizationStatus.mockResolvedValue({
+      success: true,
+      hasOrganization: true,
+    });
     mocks.redirect.mockImplementation((destination: string) => {
       throw new Error(`redirect:${destination}`);
     });
@@ -37,9 +46,48 @@ describe("/app", () => {
     const html = renderToStaticMarkup(await ApplicationPage());
 
     expect(mocks.getClaims).toHaveBeenCalledOnce();
+    expect(mocks.getVisibleOrganizationStatus).toHaveBeenCalledOnce();
     expect(mocks.redirect).not.toHaveBeenCalled();
     expect(html).toContain("<h1>Application</h1>");
     expect(html).toContain("You are signed in.");
+    expect(html).toContain('href="/app/inbox"');
+    expect(html).toContain("LINE受信箱を開く");
+  });
+
+  it("redirects an authenticated user without organizations to onboarding", async () => {
+    mocks.getClaims.mockResolvedValue({
+      data: { claims: { sub: "authenticated-user" } },
+      error: null,
+    });
+    mocks.getVisibleOrganizationStatus.mockResolvedValue({
+      success: true,
+      hasOrganization: false,
+    });
+
+    await expect(ApplicationPage()).rejects.toThrow(
+      "redirect:/app/onboarding",
+    );
+    expect(mocks.redirect).toHaveBeenCalledWith("/app/onboarding");
+  });
+
+  it("fails closed with a safe message when organization lookup fails", async () => {
+    const rawError = "raw Supabase error containing tenant details";
+    mocks.getClaims.mockResolvedValue({
+      data: { claims: { sub: "authenticated-user" } },
+      error: null,
+    });
+    mocks.getVisibleOrganizationStatus.mockResolvedValue({
+      success: false,
+      message: "We could not load your workspace. Please try again.",
+      rawError,
+    });
+
+    const html = renderToStaticMarkup(await ApplicationPage());
+
+    expect(mocks.redirect).not.toHaveBeenCalledWith("/app/onboarding");
+    expect(html).toContain("Application unavailable");
+    expect(html).toContain("We could not load your workspace. Please try again.");
+    expect(html).not.toContain(rawError);
   });
 
   it.each([
@@ -52,6 +100,7 @@ describe("/app", () => {
       "redirect:/login?next=/app",
     );
     expect(mocks.redirect).toHaveBeenCalledWith("/login?next=/app");
+    expect(mocks.getVisibleOrganizationStatus).not.toHaveBeenCalled();
   });
 
   it("fails closed when the auth provider returns an error", async () => {
