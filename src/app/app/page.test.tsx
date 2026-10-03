@@ -50,6 +50,8 @@ describe("/app", () => {
     expect(mocks.redirect).not.toHaveBeenCalled();
     expect(html).toContain("<h1>Application</h1>");
     expect(html).toContain("You are signed in.");
+    expect(html).toContain('href="/app/inbox"');
+    expect(html).toContain("LINE受信箱を開く");
   });
 
   it("redirects an authenticated user without organizations to onboarding", async () => {
