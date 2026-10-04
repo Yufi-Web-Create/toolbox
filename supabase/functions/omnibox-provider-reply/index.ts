@@ -189,8 +189,12 @@ Deno.serve(async (req) => {
     if (!accessToken || (expiresAt && expiresAt < Date.now() + 60_000)) {
       const refreshed = await refreshGoogleToken(
         bundle,
-        Deno.env.get("OMNIBOX_GOOGLE_CLIENT_ID") ?? "",
-        Deno.env.get("OMNIBOX_GOOGLE_CLIENT_SECRET") ?? "",
+        typeof bundle.omnibox_client_id === "string"
+          ? bundle.omnibox_client_id
+          : Deno.env.get("OMNIBOX_GOOGLE_CLIENT_ID") ?? "",
+        typeof bundle.omnibox_client_secret === "string"
+          ? bundle.omnibox_client_secret
+          : Deno.env.get("OMNIBOX_GOOGLE_CLIENT_SECRET") ?? "",
       );
 
       if (!refreshed) {
