@@ -527,67 +527,14 @@ async function applyLineWebhook(fetchImpl, lineAccessToken, organizationId) {
   };
 }
 
-async function handleHealth({ response, config, fetchImpl }) {
-  if (!config.configured) {
-    sendJson(response, 200, {
-      ok: true,
-      configured: false,
-      lineConnected: false,
-      lineApiReachable: false,
-      webhookActive: false,
-      webhookMatches: false,
-      webhookUrl: null,
-      missing: config.missing,
-    });
-    return;
-  }
-
-  let providerConfig = null;
-  try {
-    providerConfig = await loadProviderConfig(
-      fetchImpl,
-      config,
-      auth.organization.organization_id,
-      true,
-    );
-  } catch {}
-
-  if (!providerConfig) {
-    sendJson(response, 200, {
-      ok: true,
-      configured: true,
-      lineConnected: false,
-      lineApiReachable: false,
-      webhookActive: false,
-      webhookMatches: false,
-      webhookUrl: null,
-      missing: [],
-    });
-    return;
-  }
-
-  try {
-    const token = await issueStatelessLineToken(fetchImpl, providerConfig);
-    const webhook = await getLineWebhookStatus(fetchImpl, token);
-    sendJson(response, 200, {
-      ok: true,
-      configured: true,
-      lineConnected: true,
-      ...webhook,
-      missing: [],
-    });
-  } catch {
-    sendJson(response, 200, {
-      ok: true,
-      configured: true,
-      lineConnected: true,
-      lineApiReachable: false,
-      webhookActive: false,
-      webhookMatches: false,
-      webhookUrl: null,
-      missing: [],
-    });
-  }
+async function handleHealth({ response, config }) {
+  sendJson(response, 200, {
+    ok: true,
+    configured: config.configured,
+    bridgeReady: config.configured,
+    multiTenant: true,
+    missing: config.missing,
+  });
 }
 
 async function authenticateVisibleOrganization({
@@ -683,7 +630,12 @@ async function handleLineRepair({ request, response, config, fetchImpl }) {
 
   let providerConfig;
   try {
-    providerConfig = await loadProviderConfig(fetchImpl, config, true);
+    providerConfig = await loadProviderConfig(
+      fetchImpl,
+      config,
+      auth.organization.organization_id,
+      true,
+    );
   } catch {
     sendJson(response, 502, { ok: false, error: "config_lookup_failed" });
     return;
@@ -696,7 +648,11 @@ async function handleLineRepair({ request, response, config, fetchImpl }) {
 
   let lineAccessToken;
   try {
-    lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig);
+    lineAccessToken = await issueStatelessLineToken(
+      fetchImpl,
+      providerConfig,
+      auth.organization.organization_id,
+    );
   } catch {
     sendJson(response, 502, { ok: false, error: "line_credentials_rejected" });
     return;
@@ -770,7 +726,7 @@ async function handleOperatorLineRepair({ request, response, config, fetchImpl }
     return;
   }
   let token;
-  try { token = await issueStatelessLineToken(fetchImpl, providerConfig); }
+  try { token = await issueStatelessLineToken(fetchImpl, providerConfig, organizationId); }
   catch {
     sendJson(response, 502, { ok: false, error: "line_credentials_rejected" });
     return;
@@ -1150,13 +1106,18 @@ async function handleLineReply({ request, response, config, fetchImpl }) {
     return;
   }
 
-  const providerConfig = await loadProviderConfig(fetchImpl, config);
+  const organizationId = conversation.organization_id;
+  const providerConfig = await loadProviderConfig(fetchImpl, config, organizationId);
   if (!providerConfig) {
     sendJson(response, 503, { ok: false, error: "line_not_connected" });
     return;
   }
 
-  const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig);
+  const lineAccessToken = await issueStatelessLineToken(
+    fetchImpl,
+    providerConfig,
+    organizationId,
+  );
   const lineResponse = await fetchImpl("https://api.line.me/v2/bot/message/push", {
     method: "POST",
     headers: {
