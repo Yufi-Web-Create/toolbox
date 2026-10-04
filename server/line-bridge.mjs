@@ -61,14 +61,11 @@ export function verifyLineSignature(rawBody, signature, channelSecret) {
   return safeStringEqual(expected, signature);
 }
 
-export function normalizeLineTextEvent(event) {
+export function normalizeLineMessageEvent(event) {
   if (
     !event ||
     event.type !== "message" ||
-    event.message?.type !== "text" ||
     typeof event.message?.id !== "string" ||
-    typeof event.message?.text !== "string" ||
-    !event.message.text.trim() ||
     event.source?.type !== "user" ||
     typeof event.source?.userId !== "string" ||
     !event.source.userId
@@ -81,13 +78,61 @@ export function normalizeLineTextEvent(event) {
       ? new Date(event.timestamp).toISOString()
       : new Date().toISOString();
 
-  return {
-    customerExternalId: event.source.userId,
-    providerThreadId: `line:user:${event.source.userId}`,
-    providerMessageId: event.message.id,
-    body: event.message.text,
-    occurredAt,
-  };
+  if (
+    event.message.type === "text" &&
+    typeof event.message.text === "string" &&
+    event.message.text.trim()
+  ) {
+    return {
+      customerExternalId: event.source.userId,
+      providerThreadId: `line:user:${event.source.userId}`,
+      providerMessageId: event.message.id,
+      body: event.message.text,
+      messageType: "text",
+      metadata: {},
+      occurredAt,
+    };
+  }
+
+  if (
+    event.message.type === "sticker" &&
+    typeof event.message.stickerId === "string" &&
+    event.message.stickerId
+  ) {
+    return {
+      customerExternalId: event.source.userId,
+      providerThreadId: `line:user:${event.source.userId}`,
+      providerMessageId: event.message.id,
+      body: "LINEスタンプ",
+      messageType: "sticker",
+      metadata: {
+        packageId:
+          typeof event.message.packageId === "string"
+            ? event.message.packageId
+            : null,
+        stickerId: event.message.stickerId,
+        stickerResourceType:
+          typeof event.message.stickerResourceType === "string"
+            ? event.message.stickerResourceType
+            : null,
+        keywords: Array.isArray(event.message.keywords)
+          ? event.message.keywords.filter((value) => typeof value === "string")
+          : [],
+        text:
+          typeof event.message.text === "string"
+            ? event.message.text
+            : null,
+      },
+      occurredAt,
+    };
+  }
+
+  return null;
+}
+
+export function normalizeLineTextEvent(event) {
+  const normalized = normalizeLineMessageEvent(event);
+  return normalized?.messageType === "text" ? normalized : null;
 }
 
 export function getBridgeConfiguration(env = process.env) {
@@ -537,7 +582,7 @@ async function handleLineWebhook({ request, response, config, fetchImpl }) {
   const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig);
 
   for (const event of events) {
-    const normalized = normalizeLineTextEvent(event);
+    const normalized = normalizeLineMessageEvent(event);
     if (!normalized) continue;
 
     const profile = await fetchLineProfile(
