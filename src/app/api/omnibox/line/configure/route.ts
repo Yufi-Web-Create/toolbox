@@ -33,6 +33,25 @@ export async function POST(request: Request) {
       );
     }
 
+    const userId = claimsData.claims.sub;
+    const { data: memberships, error: membershipError } = await supabase
+      .from("organization_members")
+      .select("role")
+      .eq("user_id", userId)
+      .limit(1);
+
+    if (
+      membershipError ||
+      !Array.isArray(memberships) ||
+      memberships.length !== 1 ||
+      memberships[0].role !== "owner"
+    ) {
+      return NextResponse.json(
+        { ok: false, message: "LINE公式アカウントの連携は管理者のみ行えます。" },
+        { status: 403 },
+      );
+    }
+
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token ?? "";
 
@@ -68,10 +87,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message }, { status: 400 });
     }
 
-    await supabase.rpc("omnibox_update_line_connection_metadata", {
-      p_account_name: accountName || "LINE公式アカウント",
-      p_channel_id: channelId,
-    });
+    const { data: metadataUpdated, error: metadataError } = await supabase.rpc(
+      "omnibox_update_line_connection_metadata",
+      {
+        p_account_name: accountName || "LINE公式アカウント",
+        p_channel_id: channelId,
+      },
+    );
+
+    if (metadataError || metadataUpdated !== true) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "LINEへの接続は確認できましたが、OmniBoxへの連携情報を保存できませんでした。もう一度お試しください。",
+        },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({
       ok: true,
