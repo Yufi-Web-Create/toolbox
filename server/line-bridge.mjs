@@ -282,7 +282,6 @@ async function storeOperatorProviderConfig(fetchImpl, config, provider, provider
 async function loadOperatorProviderConfig(fetchImpl, config, provider) {
   const { response, data } = await signedEdgeRequest(fetchImpl, config, {
     action: "get-operator-config",
-    organizationId,
     provider,
   });
   if (response.status === 404) return null;
