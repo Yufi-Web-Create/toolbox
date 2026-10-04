@@ -47,6 +47,58 @@ function scopeEnv(name: string, fallback: string[]) {
     : fallback;
 }
 
+async function storedProviderConfig(provider: OAuthProvider) {
+  const key = process.env.OMNIBOX_PROVIDER_BRIDGE_KEY?.trim();
+  if (!key) return null;
+
+  const bridgeUrl =
+    process.env.LINE_BRIDGE_URL?.trim() ||
+    "https://omnibox-line-bridge.onrender.com";
+
+  try {
+    const response = await fetch(
+      new URL("/internal/operator/provider/get", bridgeUrl),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-omnibox-provider-key": key,
+        },
+        body: JSON.stringify({ provider }),
+        cache: "no-store",
+      },
+    );
+    const data = (await response.json().catch(() => null)) as
+      | {
+          configured?: boolean;
+          config?: {
+            clientId?: string;
+            clientSecret?: string;
+            scopes?: string[];
+          };
+        }
+      | null;
+
+    if (!response.ok || data?.configured !== true || !data.config) return null;
+
+    const clientId =
+      typeof data.config.clientId === "string" ? data.config.clientId.trim() : "";
+    const clientSecret =
+      typeof data.config.clientSecret === "string"
+        ? data.config.clientSecret.trim()
+        : "";
+    const scopes = Array.isArray(data.config.scopes)
+      ? data.config.scopes.filter(
+          (scope): scope is string => typeof scope === "string" && Boolean(scope.trim()),
+        )
+      : [];
+
+    return clientId && clientSecret ? { clientId, clientSecret, scopes } : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isOAuthProvider(value: string): value is OAuthProvider {
   return value === "instagram" || value === "x" || value === "google";
 }
@@ -57,18 +109,18 @@ export function providerLabel(provider: OAuthProvider) {
   return "Google / Gmail";
 }
 
-export function getProviderConfig(
+export async function getProviderConfig(
   provider: OAuthProvider,
   origin: string,
-): ProviderConfig | null {
+): Promise<ProviderConfig | null> {
   const redirectUri = `${origin}/api/omnibox/oauth/${provider}/callback`;
+  const stored = await storedProviderConfig(provider);
 
   if (provider === "instagram") {
-    const clientId = env("OMNIBOX_INSTAGRAM_CLIENT_ID", "INSTAGRAM_CLIENT_ID");
-    const clientSecret = env(
-      "OMNIBOX_INSTAGRAM_CLIENT_SECRET",
-      "INSTAGRAM_CLIENT_SECRET",
-    );
+    const clientId = stored?.clientId || env("OMNIBOX_INSTAGRAM_CLIENT_ID", "INSTAGRAM_CLIENT_ID");
+    const clientSecret =
+      stored?.clientSecret ||
+      env("OMNIBOX_INSTAGRAM_CLIENT_SECRET", "INSTAGRAM_CLIENT_SECRET");
     if (!clientId || !clientSecret) return null;
 
     return {
@@ -77,18 +129,22 @@ export function getProviderConfig(
       clientSecret,
       authorizeUrl: "https://www.instagram.com/oauth/authorize",
       tokenUrl: "https://api.instagram.com/oauth/access_token",
-      scopes: scopeEnv("OMNIBOX_INSTAGRAM_SCOPES", [
-        "instagram_business_basic",
-        "instagram_business_manage_messages",
-        "instagram_business_content_publish",
-      ]),
+      scopes:
+        stored?.scopes?.length
+          ? stored.scopes
+          : scopeEnv("OMNIBOX_INSTAGRAM_SCOPES", [
+              "instagram_business_basic",
+              "instagram_business_manage_messages",
+              "instagram_business_content_publish",
+            ]),
       redirectUri,
     };
   }
 
   if (provider === "x") {
-    const clientId = env("OMNIBOX_X_CLIENT_ID", "X_CLIENT_ID");
-    const clientSecret = env("OMNIBOX_X_CLIENT_SECRET", "X_CLIENT_SECRET");
+    const clientId = stored?.clientId || env("OMNIBOX_X_CLIENT_ID", "X_CLIENT_ID");
+    const clientSecret =
+      stored?.clientSecret || env("OMNIBOX_X_CLIENT_SECRET", "X_CLIENT_SECRET");
     if (!clientId || !clientSecret) return null;
 
     return {
@@ -97,23 +153,26 @@ export function getProviderConfig(
       clientSecret,
       authorizeUrl: "https://x.com/i/oauth2/authorize",
       tokenUrl: "https://api.x.com/2/oauth2/token",
-      scopes: scopeEnv("OMNIBOX_X_SCOPES", [
-        "tweet.read",
-        "tweet.write",
-        "users.read",
-        "dm.read",
-        "dm.write",
-        "offline.access",
-      ]),
+      scopes:
+        stored?.scopes?.length
+          ? stored.scopes
+          : scopeEnv("OMNIBOX_X_SCOPES", [
+              "tweet.read",
+              "tweet.write",
+              "users.read",
+              "dm.read",
+              "dm.write",
+              "offline.access",
+            ]),
       redirectUri,
     };
   }
 
-  const clientId = env("OMNIBOX_GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID");
-  const clientSecret = env(
-    "OMNIBOX_GOOGLE_CLIENT_SECRET",
-    "GOOGLE_CLIENT_SECRET",
-  );
+  const clientId =
+    stored?.clientId || env("OMNIBOX_GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID");
+  const clientSecret =
+    stored?.clientSecret ||
+    env("OMNIBOX_GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET");
   if (!clientId || !clientSecret) return null;
 
   return {
@@ -122,13 +181,16 @@ export function getProviderConfig(
     clientSecret,
     authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: scopeEnv("OMNIBOX_GOOGLE_SCOPES", [
-      "openid",
-      "email",
-      "profile",
-      "https://www.googleapis.com/auth/gmail.readonly",
-      "https://www.googleapis.com/auth/gmail.send",
-    ]),
+    scopes:
+      stored?.scopes?.length
+        ? stored.scopes
+        : scopeEnv("OMNIBOX_GOOGLE_SCOPES", [
+            "openid",
+            "email",
+            "profile",
+            "https://www.googleapis.com/auth/gmail.readonly",
+            "https://www.googleapis.com/auth/gmail.send",
+          ]),
     redirectUri,
   };
 }
