@@ -223,11 +223,12 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("社内共有メモを入力");
   });
 
-  it("does not generate fake AI replies before AI is connected", () => {
-    expect(html).toContain("AI機能は現在準備中です");
-    expect(html).toContain("AI丁寧返信（準備中）");
+  it("does not expose fake AI generation before AI is connected", () => {
+    expect(html).not.toContain("AI丁寧返信（準備中）");
+    expect(html).not.toContain("親しみやすい返信（準備中）");
     expect(html).not.toContain("確認が取れましたのでご案内いたします");
     expect(html).not.toContain("しっかり確認できました");
+    expect(html).not.toContain("generateFallbackDraft");
   });
 
   it("supports tablet and mobile inbox layouts", () => {
