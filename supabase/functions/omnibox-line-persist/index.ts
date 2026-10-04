@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
         .select("id")
         .eq("organization_id", ALLOWED_ORGANIZATION_ID)
         .eq("provider", "line")
+        .is("external_account_id", null)
         .maybeSingle();
 
     if (connectionLookupError) {
@@ -148,6 +149,7 @@ Deno.serve(async (req) => {
       .eq("organization_id", ALLOWED_ORGANIZATION_ID)
       .eq("provider", "line")
       .eq("status", "active")
+      .is("external_account_id", null)
       .maybeSingle();
 
     if (connectionError || !lineConnection?.id) {
