@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       .from("organizations")
       .update({ name, login_id: loginId })
       .eq("id", membership.organization_id)
-      .select("id, name, login_id")
+      .select("id, name, login_id, plan_key")
       .single();
 
     if (error || !data) {
@@ -90,6 +90,7 @@ export async function POST(request: Request) {
         id: data.id,
         name: data.name,
         loginId: data.login_id,
+        plan: data.plan_key ?? "standard",
       },
     });
   } catch {
