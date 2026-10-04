@@ -155,6 +155,12 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("syncGoogleInbox");
   });
 
+  it("supports X DM synchronization in the connected account UI", () => {
+    expect(html).toContain("/api/omnibox/x/sync");
+    expect(html).toContain("syncXInbox");
+    expect(html).toContain("X DMを同期");
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
