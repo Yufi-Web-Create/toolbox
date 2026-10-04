@@ -30,7 +30,7 @@ export function SignupForm() {
           name="loginId"
           required
           type="text"
-          placeholder="hajimari_admin"
+          placeholder="sample_admin"
         />
       </div>
 
