@@ -51,6 +51,27 @@
     .pulse-sync {
       animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
+    #status-sidebar,
+    #customer-info-panel {
+      transition: width 180ms ease, min-width 180ms ease;
+    }
+    #status-sidebar.is-collapsed {
+      width: 44px !important;
+      min-width: 44px !important;
+    }
+    #status-sidebar.is-collapsed .status-sidebar-body {
+      display: none;
+    }
+    #customer-info-panel.is-collapsed {
+      width: 44px !important;
+      min-width: 44px !important;
+      padding-left: 6px !important;
+      padding-right: 6px !important;
+      overflow: hidden;
+    }
+    #customer-info-panel.is-collapsed .customer-panel-body {
+      display: none;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased h-screen flex flex-col overflow-hidden">
@@ -185,7 +206,11 @@
     <div id="view-inbox" class="view-panel w-full h-full flex flex-col md:flex-row overflow-hidden">
 
       <!-- 左サイドバー: フィルタリング & チャネル切替 -->
-      <aside class="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
+      <aside id="status-sidebar" class="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 relative">
+        <button type="button" onclick="toggleStatusSidebar()" class="hidden md:flex absolute -right-3 top-3 z-10 w-6 h-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:text-teal-700" title="ステータスメニューを最小化">
+          <i id="status-sidebar-toggle-icon" data-lucide="panel-left-close" class="w-3.5 h-3.5"></i>
+        </button>
+        <div class="status-sidebar-body flex flex-col h-full">
         <div class="p-3 border-b border-slate-100">
           <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
@@ -251,6 +276,7 @@
             </p>
           </div>
         </div>
+        </div>
       </aside>
 
       <!-- 中央: スレッド一覧 -->
@@ -261,10 +287,9 @@
             <p id="inbox-filter-label" class="text-[11px] text-slate-500">すべての窓口・すべてのステータス</p>
           </div>
           <div class="flex items-center gap-1">
-            <button onclick="simulateIncomingMessage()" class="text-xs bg-white border border-slate-200 text-slate-700 hover:border-teal-500 hover:text-teal-600 px-2 py-1 rounded shadow-xs flex items-center gap-1 transition" title="新しい問い合わせを受信">
-              <i data-lucide="download-cloud" class="w-3 h-3 text-teal-600"></i>
-              <span>疑似受信</span>
-            </button>
+            <span class="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-sync"></span>自動更新
+            </span>
           </div>
         </div>
 
@@ -312,9 +337,7 @@
               </select>
 
               <select id="chat-assignee-select" onchange="updateCurrentAssignee(this.value)" class="text-xs border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 text-slate-700 font-medium focus:outline-none focus:border-teal-500">
-                <option value="山田 太郎">👤 山田 太郎</option>
-                <option value="佐藤 美咲">👤 佐藤 美咲</option>
-                <option value="未割り当て">👤 未割り当て</option>
+                <option value="">👤 未割り当て</option>
               </select>
 
               <button onclick="toggleSideInfoPanel()" class="p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition" title="顧客カルテ・社内メモを表示">
@@ -386,7 +409,11 @@
             </div>
 
             <!-- 顧客情報 & 社内メモ サイドパネル -->
-            <div id="customer-info-panel" class="w-72 bg-white border-l border-slate-200 p-4 overflow-y-auto hidden lg:block shrink-0">
+            <div id="customer-info-panel" class="w-72 bg-white border-l border-slate-200 p-4 overflow-y-auto hidden lg:block shrink-0 relative">
+              <button type="button" onclick="toggleCustomerPanel()" class="absolute left-1 top-2 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-teal-700 hover:bg-slate-100" title="顧客カルテを最小化">
+                <i id="customer-panel-toggle-icon" data-lucide="panel-right-close" class="w-4 h-4"></i>
+              </button>
+              <div class="customer-panel-body pt-8">
               <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">顧客カルテ</div>
               
               <div class="space-y-3 text-xs mb-6">
@@ -424,6 +451,7 @@
                   <input type="text" id="quick-note-input" placeholder="メモを残す..." class="flex-1 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-teal-500">
                   <button onclick="addQuickNote()" class="text-xs px-2.5 py-1.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">追加</button>
                 </div>
+              </div>
               </div>
             </div>
 
@@ -1273,6 +1301,9 @@
     let isDemoSession = false;
     let providerOAuthReadiness = {};
     let providerInboxSyncStarted = false;
+    let liveInboxTimer = null;
+    let liveInboxRefreshInFlight = false;
+    let assignableStaff = [];
 
     let threads = [];
     let connectedAccounts = [];
@@ -1506,7 +1537,69 @@
       }
     }
 
-    async function loadLiveInbox(conversationId = null) {
+    async function loadAssignableStaff() {
+      if (isDemoSession) {
+        assignableStaff = [];
+        renderAssigneeOptions();
+        return true;
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/settings/employees', {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok || !Array.isArray(result.employees)) {
+          throw new Error(result.message || 'スタッフ一覧を読み込めませんでした');
+        }
+        assignableStaff = result.employees.map(employee => ({
+          id: employee.id,
+          name: employee.name || employee.email || '従業員'
+        }));
+        renderAssigneeOptions();
+        return true;
+      } catch (error) {
+        console.error('Staff load failed:', error);
+        assignableStaff = [];
+        renderAssigneeOptions();
+        return false;
+      }
+    }
+
+    function renderAssigneeOptions(selectedUserId = null) {
+      const select = document.getElementById('chat-assignee-select');
+      if (!select) return;
+      const selected = selectedUserId ?? threads.find(t => t.id === currentThreadId)?.assigneeUserId ?? '';
+      select.innerHTML = '<option value="">👤 未割り当て</option>' +
+        assignableStaff.map(staff =>
+          `<option value="${escapeHtml(staff.id)}">👤 ${escapeHtml(staff.name)}</option>`
+        ).join('');
+      select.value = selected || '';
+    }
+
+    function startLiveInboxRefresh() {
+      stopLiveInboxRefresh();
+      if (isDemoSession || !loggedInUser) return;
+      liveInboxTimer = window.setInterval(async () => {
+        if (document.hidden || liveInboxRefreshInFlight || !loggedInUser) return;
+        liveInboxRefreshInFlight = true;
+        try {
+          await loadLiveInbox(currentThreadId, { silent: true });
+        } finally {
+          liveInboxRefreshInFlight = false;
+        }
+      }, 1500);
+    }
+
+    function stopLiveInboxRefresh() {
+      if (liveInboxTimer) {
+        window.clearInterval(liveInboxTimer);
+        liveInboxTimer = null;
+      }
+    }
+
+    async function loadLiveInbox(conversationId = null, { silent = false } = {}) {
       try {
         const suffix = conversationId ? `?conversation=${encodeURIComponent(conversationId)}` : '';
         const response = await fetch('/api/omnibox/inbox' + suffix, {
@@ -1562,7 +1655,8 @@
             avatar: conversation.customer_avatar_url || '',
             customerNameSource: conversation.customer_name_source || 'provider',
             status: conversation.status === 'completed' ? 'resolved' : conversation.status,
-            assignee: '未割り当て',
+            assigneeUserId: conversation.assignee_user_id || null,
+            assignee: assignableStaff.find(staff => staff.id === conversation.assignee_user_id)?.name || '未割り当て',
             lastMessage: conversation.last_message_preview || '',
             lastTime: formatLiveTime(conversation.last_message_at),
             unreadCount: conversation.status === 'unread' ? 1 : 0,
@@ -1592,7 +1686,9 @@
       } catch (error) {
         console.error('Live inbox load failed:', error);
         if (threads.length === 0) onDataUpdated();
-        showToast('受信箱を読み込めませんでした。接続設定をご確認ください');
+        if (!silent) {
+          showToast('受信箱を読み込めませんでした。接続設定をご確認ください');
+        }
         return false;
       }
     }
@@ -1796,6 +1892,7 @@
           } else {
             await loadTemplates();
             await loadProviderConnections();
+            await loadAssignableStaff();
             await loadSocialPosts();
             if (!providerInboxSyncStarted) {
               providerInboxSyncStarted = true;
@@ -1805,8 +1902,10 @@
               ]);
             }
             await loadLiveInbox();
+            startLiveInboxRefresh();
           }
         } else {
+          stopLiveInboxRefresh();
           loggedInUser = null;
           currentOrganization = null;
           requiresOrganizationSetup = false;
@@ -1815,6 +1914,7 @@
         }
       } catch (err) {
         console.error('Session init failed:', err);
+        stopLiveInboxRefresh();
         loggedInUser = null;
         currentOrganization = null;
         requiresOrganizationSetup = false;
@@ -2288,7 +2388,7 @@
       channelBadge.innerHTML = meta.icon;
 
       document.getElementById('chat-status-select').value = thread.status;
-      document.getElementById('chat-assignee-select').value = thread.assignee || '未割り当て';
+      renderAssigneeOptions(thread.assigneeUserId || null);
 
       updateStatusPill(thread.status);
 
@@ -2525,35 +2625,69 @@
     window.updateCurrentThreadStatus = async function(newStatus) {
       const thread = threads.find(t => t.id === currentThreadId);
       if (!thread) return;
-      thread.status = newStatus;
-      thread.updatedAt = Date.now();
-      updateStatusPill(newStatus);
 
-      if (isCloudReady && db) {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'threads', thread.id), {
-          status: newStatus,
-          updatedAt: thread.updatedAt
-        });
+      if (isDemoSession) {
+        thread.status = newStatus;
+        updateStatusPill(newStatus);
+        renderThreadList();
+        updateBadges();
+        return;
       }
-      renderThreadList();
-      updateBadges();
-      showToast(`ステータスを更新しました`);
+
+      try {
+        const response = await fetch('/api/omnibox/inbox', {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId: thread.liveConversationId || thread.id,
+            status: newStatus
+          })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error('ステータスを更新できませんでした');
+        thread.status = newStatus;
+        updateStatusPill(newStatus);
+        renderThreadList();
+        updateBadges();
+        showToast('ステータスを更新しました');
+      } catch (error) {
+        showToast(error.message || 'ステータスを更新できませんでした');
+      }
     };
 
-    window.updateCurrentAssignee = async function(newAssignee) {
+    window.updateCurrentAssignee = async function(assigneeUserId) {
       const thread = threads.find(t => t.id === currentThreadId);
       if (!thread) return;
-      thread.assignee = newAssignee;
-      thread.updatedAt = Date.now();
+      const staff = assignableStaff.find(item => item.id === assigneeUserId);
 
-      if (isCloudReady && db) {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'threads', thread.id), {
-          assignee: newAssignee,
-          updatedAt: thread.updatedAt
-        });
+      if (isDemoSession) {
+        thread.assigneeUserId = assigneeUserId || null;
+        thread.assignee = staff?.name || '未割り当て';
+        renderThreadList();
+        return;
       }
-      renderThreadList();
-      showToast(`担当者を「${newAssignee}」に変更しました`);
+
+      try {
+        const response = await fetch('/api/omnibox/inbox', {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId: thread.liveConversationId || thread.id,
+            assigneeUserId: assigneeUserId || null
+          })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error('担当者を更新できませんでした');
+        thread.assigneeUserId = assigneeUserId || null;
+        thread.assignee = staff?.name || '未割り当て';
+        renderThreadList();
+        renderAssigneeOptions(thread.assigneeUserId);
+        showToast(`担当者を「${thread.assignee}」に変更しました`);
+      } catch (error) {
+        showToast(error.message || '担当者を更新できませんでした');
+      }
     };
 
     window.setInputMode = function(mode) {
@@ -2630,51 +2764,6 @@
       renderInternalNotes(thread);
       renderMessages(thread);
       showToast('社内メモを追加しました');
-    };
-
-    window.simulateIncomingMessage = async function() {
-      const targetAcc = connectedAccounts.length > 0 
-        ? connectedAccounts[Math.floor(Math.random() * connectedAccounts.length)]
-        : defaultAccounts[0];
-
-      const simulatedSenders = [
-        { name: '西野 葵', handle: '@aoi_n', msg: '今夜の営業時間にまだ空き枠はございますでしょうか？' },
-        { name: '佐々木 健二', handle: '@kenji_s', msg: '先日注文した商品の配達希望日を来週月曜に変更できますか？' },
-        { name: '株式会社グローバル 担当者様', handle: 'info@g-design.jp', msg: '来期のタイアップ企画についてご提案書をお送りしたいです。' },
-        { name: '松本 玲奈', handle: '@reina_m', msg: '限定コラボ商品の再販予定はございますか？' }
-      ];
-      const randomMsg = simulatedSenders[Math.floor(Math.random() * simulatedSenders.length)];
-
-      const newId = 'thr-' + Date.now();
-      const newThr = {
-        id: newId,
-        accountId: targetAcc.id,
-        customerName: randomMsg.name,
-        customerHandle: randomMsg.handle,
-        channel: targetAcc.platform,
-        avatar: `https://images.unsplash.com/photo-${1530000000000 + Math.floor(Math.random()*10000000)}?w=120&auto=format&fit=crop&q=80`,
-        status: 'unread',
-        assignee: '未割り当て',
-        lastMessage: randomMsg.msg,
-        lastTime: 'たった今',
-        unreadCount: 1,
-        tags: ['新規着信', targetAcc.accountName],
-        notes: [],
-        messages: [
-          { sender: 'customer', text: randomMsg.msg, time: 'たった今' }
-        ],
-        updatedAt: Date.now()
-      };
-
-      if (isCloudReady && db) {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'threads', newId), newThr);
-      } else {
-        threads.unshift(newThr);
-        onDataUpdated();
-      }
-
-      selectThread(newId);
-      showToast(`⚡ 【${targetAcc.accountName}】宛てに新着メッセージを受信しました！`);
     };
 
     function renderConnectedAccounts() {
@@ -3588,7 +3677,26 @@
     };
 
     window.toggleSideInfoPanel = function() {
-      document.getElementById('customer-info-panel').classList.toggle('hidden');
+      toggleCustomerPanel();
+    };
+
+    window.toggleStatusSidebar = function() {
+      const panel = document.getElementById('status-sidebar');
+      const icon = document.getElementById('status-sidebar-toggle-icon');
+      panel?.classList.toggle('is-collapsed');
+      icon?.setAttribute('data-lucide', panel?.classList.contains('is-collapsed') ? 'panel-left-open' : 'panel-left-close');
+      lucide.createIcons();
+    };
+
+    window.toggleCustomerPanel = function() {
+      const panel = document.getElementById('customer-info-panel');
+      const icon = document.getElementById('customer-panel-toggle-icon');
+      if (!panel) return;
+      panel.classList.remove('hidden');
+      panel.classList.add('lg:block');
+      panel.classList.toggle('is-collapsed');
+      icon?.setAttribute('data-lucide', panel.classList.contains('is-collapsed') ? 'panel-right-open' : 'panel-right-close');
+      lucide.createIcons();
     };
 
     window.openAddAccountModal = function() {
@@ -3797,12 +3905,14 @@
           if (!isDemoSession) {
             await loadTemplates();
             await loadProviderConnections();
+            await loadAssignableStaff();
             if (!providerInboxSyncStarted) {
               providerInboxSyncStarted = true;
               await syncGoogleInbox({ silent: true, reloadInbox: false });
             }
           }
           await loadLiveInbox();
+          startLiveInboxRefresh();
           window.switchView('inbox');
           showToast(`ようこそ、${loggedInUser.name}さん！OmniBoxへログインしました`);
         }
