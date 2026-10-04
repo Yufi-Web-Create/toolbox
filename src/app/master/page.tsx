@@ -85,8 +85,15 @@ export default async function MasterPage() {
   }
 
   const line = await getLineHealth();
-  const aiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
-  const aiModel = process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
+  const gatewayConfigured = Boolean(
+    process.env.AI_GATEWAY_API_KEY?.trim() ||
+      process.env.VERCEL_OIDC_TOKEN?.trim(),
+  );
+  const openAiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
+  const aiConfigured = gatewayConfigured || openAiConfigured;
+  const aiModel =
+    process.env.OPENAI_MODEL?.trim() ||
+    (gatewayConfigured ? "openai/gpt-6-luna" : "gpt-6-luna");
   const instagramConfigured = Boolean(
     process.env.OMNIBOX_INSTAGRAM_CLIENT_ID?.trim() &&
       process.env.OMNIBOX_INSTAGRAM_CLIENT_SECRET?.trim(),
@@ -143,8 +150,18 @@ export default async function MasterPage() {
             <h2>AI返信アシスタント</h2>
             <div className={styles.rows}>
               <div className={styles.row}>
-                <span>OpenAI API</span>
+                <span>AI実行環境</span>
                 <State ready={aiConfigured} />
+              </div>
+              <div className={styles.row}>
+                <span>接続方式</span>
+                <span className={styles.value}>
+                  {gatewayConfigured
+                    ? "Vercel AI Gateway / OIDC"
+                    : openAiConfigured
+                      ? "OpenAI API"
+                      : "未設定"}
+                </span>
               </div>
               <div className={styles.row}>
                 <span>モデル</span>
