@@ -832,7 +832,7 @@
             <div class="flex items-start justify-between gap-4 mb-5">
               <div>
                 <h3 class="text-sm font-bold text-slate-800">従業員アカウント</h3>
-                <p class="text-xs text-slate-500 mt-1">従業員はメールアドレスとパスワードでログインします。所属組織は自動判定されます。</p>
+                <p class="text-xs text-slate-500 mt-1">従業員はログインIDとパスワードでログインします。IDはOmniBox全体で重複できません。</p>
                 <div class="mt-2 inline-flex items-center gap-1.5 text-[11px] bg-teal-50 text-teal-800 border border-teal-100 px-2.5 py-1 rounded-lg">
                   <i data-lucide="building-2" class="w-3 h-3"></i>
                   組織ID:
@@ -847,8 +847,8 @@
                 <input id="employee-create-name" type="text" maxlength="100" required class="w-full text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="例: 佐藤 美咲">
               </div>
               <div>
-                <label class="text-[11px] font-bold text-slate-600 block mb-1">メールアドレス</label>
-                <input id="employee-create-email" type="email" required class="w-full text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="staff@example.com">
+                <label class="text-[11px] font-bold text-slate-600 block mb-1">ログインID</label>
+                <input id="employee-create-login-id" type="text" minlength="3" maxlength="32" autocomplete="off" required class="w-full text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="staff01">
               </div>
               <div>
                 <label class="text-[11px] font-bold text-slate-600 block mb-1">初期パスワード</label>
