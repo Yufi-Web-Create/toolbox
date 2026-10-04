@@ -735,6 +735,73 @@ async function handleOperatorLineRepair({ request, response, config, fetchImpl }
   sendJson(response, result.ok ? 200 : 502, result);
 }
 
+async function handleOperatorLineStatus({ request, response, config, fetchImpl }) {
+  if (!providerBridgeAuthorized(request, config)) {
+    sendJson(response, 401, { ok: false, error: "unauthorized" });
+    return;
+  }
+
+  let payload;
+  try { payload = await readJsonBody(request); }
+  catch {
+    sendJson(response, 400, { ok: false, error: "invalid_json" });
+    return;
+  }
+
+  const organizationId =
+    typeof payload?.organizationId === "string" ? payload.organizationId.trim() : "";
+  if (!isUuid(organizationId)) {
+    sendJson(response, 400, { ok: false, error: "invalid_organization_id" });
+    return;
+  }
+
+  let providerConfig;
+  try {
+    providerConfig = await loadProviderConfig(fetchImpl, config, organizationId, true);
+  } catch {
+    sendJson(response, 502, { ok: false, error: "config_lookup_failed" });
+    return;
+  }
+
+  if (!providerConfig) {
+    sendJson(response, 200, {
+      ok: true,
+      bridgeReady: config.configured,
+      lineConnected: false,
+      lineApiReachable: false,
+      webhookActive: false,
+      webhookMatches: false,
+      webhookUrl: lineWebhookUrl(organizationId),
+    });
+    return;
+  }
+
+  try {
+    const token = await issueStatelessLineToken(fetchImpl, providerConfig, organizationId);
+    const status = await getLineWebhookStatus(
+      fetchImpl,
+      token,
+      lineWebhookUrl(organizationId),
+    );
+    sendJson(response, 200, {
+      ok: true,
+      bridgeReady: config.configured,
+      lineConnected: true,
+      ...status,
+    });
+  } catch {
+    sendJson(response, 200, {
+      ok: true,
+      bridgeReady: config.configured,
+      lineConnected: true,
+      lineApiReachable: false,
+      webhookActive: false,
+      webhookMatches: false,
+      webhookUrl: lineWebhookUrl(organizationId),
+    });
+  }
+}
+
 async function handleOperatorProviderConfigure({ request, response, config, fetchImpl }) {
   if (!providerBridgeAuthorized(request, config)) {
     sendJson(response, 401, { ok: false, error: "unauthorized" });
@@ -1195,6 +1262,11 @@ export function createLineBridgeServer({
 
       if (request.method === "POST" && url.pathname === "/internal/operator/line/repair") {
         await handleOperatorLineRepair({ request, response, config, fetchImpl });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/operator/line/status") {
+        await handleOperatorLineStatus({ request, response, config, fetchImpl });
         return;
       }
 
