@@ -29,12 +29,13 @@ export async function GET(request: Request) {
     }
 
     const origin = new URL(request.url).origin;
-    const providers = Object.fromEntries(
-      OAUTH_PROVIDERS.map((provider) => [
+    const providerConfigs = await Promise.all(
+      OAUTH_PROVIDERS.map(async (provider) => [
         provider,
-        { configured: Boolean(getProviderConfig(provider, origin)) },
-      ]),
+        { configured: Boolean(await getProviderConfig(provider, origin)) },
+      ] as const),
     );
+    const providers = Object.fromEntries(providerConfigs);
 
     return NextResponse.json({
       ok: true,
