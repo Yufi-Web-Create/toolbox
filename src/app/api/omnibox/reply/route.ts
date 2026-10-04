@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { sendLineReply } from "../../../../lib/integrations/line/server";
+import { isPlanKey, planAllowsProvider } from "../../../../lib/plans";
 import { createClient } from "../../../../lib/supabase/server";
 
 function providerReplyUrl() {
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
 
     const { data: conversations, error: conversationError } = await supabase
       .from("conversations")
-      .select("id, provider")
+      .select("id, provider, organization_id")
       .eq("id", conversationId)
       .limit(1);
 
@@ -60,6 +61,27 @@ export async function POST(request: Request) {
     }
 
     const provider = conversations[0].provider;
+    const organizationId = conversations[0].organization_id;
+    const { data: organization } = await supabase
+      .from("organizations")
+      .select("plan_key")
+      .eq("id", organizationId)
+      .maybeSingle();
+    const plan = isPlanKey(organization?.plan_key)
+      ? organization.plan_key
+      : "standard";
+
+    if (
+      !planAllowsProvider(
+        plan,
+        provider === "email" ? "google" : provider,
+      )
+    ) {
+      return NextResponse.json(
+        { ok: false, message: "現在のプランではこのチャネルを利用できません。" },
+        { status: 403 },
+      );
+    }
 
     if (provider === "line") {
       const result = await sendLineReply({
