@@ -121,7 +121,7 @@ export async function GET(request: Request, context: Context) {
       throw new Error("plan_upgrade_required");
     }
 
-    const config = getProviderConfig(rawProvider, requestUrl.origin);
+    const config = await getProviderConfig(rawProvider, requestUrl.origin);
     if (!config) {
       throw new Error("provider_not_configured");
     }
