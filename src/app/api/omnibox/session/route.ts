@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createOrganizationWithOwner } from "../../../../lib/organizations/server";
+import { isPlanKey, planFeatures } from "../../../../lib/plans";
 import { createClient } from "../../../../lib/supabase/server";
 
 type Membership = {
@@ -58,12 +59,13 @@ export async function GET() {
       id: string;
       name: string;
       loginId: string | null;
+      plan: "lite" | "standard" | "pro" | "premium" | "enterprise";
     } | null = null;
 
     if (membership) {
       const { data: organizations } = await supabase
         .from("organizations")
-        .select("id, name, login_id")
+        .select("id, name, login_id, plan_key")
         .eq("id", membership.organization_id)
         .limit(1);
 
@@ -72,6 +74,9 @@ export async function GET() {
           id: organizations[0].id,
           name: organizations[0].name,
           loginId: organizations[0].login_id ?? null,
+          plan: isPlanKey(organizations[0].plan_key)
+            ? organizations[0].plan_key
+            : "standard",
         };
       }
     }
@@ -99,6 +104,7 @@ export async function GET() {
       requiresOrganizationSetup,
       membershipReady: Boolean(membership),
       isDemo,
+      features: planFeatures(organization?.plan ?? "standard"),
     });
   } catch {
     return NextResponse.json({ authenticated: false });
