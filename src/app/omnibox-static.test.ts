@@ -26,8 +26,13 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain('id="view-publish"');
     expect(html).toContain('id="view-templates"');
     expect(html).toContain('id="view-channels"');
-    expect(html).toContain('id="view-analytics"');
   });
+  it("does not include the analytics navigation or view", () => {
+    expect(html).not.toContain('id="nav-analytics"');
+    expect(html).not.toContain('id="view-analytics"');
+    expect(html).not.toContain("switchView('analytics')");
+  });
+
 
   it("requires Cmd+Enter on Mac or Ctrl+Enter on Windows to send", () => {
     expect(html).toContain("Enterで改行 / ⌘+Enter・Ctrl+Enterで送信");
