@@ -147,6 +147,14 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("getChannelMeta(thread.channel).name");
   });
 
+  it("exposes Instagram webhook setup and Gmail sync controls", () => {
+    expect(html).toContain("Instagram DM受信設定");
+    expect(html).toContain("/api/omnibox/instagram/webhook-info");
+    expect(html).toContain("showInstagramWebhookInfo");
+    expect(html).toContain("Gmailを同期");
+    expect(html).toContain("syncGoogleInbox");
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
