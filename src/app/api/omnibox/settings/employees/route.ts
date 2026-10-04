@@ -52,6 +52,8 @@ async function forward(method: "GET" | "POST" | "PATCH" | "DELETE", payload?: un
         ? "そのメールアドレスはすでに使用されています。"
         : code === "owner_required"
           ? "従業員アカウントの管理は管理者のみ行えます。"
+          : code === "plan_user_limit_reached"
+            ? "ライトプランは管理者を含め3名まで利用できます。上位プランへ変更してください。"
           : code === "invalid_password"
             ? "パスワードは8文字以上で入力してください。"
             : code === "employee_not_found"
