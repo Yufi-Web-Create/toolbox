@@ -1,26 +1,31 @@
 import { NextResponse } from "next/server";
 
+import {
+  internalEmailForLoginId,
+  isValidLoginId,
+  normalizeLoginId,
+} from "../../../../lib/login-id";
 import { createClient } from "../../../../lib/supabase/server";
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const email = typeof body?.email === "string" ? body.email.trim() : "";
+    const loginId = normalizeLoginId(
+      typeof body?.loginId === "string" ? body.loginId : "",
+    );
     const password = typeof body?.password === "string" ? body.password : "";
     const loginType = body?.loginType === "employee" ? "employee" : "admin";
-    void loginType;
-    if (!email || !EMAIL_PATTERN.test(email) || !password) {
+
+    if (!isValidLoginId(loginId) || !password) {
       return NextResponse.json(
-        { ok: false, message: "メールアドレスまたはパスワードを確認してください。" },
+        { ok: false, message: "IDまたはパスワードを確認してください。" },
         { status: 400 },
       );
     }
 
     const supabase = await createClient();
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: internalEmailForLoginId(loginId),
       password,
     });
 
@@ -42,21 +47,35 @@ export async function POST(request: Request) {
         ? memberships[0]
         : null;
 
-    if (!membership) {
+    const accountType =
+      typeof data.user.user_metadata?.account_type === "string"
+        ? data.user.user_metadata.account_type
+        : "member";
+    const roleKey = membership?.role ?? accountType;
+    const actualLoginType = roleKey === "member" ? "employee" : "admin";
+
+    if (
+      (!membership && roleKey !== "owner") ||
+      actualLoginType !== loginType
+    ) {
       await supabase.auth.signOut();
       return NextResponse.json(
-        { ok: false, message: "所属組織を確認できませんでした。" },
+        {
+          ok: false,
+          message:
+            actualLoginType !== loginType
+              ? "選択したログイン種別とアカウント種別が一致しません。"
+              : "所属組織を確認できませんでした。",
+        },
         { status: 403 },
       );
     }
 
-    // The stored membership is the source of truth. Employee organization
-    // membership is resolved after authentication, so users do not need to
-    // type a separate organization ID at login.
     return NextResponse.json({
       ok: true,
-      roleKey: membership.role,
-      loginType: membership.role === "member" ? "employee" : "admin",
+      roleKey,
+      loginType: actualLoginType,
+      loginId,
     });
   } catch {
     return NextResponse.json(
