@@ -14,6 +14,10 @@ if (scripts.length === 0) {
 }
 
 const source = scripts.join("\n\n");
+const windowAssignedGlobals = [
+  ...source.matchAll(/\bwindow\.([A-Za-z_$][\w$]*)\s*=/g),
+].map((match) => match[1]);
+
 const globals = Object.fromEntries(
   [
     "window","document","console","fetch","URL","URLSearchParams","FormData",
@@ -21,7 +25,8 @@ const globals = Object.fromEntries(
     "navigator","location","crypto","Event","CustomEvent","Image","HTMLElement",
     "Node","localStorage","sessionStorage","alert","confirm","requestAnimationFrame",
     "cancelAnimationFrame","atob","btoa","TextEncoder","TextDecoder","AbortController",
-    "lucide","tailwind"
+    "lucide","tailwind","__app_id",
+    ...windowAssignedGlobals
   ].map((name) => [name, "readonly"]),
 );
 
