@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
   messageEq: vi.fn(),
   messageOrder: vi.fn(),
   messageLimit: vi.fn(),
+  noteSelect: vi.fn(),
+  noteEq: vi.fn(),
+  noteOrder: vi.fn(),
+  noteLimit: vi.fn(),
 }));
 
 vi.mock("../supabase/server", () => ({
@@ -28,6 +32,7 @@ describe("getInboxSnapshot", () => {
     mocks.from.mockImplementation((table: string) => {
       if (table === "conversations") return { select: mocks.conversationSelect };
       if (table === "messages") return { select: mocks.messageSelect };
+      if (table === "internal_notes") return { select: mocks.noteSelect };
       throw new Error(`unexpected table: ${table}`);
     });
 
@@ -42,6 +47,15 @@ describe("getInboxSnapshot", () => {
     mocks.messageSelect.mockReturnValue(messageChain);
     mocks.messageEq.mockReturnValue(messageChain);
     mocks.messageOrder.mockReturnValue({ limit: mocks.messageLimit });
+
+    const noteChain = {
+      eq: mocks.noteEq,
+      order: mocks.noteOrder,
+    };
+    mocks.noteSelect.mockReturnValue(noteChain);
+    mocks.noteEq.mockReturnValue(noteChain);
+    mocks.noteOrder.mockReturnValue({ limit: mocks.noteLimit });
+    mocks.noteLimit.mockResolvedValue({ data: [], error: null });
   });
 
   it("loads only conversations and messages for the active organization", async () => {
@@ -96,6 +110,7 @@ describe("getInboxSnapshot", () => {
       conversations,
       selectedConversation: conversations[1],
       messages,
+      notes: [],
     });
 
     expect(mocks.conversationEq).toHaveBeenCalledWith(
@@ -120,6 +135,7 @@ describe("getInboxSnapshot", () => {
       conversations: [],
       selectedConversation: null,
       messages: [],
+      notes: [],
     });
 
     expect(mocks.messageSelect).not.toHaveBeenCalled();
