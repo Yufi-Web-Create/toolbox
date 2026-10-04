@@ -434,7 +434,7 @@ async function fetchLineProfile(fetchImpl, accessToken, userId) {
   }
 }
 
-async function getLineWebhookStatus(fetchImpl, lineAccessToken) {
+export async function getLineWebhookStatus(fetchImpl, lineAccessToken) {
   const response = await fetchImpl(
     "https://api.line.me/v2/bot/channel/webhook/endpoint",
     {
