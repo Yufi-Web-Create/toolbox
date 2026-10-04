@@ -2249,6 +2249,8 @@
         thread.messages = messages.map(message => ({
           sender: message.direction === 'inbound' ? 'customer' : 'agent',
           text: message.body,
+          type: message.message_type || 'text',
+          metadata: message.metadata || {},
           time: formatLiveTime(message.created_at)
         }));
 
@@ -2416,14 +2418,41 @@
             </div>
           `;
         } else if (isCustomer) {
+          const isLineSticker = thread.channel === 'line' && msg.type === 'sticker';
+          const stickerKeywords = Array.isArray(msg.metadata?.keywords)
+            ? msg.metadata.keywords.filter(Boolean).slice(0, 4)
+            : [];
+          const stickerLabel =
+            typeof msg.metadata?.text === 'string' && msg.metadata.text.trim()
+              ? msg.metadata.text.trim()
+              : stickerKeywords.join('・');
+
           wrapper.innerHTML = `
             <div class="flex items-end gap-2 max-w-[85%] sm:max-w-[70%]">
               <img src="${thread.avatar}" class="w-7 h-7 rounded-full object-cover shrink-0 mb-1">
               <div>
-                <div class="text-[10px] text-slate-400 mb-0.5 ml-1">${thread.customerName}</div>
-                <div class="bg-white border border-slate-200 text-slate-800 p-3 rounded-2xl rounded-bl-xs text-xs sm:text-sm shadow-xs leading-relaxed">
-                  ${msg.text}
-                </div>
+                <div class="text-[10px] text-slate-400 mb-0.5 ml-1">${escapeHtml(thread.customerName)}</div>
+                ${isLineSticker ? `
+                  <div class="bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl rounded-bl-xs shadow-xs min-w-[150px]">
+                    <div class="flex items-center gap-2">
+                      <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <i data-lucide="sticker" class="w-6 h-6"></i>
+                      </div>
+                      <div class="min-w-0">
+                        <div class="text-xs font-bold text-slate-800">LINEスタンプ</div>
+                        ${stickerLabel ? `<div class="text-[10px] text-slate-500 mt-0.5 truncate">${escapeHtml(stickerLabel)}</div>` : ''}
+                        <div class="text-[9px] text-slate-400 mt-0.5 font-mono">
+                          ${msg.metadata?.packageId ? 'Package ' + escapeHtml(String(msg.metadata.packageId)) : ''}
+                          ${msg.metadata?.stickerId ? ' / Sticker ' + escapeHtml(String(msg.metadata.stickerId)) : ''}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ` : `
+                  <div class="bg-white border border-slate-200 text-slate-800 p-3 rounded-2xl rounded-bl-xs text-xs sm:text-sm shadow-xs leading-relaxed">
+                    ${escapeHtml(msg.text)}
+                  </div>
+                `}
                 <div class="text-[10px] text-slate-400 mt-1 ml-1">${msg.time}</div>
               </div>
             </div>
@@ -2434,7 +2463,7 @@
               <div>
                 <div class="text-[10px] text-slate-400 mb-0.5 mr-1 text-right">担当スタッフ (${thread.assignee || 'オペレーター'})</div>
                 <div class="bg-teal-600 text-white p-3 rounded-2xl rounded-br-xs text-xs sm:text-sm shadow-xs leading-relaxed">
-                  ${msg.text}
+                  ${escapeHtml(msg.text)}
                 </div>
                 <div class="text-[10px] text-slate-400 mt-1 mr-1 text-right flex items-center justify-end gap-1">
                   <span>配信済</span> • <span>${msg.time}</span>
