@@ -74,7 +74,7 @@ export async function GET(request: Request, context: Context) {
   }
 
   const origin = new URL(request.url).origin;
-  const config = getProviderConfig(rawProvider, origin);
+  const config = await getProviderConfig(rawProvider, origin);
   if (!config) {
     return NextResponse.redirect(
       returnUrl(request, rawProvider, "provider_not_configured"),
