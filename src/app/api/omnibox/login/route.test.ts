@@ -10,9 +10,6 @@ const mocks = vi.hoisted(() => ({
   memberSelect: vi.fn(),
   memberEq: vi.fn(),
   memberLimit: vi.fn(),
-  orgSelect: vi.fn(),
-  orgEq: vi.fn(),
-  orgLimit: vi.fn(),
 }));
 
 vi.mock("../../../../lib/supabase/server", () => ({
@@ -43,7 +40,10 @@ describe("OmniBox login API", () => {
       data: {
         user: {
           id: "10000000-0000-0000-0000-000000000001",
-          email: "staff@example.com",
+          user_metadata: {
+            account_type: "member",
+            login_id: "staff01",
+          },
         },
       },
       error: null,
@@ -52,9 +52,6 @@ describe("OmniBox login API", () => {
     mocks.from.mockImplementation((table: string) => {
       if (table === "organization_members") {
         return { select: mocks.memberSelect };
-      }
-      if (table === "organizations") {
-        return { select: mocks.orgSelect };
       }
       throw new Error(`unexpected table: ${table}`);
     });
@@ -66,21 +63,14 @@ describe("OmniBox login API", () => {
       error: null,
     });
 
-    mocks.orgSelect.mockReturnValue({ eq: mocks.orgEq });
-    mocks.orgEq.mockReturnValue({ limit: mocks.orgLimit });
-    mocks.orgLimit.mockResolvedValue({
-      data: [{ id: "org-1", login_id: "OMNIBOX" }],
-      error: null,
-    });
-
     mocks.signOut.mockResolvedValue({ error: null });
   });
 
-  it("auto-detects a member without requiring an organization ID", async () => {
+  it("logs an employee in with ID and password", async () => {
     const response = await POST(
       request({
         loginType: "employee",
-        email: "staff@example.com",
+        loginId: "staff01",
         password: "password123",
       }),
     );
@@ -90,39 +80,32 @@ describe("OmniBox login API", () => {
       ok: true,
       roleKey: "member",
       loginType: "employee",
+      loginId: "staff01",
     });
-    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(mocks.signInWithPassword).toHaveBeenCalledWith({
+      email: "staff01@login.omnibox.app",
+      password: "password123",
+    });
   });
 
-  it("does not reject a valid member because of a stale organization ID input", async () => {
-    const response = await POST(
-      request({
-        loginType: "employee",
-        organizationId: "OTHER",
-        email: "staff@example.com",
-        password: "password123",
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    expect(mocks.signOut).not.toHaveBeenCalled();
-  });
-
-  it("auto-detects a member even when the UI submits administrator mode", async () => {
+  it("rejects a role mismatch", async () => {
     const response = await POST(
       request({
         loginType: "admin",
-        email: "staff@example.com",
+        loginId: "staff01",
         password: "password123",
       }),
     );
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      ok: true,
-      roleKey: "member",
-      loginType: "employee",
-    });
-    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    expect(mocks.signOut).toHaveBeenCalled();
+  });
+
+  it("rejects malformed login IDs before authentication", async () => {
+    const response = await POST(
+      request({ loginType: "employee", loginId: "x", password: "password123" }),
+    );
+    expect(response.status).toBe(400);
+    expect(mocks.signInWithPassword).not.toHaveBeenCalled();
   });
 });
