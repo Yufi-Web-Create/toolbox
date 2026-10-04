@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, provider: "line" });
     }
 
-    if (provider !== "instagram" && provider !== "email") {
+    if (provider !== "instagram" && provider !== "email" && provider !== "x") {
       return NextResponse.json(
         { ok: false, message: "このチャネルへの返信はまだ対応していません。" },
         { status: 501 },
@@ -117,7 +117,9 @@ export async function POST(request: Request) {
             ? "Instagramへ送信できませんでした。連携権限をご確認ください。"
             : error === "gmail_send_failed"
               ? "Gmailから返信を送信できませんでした。"
-              : error === "provider_connection_unavailable"
+              : error === "x_send_failed"
+                ? "XのDMを送信できませんでした。連携権限をご確認ください。"
+                : error === "provider_connection_unavailable"
                 ? "SNS連携が無効です。連携アカウントをご確認ください。"
                 : "返信を送信できませんでした。";
 
