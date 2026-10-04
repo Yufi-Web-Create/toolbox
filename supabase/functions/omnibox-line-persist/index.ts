@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
     const authTag = String(payload.authTag ?? "");
 
     if (
-      !["instagram", "x", "google"].includes(provider) ||
+      !["instagram", "x", "google", "ai"].includes(provider) ||
       !encryptedKey ||
       !encryptedPayload ||
       !iv ||
@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
 
   if (payload.action === "get-operator-config") {
     const provider = String(payload.provider ?? "");
-    if (!["instagram", "x", "google"].includes(provider)) {
+    if (!["instagram", "x", "google", "ai"].includes(provider)) {
       return json(400, { ok: false, error: "invalid_provider" });
     }
 
