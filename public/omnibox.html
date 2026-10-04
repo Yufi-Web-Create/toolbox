@@ -4035,6 +4035,7 @@
         .filter(Boolean);
 
       try {
+        const mediaUrls = await uploadSelectedPostImages();
         const response = await fetch('/api/omnibox/posts', {
           method: 'POST',
           credentials: 'same-origin',
