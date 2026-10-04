@@ -109,7 +109,7 @@ function ProviderForm({
         <h2>{title}</h2>
         <State ready={configured} />
       </div>
-      <form action={configureOAuthProviderFromMaster} className={styles.form}>
+      <form action={configureOAuthProviderFromMaster} className={styles.form} autoComplete="off">
         <input name="provider" type="hidden" value={provider} />
         <label className={styles.field}>
           <span>Client ID</span>
@@ -117,6 +117,11 @@ function ProviderForm({
             name="clientId"
             defaultValue={clientId}
             placeholder="Developer App の Client ID"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            data-1p-ignore="true"
+            data-lpignore="true"
             required
           />
         </label>
@@ -126,6 +131,11 @@ function ProviderForm({
             name="clientSecret"
             type="password"
             placeholder={configured ? "変更するときだけ新しいSecretを入力" : "Client Secret"}
+            autoComplete="new-password"
+            autoCapitalize="none"
+            spellCheck={false}
+            data-1p-ignore="true"
+            data-lpignore="true"
             required
           />
         </label>
@@ -322,13 +332,18 @@ export default async function MasterPage({
                 </form>
               </div>
 
-              <form action={configureLineFromMaster} className={styles.form}>
+              <form action={configureLineFromMaster} className={styles.form} autoComplete="off">
                 <label className={styles.field}>
                   <span>Channel ID</span>
                   <input
                     name="channelId"
                     inputMode="numeric"
                     placeholder="LINE Developers の Channel ID"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    data-1p-ignore="true"
+                    data-lpignore="true"
                     required
                   />
                 </label>
@@ -338,6 +353,11 @@ export default async function MasterPage({
                     name="channelSecret"
                     type="password"
                     placeholder="Messaging API の Channel Secret"
+                    autoComplete="new-password"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    data-1p-ignore="true"
+                    data-lpignore="true"
                     required
                   />
                 </label>
