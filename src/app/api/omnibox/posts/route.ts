@@ -73,7 +73,7 @@ export async function GET() {
     const { data, error } = await ctx.supabase
       .from("social_posts")
       .select(
-        "id, content, media_url, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
+        "id, content, media_url, media_urls, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
       )
       .eq("organization_id", ctx.organizationId)
       .order("created_at", { ascending: false })
@@ -115,8 +115,17 @@ export async function POST(request: Request) {
     const payload = await request.json();
     const content =
       typeof payload?.content === "string" ? payload.content.trim() : "";
-    const mediaUrl =
-      typeof payload?.mediaUrl === "string" ? payload.mediaUrl.trim() : "";
+    const mediaUrls = Array.isArray(payload?.mediaUrls)
+      ? [...new Set(
+          payload.mediaUrls
+            .filter((value: unknown) => typeof value === "string")
+            .map((value: string) => value.trim())
+            .filter(Boolean),
+        )].slice(0, 10)
+      : typeof payload?.mediaUrl === "string" && payload.mediaUrl.trim()
+        ? [payload.mediaUrl.trim()]
+        : [];
+    const mediaUrl = mediaUrls[0] ?? "";
     const targetConnectionIds = Array.isArray(payload?.targetConnectionIds)
       ? [...new Set(
           payload.targetConnectionIds
@@ -187,12 +196,28 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      selected.some((connection) => connection.provider === "instagram") &&
-      !mediaUrl
-    ) {
+    const includesInstagram = selected.some(
+      (connection) => connection.provider === "instagram",
+    );
+    const includesX = selected.some((connection) => connection.provider === "x");
+
+    if (includesInstagram && mediaUrls.length === 0) {
       return NextResponse.json(
-        { ok: false, message: "Instagram投稿には公開画像URLが必要です。" },
+        { ok: false, message: "Instagram投稿には画像が必要です。" },
+        { status: 400 },
+      );
+    }
+
+    if (includesInstagram && mediaUrls.length > 10) {
+      return NextResponse.json(
+        { ok: false, message: "Instagram投稿の画像は10枚までです。" },
+        { status: 400 },
+      );
+    }
+
+    if (includesX && mediaUrls.length > 4) {
+      return NextResponse.json(
+        { ok: false, message: "X投稿の画像は4枚までです。" },
         { status: 400 },
       );
     }
@@ -204,13 +229,14 @@ export async function POST(request: Request) {
         created_by: ctx.userId,
         content,
         media_url: mediaUrl || null,
+        media_urls: mediaUrls,
         target_connection_ids: targetConnectionIds,
         scheduled_at:
           timing === "schedule" ? new Date(scheduledAt!).toISOString() : null,
         status: timing === "schedule" ? "scheduled" : "publishing",
       })
       .select(
-        "id, content, media_url, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
+        "id, content, media_url, media_urls, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
       )
       .single();
 
@@ -252,7 +278,7 @@ export async function POST(request: Request) {
     const { data: refreshed } = await ctx.supabase
       .from("social_posts")
       .select(
-        "id, content, media_url, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
+        "id, content, media_url, media_urls, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
       )
       .eq("id", post.id)
       .maybeSingle();
