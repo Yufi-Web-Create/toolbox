@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   createLineBridgeServer,
   getBridgeConfiguration,
+  getLineWebhookStatus,
   normalizeLineMessageEvent,
   normalizeLineTextEvent,
   verifyLineSignature,
@@ -110,4 +111,28 @@ test("health reports disconnected when no encrypted LINE config exists yet", asy
     server.close();
     await once(server, "close");
   }
+});
+
+
+test("getLineWebhookStatus reports active and matching webhook state", async () => {
+  const calls = [];
+  const result = await getLineWebhookStatus(async (url, options) => {
+    calls.push({ url, options });
+    return new Response(
+      JSON.stringify({
+        endpoint: "https://omnibox-line-bridge.onrender.com/webhooks/line",
+        active: true,
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }, "test-access-token");
+
+  assert.equal(calls.length, 1);
+  assert.equal(result.lineApiReachable, true);
+  assert.equal(result.webhookActive, true);
+  assert.equal(result.webhookMatches, true);
+  assert.equal(
+    result.webhookUrl,
+    "https://omnibox-line-bridge.onrender.com/webhooks/line",
+  );
 });

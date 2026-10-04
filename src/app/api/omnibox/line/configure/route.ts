@@ -78,6 +78,8 @@ export async function POST(request: Request) {
       webhookUrl: result.webhookUrl,
       webhookVerified: result.webhookVerified === true,
       webhookActive: result.webhookActive === true,
+      webhookMatches: result.webhookMatches === true,
+      lineApiReachable: result.lineApiReachable === true,
     });
   } catch {
     return NextResponse.json(

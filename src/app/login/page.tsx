@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { LoginForm } from "./login-form";
 import { getCallbackErrorMessage, getSafeNextPath } from "./validation";
 import styles from "./page.module.css";
@@ -24,7 +26,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className={styles.page}>
       <section className={styles.portal}>
         <div className={styles.hero}>
-          <div className={styles.logoMark}>◫</div>
+          <Link className={styles.logoMark} href="/master-login" aria-label="運営マスターログイン">◫</Link>
           <h1>OmniBox ポータル</h1>
           <p>複数SNSのメッセージ一元管理 &amp; 予約投稿ハブ</p>
         </div>

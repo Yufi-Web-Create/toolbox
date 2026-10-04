@@ -148,8 +148,8 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("account.provider === 'google'");
   });
 
-  it("sends replies from live LINE Instagram and email conversations", () => {
-    expect(html).toContain("['line', 'instagram', 'email'].includes(thread.channel)");
+  it("sends replies from live LINE Instagram X and email conversations", () => {
+    expect(html).toContain("['line', 'instagram', 'email', 'x'].includes(thread.channel)");
     expect(html).toContain("/api/omnibox/reply");
     expect(html).toContain("getChannelMeta(thread.channel).name");
   });

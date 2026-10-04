@@ -383,10 +383,10 @@
                 <i data-lucide="sparkles" class="w-3.5 h-3.5 text-teal-600"></i>
                 <span>AIアシスタント</span>
               </div>
-              <span class="text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded">準備中</span>
+              <span id="ai-status-badge" class="text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded">プラン確認中</span>
             </div>
             <p class="text-[11px] text-teal-700 leading-relaxed">
-              お客さまのメッセージ文脈をリアルタイムに解釈し、高精度な返信文案や投稿案を生成します。
+              会話履歴をもとに返信案を生成します。内容を確認してから送信する人間確認型のAIです。
             </p>
           </div>
         </div>
@@ -495,6 +495,10 @@
                     <button onclick="openTemplateSelectorModal()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
                       <i data-lucide="file-text" class="w-3 h-3 text-slate-500"></i>
                       <span>定型文挿入</span>
+                    </button>
+                    <button id="ai-draft-button" onclick="generateAiReplyDraft()" class="text-xs bg-teal-50 hover:bg-teal-100 text-teal-700 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1 transition">
+                      <i data-lucide="sparkles" class="w-3 h-3"></i>
+                      <span>AI返信案</span>
                     </button>
                   </div>
 
@@ -719,16 +723,26 @@
         </div>
 
         <div class="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-md">
-          <div class="flex items-center gap-2 mb-2 font-bold text-sm text-teal-400">
-            <i data-lucide="terminal" class="w-4 h-4"></i>
-            <span>LINE公式アカウントの実接続</span>
+          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2 mb-2 font-bold text-sm text-teal-400">
+                <i data-lucide="terminal" class="w-4 h-4"></i>
+                <span>LINE公式アカウントの実接続</span>
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                LINE DevelopersのMessaging APIチャネルにあるChannel ID / Channel Secretを登録すると、OmniBoxがアクセストークン発行、Webhook URL設定、疎通確認まで自動で行います。
+              </p>
+            </div>
+            <button id="line-webhook-repair-button" onclick="repairLineWebhook()" class="hidden shrink-0 text-[11px] px-3 py-2 rounded-lg border border-teal-700 bg-teal-900/40 text-teal-200 hover:bg-teal-900">
+              Webhookを診断・再設定
+            </button>
           </div>
-          <p class="text-xs text-slate-300 leading-relaxed mb-3">
-            「新規アカウントを追加」からLINEを選び、LINE DevelopersのMessaging APIチャネルにあるChannel ID / Channel Secretを入力してください。OmniBoxがアクセストークン発行、Webhook URL設定、疎通確認まで自動で行います。
-          </p>
-          <div class="bg-slate-950 p-3 rounded-xl font-mono text-[11px] text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div class="mt-3 bg-slate-950 p-3 rounded-xl font-mono text-[11px] text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <span class="break-all">Webhookエンドポイント: https://omnibox-line-bridge.onrender.com/webhooks/line</span>
             <button onclick="copyToClipboard('https://omnibox-line-bridge.onrender.com/webhooks/line')" class="text-teal-400 hover:text-teal-300 shrink-0 whitespace-nowrap">コピー</button>
+          </div>
+          <div id="line-webhook-health" class="mt-3 text-[11px] text-slate-400">
+            LINE接続状態を確認しています...
           </div>
         </div>
 
@@ -741,6 +755,53 @@
             <span class="text-[10px] px-2 py-1 rounded bg-amber-50 text-amber-700 border border-amber-100">運営側設定</span>
           </div>
           <div id="oauth-setup-checklist" class="space-y-2 text-[11px]"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
+          <h3 class="text-sm font-bold text-slate-800">SNS連携に必要な操作</h3>
+          <p class="text-[11px] text-slate-500 mt-1 mb-3">運営側でDeveloper Appを一度準備した後、店舗・顧客側はOmniBoxから対象アカウントへログインして許可するだけの流れにします。</p>
+          <div class="space-y-2">
+            <details class="rounded-xl border border-slate-200 p-3">
+              <summary class="cursor-pointer text-xs font-bold text-slate-800">LINE公式アカウント</summary>
+              <ol class="mt-2 ml-4 list-decimal space-y-1.5 text-[11px] text-slate-600 leading-relaxed">
+                <li>LINE DevelopersでProviderを作成または選択し、Messaging APIチャネルを用意します。</li>
+                <li>Messaging APIチャネルのChannel IDとChannel Secretを確認します。</li>
+                <li>OmniBoxの「新規アカウントを追加」→「LINE」を選び、2つの値を入力します。</li>
+                <li>OmniBoxがWebhook URLを登録し、LINE側の疎通テストと有効状態を確認します。</li>
+                <li>受信が止まった場合は「Webhookを診断・再設定」で保存済み情報から復旧を試します。</li>
+              </ol>
+            </details>
+            <details class="rounded-xl border border-slate-200 p-3">
+              <summary class="cursor-pointer text-xs font-bold text-slate-800">Instagram / Meta</summary>
+              <ol class="mt-2 ml-4 list-decimal space-y-1.5 text-[11px] text-slate-600 leading-relaxed">
+                <li>Meta側でInstagram Business連携に使うDeveloper Appを用意します。</li>
+                <li>下に表示されるCallback URLをDeveloper Appへ完全一致で登録します。</li>
+                <li>運営環境へClient ID / Client Secretを登録し、必要なInstagram権限を有効にします。</li>
+                <li>OmniBoxの「新規アカウントを追加」→「Instagram」から公式OAuth画面へ進み、対象アカウントで許可します。</li>
+                <li>本番公開時はMeta側のApp Review・権限審査・Webhook購読要件も確認します。</li>
+              </ol>
+            </details>
+            <details class="rounded-xl border border-slate-200 p-3">
+              <summary class="cursor-pointer text-xs font-bold text-slate-800">X</summary>
+              <ol class="mt-2 ml-4 list-decimal space-y-1.5 text-[11px] text-slate-600 leading-relaxed">
+                <li>X Developer Portalでアプリを用意し、OAuth 2.0を有効にします。</li>
+                <li>下に表示されるCallback URLを登録し、Client ID / Client Secretを運営環境へ設定します。</li>
+                <li>tweet.read / tweet.write / users.read / dm.read / dm.write / offline.access の利用権限を確認します。</li>
+                <li>OmniBoxの「新規アカウントを追加」→「X」からOAuth認証し、対象アカウントで許可します。</li>
+                <li>DM APIなど契約・アクセスレベルに依存する機能はX側の利用条件も確認します。</li>
+              </ol>
+            </details>
+            <details class="rounded-xl border border-slate-200 p-3">
+              <summary class="cursor-pointer text-xs font-bold text-slate-800">Google / Gmail</summary>
+              <ol class="mt-2 ml-4 list-decimal space-y-1.5 text-[11px] text-slate-600 leading-relaxed">
+                <li>Google Cloudでプロジェクトを用意し、Gmail APIを有効化します。</li>
+                <li>OAuth同意画面を設定し、Webアプリケーション用OAuth Clientを作成します。</li>
+                <li>下に表示されるCallback URLを承認済みリダイレクトURIへ完全一致で登録します。</li>
+                <li>Client ID / Client Secretを運営環境へ設定し、OmniBoxからGoogleアカウントで認可します。</li>
+                <li>gmail.readonly / gmail.send は審査対象になり得るため、本番運用前にGoogle側のOAuth検証要件を確認します。</li>
+              </ol>
+            </details>
+          </div>
         </div>
 
         <div id="connected-accounts-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
@@ -1414,7 +1475,7 @@
         name: 'プロ',
         price: '¥44,800/月',
         description: 'スタンダード + AI応答枠',
-        features: ['スタンダード全機能', 'AI応答 月500件', 'AI機能は現在開発中']
+        features: ['スタンダード全機能', 'AI応答 月500件', 'AI返信案を受信箱で生成']
       },
       premium: {
         name: 'プレミアム',
@@ -1607,6 +1668,22 @@
         headerPostButton.classList.toggle('sm:flex', canPublish);
       }
 
+      const canUseAi = currentPlanFeatures.ai === true;
+      const aiButton = document.getElementById('ai-draft-button');
+      const aiBadge = document.getElementById('ai-status-badge');
+      if (aiButton) {
+        aiButton.disabled = !canUseAi;
+        aiButton.classList.toggle('opacity-50', !canUseAi);
+        aiButton.classList.toggle('cursor-not-allowed', !canUseAi);
+        aiButton.title = canUseAi ? '現在の会話からAI返信案を作成' : 'プロ以上のプランで利用できます';
+      }
+      if (aiBadge) {
+        aiBadge.textContent = canUseAi ? '利用可能' : 'プロ以上';
+        aiBadge.className = canUseAi
+          ? 'text-[9px] bg-emerald-100 text-emerald-700 font-mono px-1.5 py-0.2 rounded'
+          : 'text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded';
+      }
+
       document.querySelectorAll('[data-oauth-provider]').forEach(button => {
         const provider = button.dataset.oauthProvider;
         const allowed = providerAllowedByPlan(provider);
@@ -1691,6 +1768,90 @@
         showToast(`${planCatalog[currentPlan].name}へ変更しました`);
       } catch (error) {
         showToast(error.message || 'プランを変更できませんでした');
+      }
+    };
+
+    function renderLineHealth(result) {
+      const container = document.getElementById('line-webhook-health');
+      const repairButton = document.getElementById('line-webhook-repair-button');
+      if (!container) return;
+
+      if (repairButton) {
+        const ownerCanRepair = loggedInUser?.roleKey === 'owner' && !isDemoSession;
+        repairButton.classList.toggle('hidden', !ownerCanRepair);
+      }
+
+      if (!result?.ok || !result.bridgeReady) {
+        container.innerHTML = '<span class="text-amber-300">Bridgeの稼働状態を確認できません。</span>';
+        return;
+      }
+      if (!result.lineConnected) {
+        container.innerHTML = '<span class="text-amber-300">LINE接続情報が未登録です。</span>';
+        return;
+      }
+
+      const api = result.lineApiReachable
+        ? '<span class="text-emerald-300">LINE API: OK</span>'
+        : '<span class="text-amber-300">LINE API: 要確認</span>';
+      const active = result.webhookActive
+        ? '<span class="text-emerald-300">Webhook: 有効</span>'
+        : '<span class="text-amber-300">Webhook: 無効</span>';
+      const matches = result.webhookMatches
+        ? '<span class="text-emerald-300">URL: 一致</span>'
+        : '<span class="text-amber-300">URL: 不一致</span>';
+      container.innerHTML = '<div class="flex flex-wrap gap-3">' + api + active + matches + '</div>';
+    }
+
+    async function loadLineWebhookHealth() {
+      if (isDemoSession || !loggedInUser) return;
+      try {
+        const response = await fetch('/api/omnibox/line/status', {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const result = await response.json();
+        renderLineHealth(result);
+      } catch {
+        renderLineHealth({ ok: false });
+      }
+    }
+
+    window.repairLineWebhook = async function() {
+      if (loggedInUser?.roleKey !== 'owner') {
+        showToast('LINE Webhookの再設定は管理者のみ行えます');
+        return;
+      }
+
+      const button = document.getElementById('line-webhook-repair-button');
+      const original = button?.textContent || 'Webhookを診断・再設定';
+      if (button) {
+        button.disabled = true;
+        button.textContent = '再設定中...';
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/line/repair', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'LINE Webhookを再設定できませんでした');
+        }
+        await loadLineWebhookHealth();
+        showToast(
+          result.webhookVerified && result.webhookActive && result.webhookMatches
+            ? 'LINE Webhookを再設定し、疎通を確認しました'
+            : 'LINE Webhookを再設定しました。状態をご確認ください'
+        );
+      } catch (error) {
+        showToast(error.message || 'LINE Webhookを再設定できませんでした');
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = original;
+        }
       }
     };
 
@@ -1800,6 +1961,7 @@
 
         updateOAuthProviderStatus();
         onDataUpdated();
+        loadLineWebhookHealth();
         return true;
       } catch (error) {
         console.error('Provider connections load failed:', error);
@@ -2775,6 +2937,61 @@
       lucide.createIcons();
     }
 
+    window.generateAiReplyDraft = async function() {
+      if (inputMode !== 'reply') {
+        showToast('AI返信案は「お客様へ返信」モードで利用してください');
+        return;
+      }
+      if (currentPlanFeatures.ai !== true) {
+        showToast('AI返信アシスタントはプロ以上のプランで利用できます');
+        return;
+      }
+      if (isDemoSession) {
+        showToast('AI返信案は実アカウントで利用できます');
+        return;
+      }
+
+      const thread = threads.find(item => item.id === currentThreadId);
+      if (!thread?.liveConversationId) {
+        showToast('AI返信案を作成する会話を選択してください');
+        return;
+      }
+
+      const button = document.getElementById('ai-draft-button');
+      const input = document.getElementById('message-input');
+      const original = button?.innerHTML || '';
+      if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span>AI生成中...</span>';
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/ai/draft', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId: thread.liveConversationId })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok || typeof result.draft !== 'string') {
+          throw new Error(result.message || 'AI返信案を生成できませんでした');
+        }
+
+        input.value = result.draft;
+        composerDrafts.reply.set(thread.id, result.draft);
+        input.focus();
+        showToast('AI返信案を生成しました。内容を確認してから送信してください');
+      } catch (error) {
+        showToast(error.message || 'AI返信案を生成できませんでした');
+      } finally {
+        if (button) {
+          button.disabled = currentPlanFeatures.ai !== true;
+          button.innerHTML = original;
+        }
+        lucide.createIcons();
+      }
+    };
+
     window.sendMessage = async function() {
       const input = document.getElementById('message-input');
       const text = input.value.trim();
@@ -2839,7 +3056,7 @@
         return;
       }
 
-      if (!thread.liveConversationId || !['line', 'instagram', 'email'].includes(thread.channel)) {
+      if (!thread.liveConversationId || !['line', 'instagram', 'email', 'x'].includes(thread.channel)) {
         showToast('このチャネルの実送信はまだ接続されていません');
         return;
       }
