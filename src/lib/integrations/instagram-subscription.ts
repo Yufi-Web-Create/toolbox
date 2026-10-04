@@ -51,6 +51,7 @@ async function getSubscriptionStatus(
   const url = new URL(
     `https://graph.instagram.com/v26.0/${encodeURIComponent(igUserId)}/subscribed_apps`,
   );
+  url.searchParams.set("fields", "id,name,subscribed_fields");
   url.searchParams.set("access_token", accessToken);
 
   const response = await fetch(url, { cache: "no-store" });
