@@ -174,7 +174,10 @@ Deno.serve(async (req) => {
       customer_external_id: payload.customerExternalId,
       customer_avatar_url: payload.customerAvatarUrl || null,
       status: "unread",
-      last_message_preview: String(payload.body ?? "").slice(0, 500),
+      last_message_preview:
+        payload.messageType === "sticker"
+          ? "LINEスタンプ"
+          : String(payload.body ?? "").slice(0, 500),
       last_message_at: payload.occurredAt,
       updated_at: payload.occurredAt,
     };
@@ -217,6 +220,12 @@ Deno.serve(async (req) => {
       provider_message_id: payload.providerMessageId,
       direction: "inbound",
       body: payload.body,
+      message_type:
+        typeof payload.messageType === "string" ? payload.messageType : "text",
+      metadata:
+        payload.metadata && typeof payload.metadata === "object"
+          ? payload.metadata
+          : {},
       sent_by_user_id: null,
       created_at: payload.occurredAt,
     }, {
