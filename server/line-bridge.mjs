@@ -581,9 +581,23 @@ async function handleLineWebhook({ request, response, config, fetchImpl }) {
   const events = Array.isArray(payload?.events) ? payload.events : [];
   const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig);
 
+  const messageTypes = events
+    .filter((event) => event?.type === "message")
+    .map((event) => String(event?.message?.type ?? "unknown"));
+  if (messageTypes.length > 0) {
+    console.log(`LINE webhook message types: ${messageTypes.join(",")}`);
+  }
+
   for (const event of events) {
     const normalized = normalizeLineMessageEvent(event);
-    if (!normalized) continue;
+    if (!normalized) {
+      if (event?.type === "message") {
+        console.log(
+          `LINE webhook message ignored: type=${String(event?.message?.type ?? "unknown")} source=${String(event?.source?.type ?? "unknown")}`,
+        );
+      }
+      continue;
+    }
 
     const profile = await fetchLineProfile(
       fetchImpl,
@@ -599,7 +613,11 @@ async function handleLineWebhook({ request, response, config, fetchImpl }) {
       customerAvatarUrl: profile.pictureUrl,
     });
 
-    if (!persistResponse.ok) throw new Error("inbound persistence failed");
+    if (!persistResponse.ok) {
+      console.log(`LINE inbound persistence failed: type=${normalized.messageType}`);
+      throw new Error("inbound persistence failed");
+    }
+    console.log(`LINE inbound persisted: type=${normalized.messageType}`);
   }
 
   sendJson(response, 200, { ok: true });
