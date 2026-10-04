@@ -1581,7 +1581,15 @@
             lastTime: formatLiveTime(conversation.last_message_at),
             unreadCount: conversation.status === 'unread' ? 1 : 0,
             tags: [meta.name, matchedAccount?.accountName || '実データ'],
-            notes: [],
+            notes: isSelected
+              ? selectedNotes.map(note => ({
+                  id: note.id,
+                  author: note.author_name || 'スタッフ',
+                  time: formatLiveTime(note.created_at),
+                  text: note.body,
+                  createdAt: note.created_at
+                }))
+              : [],
             messages,
             updatedAt: new Date(conversation.last_message_at).getTime() || Date.now()
           };
@@ -2235,6 +2243,7 @@
         const payload = await response.json();
         const conversation = payload.selectedConversation;
         const messages = Array.isArray(payload.messages) ? payload.messages : [];
+        const notes = Array.isArray(payload.notes) ? payload.notes : [];
 
         if (conversation) {
           thread.customerName = conversation.customer_display_name || thread.customerName;
@@ -2246,13 +2255,31 @@
           thread.status = conversation.status === 'completed' ? 'resolved' : conversation.status;
         }
 
-        thread.messages = messages.map(message => ({
-          sender: message.direction === 'inbound' ? 'customer' : 'agent',
-          text: message.body,
-          type: message.message_type || 'text',
-          metadata: message.metadata || {},
-          time: formatLiveTime(message.created_at)
+        thread.notes = notes.map(note => ({
+          id: note.id,
+          author: note.author_name || 'スタッフ',
+          time: formatLiveTime(note.created_at),
+          text: note.body,
+          createdAt: note.created_at
         }));
+
+        thread.messages = [
+          ...messages.map(message => ({
+            sender: message.direction === 'inbound' ? 'customer' : 'agent',
+            text: message.body,
+            type: message.message_type || 'text',
+            metadata: message.metadata || {},
+            time: formatLiveTime(message.created_at),
+            createdAt: message.created_at
+          })),
+          ...notes.map(note => ({
+            sender: 'internal_note',
+            author: note.author_name || 'スタッフ',
+            text: note.body,
+            time: formatLiveTime(note.created_at),
+            createdAt: note.created_at
+          }))
+        ].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
 
         updateActiveChatPane(thread);
 
@@ -2491,24 +2518,54 @@
       const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
 
       if (inputMode === 'note') {
-        const newNoteMsg = {
-          sender: 'internal_note',
-          author: loggedInUser?.name || 'スタッフ',
-          text,
-          time: timeStr
-        };
-        thread.messages = thread.messages || [];
-        thread.messages.push(newNoteMsg);
-        thread.notes = thread.notes || [];
-        thread.notes.push({
-          author: loggedInUser?.name || 'スタッフ',
-          time: timeStr,
-          text
-        });
-        input.value = '';
-        renderInternalNotes(thread);
-        renderMessages(thread);
-        showToast('社内メモを画面上に追加しました（永続保存は次段階）');
+        if (isDemoSession || !thread.liveConversationId) {
+          const newNoteMsg = {
+            sender: 'internal_note',
+            author: loggedInUser?.name || 'スタッフ',
+            text,
+            time: timeStr
+          };
+          thread.messages = thread.messages || [];
+          thread.messages.push(newNoteMsg);
+          thread.notes = thread.notes || [];
+          thread.notes.push({
+            author: loggedInUser?.name || 'スタッフ',
+            time: timeStr,
+            text
+          });
+          input.value = '';
+          renderInternalNotes(thread);
+          renderMessages(thread);
+          showToast('デモ用の社内メモを追加しました');
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/omnibox/notes', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              conversationId: thread.liveConversationId,
+              body: text
+            })
+          });
+          const result = await response.json();
+
+          if (!response.ok || !result.ok) {
+            throw new Error(result.message || '社内メモを保存できませんでした');
+          }
+
+          input.value = '';
+          const refreshed = await loadConversationDetail(thread.id);
+          if (refreshed) {
+            updateActiveChatPane(refreshed);
+            renderThreadList();
+          }
+          showToast('社内共有メモを保存しました');
+        } catch (error) {
+          showToast(error.message || '社内メモを保存できませんでした');
+        }
         return;
       }
 
