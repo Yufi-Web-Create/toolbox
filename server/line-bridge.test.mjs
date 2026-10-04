@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   createLineBridgeServer,
   getBridgeConfiguration,
+  normalizeLineMessageEvent,
   normalizeLineTextEvent,
   verifyLineSignature,
 } from "./line-bridge.mjs";
@@ -31,6 +32,38 @@ test("normalizeLineTextEvent accepts supported LINE user text messages", () => {
     providerThreadId: "line:user:U123",
     providerMessageId: "message-1",
     body: "予約できますか？",
+    messageType: "text",
+    metadata: {},
+    occurredAt: new Date(1790990000000).toISOString(),
+  });
+});
+
+test("normalizeLineMessageEvent accepts LINE stickers", () => {
+  assert.deepEqual(normalizeLineMessageEvent({
+    type: "message",
+    timestamp: 1790990000000,
+    source: { type: "user", userId: "U123" },
+    message: {
+      type: "sticker",
+      id: "message-sticker-1",
+      packageId: "11537",
+      stickerId: "52002734",
+      stickerResourceType: "STATIC",
+      keywords: ["OK"],
+    },
+  }), {
+    customerExternalId: "U123",
+    providerThreadId: "line:user:U123",
+    providerMessageId: "message-sticker-1",
+    body: "LINEスタンプ",
+    messageType: "sticker",
+    metadata: {
+      packageId: "11537",
+      stickerId: "52002734",
+      stickerResourceType: "STATIC",
+      keywords: ["OK"],
+      text: null,
+    },
     occurredAt: new Date(1790990000000).toISOString(),
   });
 });
