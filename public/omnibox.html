@@ -124,10 +124,6 @@
         <i data-lucide="link-2" class="w-4 h-4"></i>
         <span>連携アカウント (<span id="nav-account-count">0</span>)</span>
       </button>
-      <button onclick="switchView('analytics')" id="nav-analytics" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-2">
-        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-        <span>分析</span>
-      </button>
     </nav>
 
     <!-- ユーザープロフィール & クイックアクション -->
@@ -192,9 +188,6 @@
     </button>
     <button onclick="switchView('channels')" class="mobile-nav-btn text-xs px-3 py-1.5 rounded-lg text-slate-600 font-medium shrink-0 flex items-center gap-1.5">
       <i data-lucide="link-2" class="w-3.5 h-3.5"></i>連携
-    </button>
-    <button onclick="switchView('analytics')" class="mobile-nav-btn text-xs px-3 py-1.5 rounded-lg text-slate-600 font-medium shrink-0 flex items-center gap-1.5">
-      <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>分析
     </button>
   </div>
 
@@ -605,80 +598,6 @@
         </div>
 
         <div id="connected-accounts-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-      </div>
-    </div>
-
-    <!-- ==============================================
-         VIEW 5: アナリティクス (ANALYTICS VIEW)
-         ============================================== -->
-    <div id="view-analytics" class="view-panel w-full h-full p-4 md:p-6 overflow-y-auto hidden">
-      <div class="max-w-5xl mx-auto space-y-6">
-        <div>
-          <h2 class="text-xl font-bold text-slate-900">問い合わせ対応 & SNSパフォーマンス分析</h2>
-          <p class="text-sm text-slate-500 mt-1">
-            各チャネルからの受信状況、オペレーターの対応完了率、リアルタイムKPIを可視化します。
-          </p>
-        </div>
-
-        <!-- KPIカード -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <span class="text-xs text-slate-400 font-medium block mb-1">総問い合わせ件数</span>
-            <div id="kpi-total-threads" class="text-2xl font-bold text-slate-800">0</div>
-          </div>
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <span class="text-xs text-slate-400 font-medium block mb-1">未対応・未読件数</span>
-            <div id="kpi-unread-count" class="text-2xl font-bold text-red-600">0</div>
-          </div>
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <span class="text-xs text-slate-400 font-medium block mb-1">対応完了率</span>
-            <div id="kpi-resolved-rate" class="text-2xl font-bold text-emerald-600">0%</div>
-          </div>
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <span class="text-xs text-slate-400 font-medium block mb-1">平均一次返信目安</span>
-            <div class="text-2xl font-bold text-teal-600">8<span class="text-xs font-normal text-slate-400 ml-1">分</span></div>
-          </div>
-        </div>
-
-        <!-- チャネル内訳 & オペレーターステータス -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <h3 class="font-bold text-sm text-slate-800 mb-4 flex items-center gap-2">
-              <i data-lucide="pie-chart" class="w-4 h-4 text-teal-600"></i>
-              <span>チャネル別 受信ボリューム比率</span>
-            </h3>
-            <div id="analytics-channel-breakdown" class="space-y-4 text-xs"></div>
-          </div>
-
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-            <h3 class="font-bold text-sm text-slate-800 mb-4 flex items-center gap-2">
-              <i data-lucide="users" class="w-4 h-4 text-teal-600"></i>
-              <span>担当者別アクティビティ</span>
-            </h3>
-            <div class="space-y-3 text-xs">
-              <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div class="flex items-center gap-2.5">
-                  <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-800 font-bold flex items-center justify-center text-xs">山</div>
-                  <div>
-                    <span class="font-bold text-slate-800 block">山田 太郎</span>
-                    <span class="text-[10px] text-slate-400">システム管理者</span>
-                  </div>
-                </div>
-                <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-bold">オンライン</span>
-              </div>
-              <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div class="flex items-center gap-2.5">
-                  <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs">佐</div>
-                  <div>
-                    <span class="font-bold text-slate-800 block">佐藤 美咲</span>
-                    <span class="text-[10px] text-slate-400">店舗オペレーター</span>
-                  </div>
-                </div>
-                <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-bold">オンライン</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -1942,7 +1861,6 @@
       renderThreadList();
       renderPublishChannelsSummary();
       updateBadges();
-      updateAnalyticsView();
 
       if (!currentThreadId && threads.length > 0) {
         selectThread(threads[0].id);
@@ -3595,49 +3513,7 @@
       document.getElementById('nav-account-count').textContent = connectedAccounts.length;
     }
 
-    function updateAnalyticsView() {
-      const total = threads.length;
-      const unread = threads.filter(t => t.status === 'unread' || t.unreadCount > 0).length;
-      const resolved = threads.filter(t => t.status === 'resolved').length;
-      
-      const elTotal = document.getElementById('kpi-total-threads');
-      const elUnread = document.getElementById('kpi-unread-count');
-      const elResolvedRate = document.getElementById('kpi-resolved-rate');
-      
-      if (elTotal) elTotal.innerHTML = `${total}<span class="text-xs font-normal text-slate-400 ml-1">件</span>`;
-      if (elUnread) elUnread.textContent = unread;
-      if (elResolvedRate) {
-        const rate = total > 0 ? Math.round((resolved / total) * 100) : 100;
-        elResolvedRate.innerHTML = `${rate}<span class="text-xs font-normal text-slate-400 ml-1">%</span>`;
-      }
 
-      const breakdownContainer = document.getElementById('analytics-channel-breakdown');
-      if (!breakdownContainer) return;
-      breakdownContainer.innerHTML = '';
-
-      const channels = [
-        { id: 'line', name: 'LINE公式', color: 'bg-emerald-500' },
-        { id: 'instagram', name: 'Instagram DM', color: 'bg-pink-500' },
-        { id: 'email', name: '代表メール', color: 'bg-blue-600' },
-        { id: 'x', name: 'X (旧Twitter)', color: 'bg-slate-900' }
-      ];
-
-      channels.forEach(ch => {
-        const count = threads.filter(t => t.channel === ch.id).length;
-        const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-        const row = document.createElement('div');
-        row.innerHTML = `
-          <div class="flex justify-between font-medium mb-1">
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full ${ch.color}"></span>${ch.name} (${count}件)</span>
-            <span>${pct}%</span>
-          </div>
-          <div class="w-full bg-slate-100 rounded-full h-2">
-            <div class="${ch.color} h-2 rounded-full" style="width: ${pct}%"></div>
-          </div>
-        `;
-        breakdownContainer.appendChild(row);
-      });
-    }
 
     window.switchView = function(viewName) {
       if (requiresOrganizationSetup && loggedInUser?.roleKey === 'owner' && viewName !== 'settings') {
