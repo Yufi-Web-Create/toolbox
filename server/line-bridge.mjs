@@ -792,6 +792,122 @@ async function handleOperatorProviderGet({ request, response, config, fetchImpl 
   sendJson(response, 200, { ok: true, provider, configured: true, config: providerConfig });
 }
 
+async function handleOperatorAiConfigure({ request, response, config, fetchImpl }) {
+  if (!providerBridgeAuthorized(request, config)) {
+    sendJson(response, 401, { ok: false, error: "unauthorized" });
+    return;
+  }
+
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch {
+    sendJson(response, 400, { ok: false, error: "invalid_json" });
+    return;
+  }
+
+  const requestedKey =
+    typeof payload?.apiKey === "string" ? payload.apiKey.trim() : "";
+  const model =
+    typeof payload?.model === "string" && payload.model.trim()
+      ? payload.model.trim()
+      : "gpt-6-luna";
+
+  if (
+    model.length > 128 ||
+    !/^[a-z0-9][a-z0-9._:/-]*$/i.test(model)
+  ) {
+    sendJson(response, 400, { ok: false, error: "invalid_ai_model" });
+    return;
+  }
+
+  let existing = null;
+  if (!requestedKey) {
+    try {
+      existing = await loadOperatorProviderConfig(fetchImpl, config, "ai");
+    } catch {}
+  }
+
+  const apiKey =
+    requestedKey ||
+    (typeof existing?.apiKey === "string" ? existing.apiKey.trim() : "");
+
+  if (apiKey.length < 20 || apiKey.length > 512) {
+    sendJson(response, 400, { ok: false, error: "invalid_ai_key" });
+    return;
+  }
+
+  let validationResponse;
+  try {
+    validationResponse = await fetchImpl("https://api.openai.com/v1/models", {
+      headers: { Authorization: "Bearer " + apiKey },
+    });
+  } catch {
+    sendJson(response, 502, { ok: false, error: "ai_provider_unreachable" });
+    return;
+  }
+
+  if (!validationResponse.ok) {
+    sendJson(response, 400, { ok: false, error: "ai_key_rejected" });
+    return;
+  }
+
+  await storeOperatorProviderConfig(fetchImpl, config, "ai", {
+    provider: "openai",
+    apiKey,
+    model,
+  });
+
+  sendJson(response, 200, {
+    ok: true,
+    configured: true,
+    provider: "openai",
+    model,
+  });
+}
+
+async function handleOperatorAiGet({ request, response, config, fetchImpl }) {
+  if (!providerBridgeAuthorized(request, config)) {
+    sendJson(response, 401, { ok: false, error: "unauthorized" });
+    return;
+  }
+
+  let aiConfig;
+  try {
+    aiConfig = await loadOperatorProviderConfig(fetchImpl, config, "ai");
+  } catch {
+    sendJson(response, 502, { ok: false, error: "ai_config_lookup_failed" });
+    return;
+  }
+
+  if (!aiConfig) {
+    sendJson(response, 200, { ok: true, configured: false });
+    return;
+  }
+
+  const apiKey =
+    typeof aiConfig.apiKey === "string" ? aiConfig.apiKey.trim() : "";
+  const model =
+    typeof aiConfig.model === "string" && aiConfig.model.trim()
+      ? aiConfig.model.trim()
+      : "gpt-6-luna";
+
+  if (!apiKey) {
+    sendJson(response, 200, { ok: true, configured: false });
+    return;
+  }
+
+  sendJson(response, 200, {
+    ok: true,
+    configured: true,
+    config: {
+      provider: "openai",
+      apiKey,
+      model,
+    },
+  });
+}
+
 async function handleLineWebhook({ request, response, config, fetchImpl }) {
   if (!config.configured) {
     sendJson(response, 503, { ok: false, error: "bridge_not_configured" });
@@ -1091,6 +1207,16 @@ export function createLineBridgeServer({
 
       if (request.method === "POST" && url.pathname === "/internal/operator/provider/get") {
         await handleOperatorProviderGet({ request, response, config, fetchImpl });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/operator/ai/configure") {
+        await handleOperatorAiConfigure({ request, response, config, fetchImpl });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/operator/ai/get") {
+        await handleOperatorAiGet({ request, response, config, fetchImpl });
         return;
       }
 
