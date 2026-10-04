@@ -25,6 +25,29 @@ function parseBundle(value: unknown) {
   }
 }
 
+function constantTimeEqual(left: string, right: string) {
+  if (!left || left.length !== right.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < left.length; i += 1) {
+    mismatch |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+async function isAuthorizedCron(
+  admin: ReturnType<typeof createClient>,
+  req: Request,
+) {
+  const supplied = req.headers.get("x-omnibox-cron-key") ?? "";
+  if (!supplied) return false;
+
+  const { data, error } = await admin.rpc("omnibox_get_system_secret", {
+    p_name: "omnibox-publish-cron-key",
+  });
+
+  return !error && typeof data === "string" && constantTimeEqual(supplied, data);
+}
+
 async function refreshXToken(bundle: Record<string, unknown>) {
   const refreshToken =
     typeof bundle.refresh_token === "string" ? bundle.refresh_token : "";
@@ -244,11 +267,6 @@ Deno.serve(async (req) => {
     return json(500, { ok: false, error: "server_not_configured" });
   }
 
-  const token = bearer(req);
-  if (!token) {
-    return json(401, { ok: false, error: "unauthorized" });
-  }
-
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -265,17 +283,28 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: authData, error: authError } =
-    await admin.auth.getUser(token);
-  const user = !authError ? authData.user : null;
-  if (!user) {
-    return json(401, { ok: false, error: "unauthorized" });
+  const cronAuthorized = await isAuthorizedCron(admin, req);
+  let user: { id: string } | null = null;
+
+  if (!cronAuthorized) {
+    const token = bearer(req);
+    if (!token) {
+      return json(401, { ok: false, error: "unauthorized" });
+    }
+
+    const { data: authData, error: authError } =
+      await admin.auth.getUser(token);
+    user = !authError && authData.user ? { id: authData.user.id } : null;
+
+    if (!user) {
+      return json(401, { ok: false, error: "unauthorized" });
+    }
   }
 
   const { data: post, error: postError } = await admin
     .from("social_posts")
     .select(
-      "id, organization_id, created_by, content, media_url, target_connection_ids, status",
+      "id, organization_id, created_by, content, media_url, target_connection_ids, scheduled_at, status",
     )
     .eq("id", postId)
     .maybeSingle();
@@ -284,15 +313,25 @@ Deno.serve(async (req) => {
     return json(404, { ok: false, error: "post_not_found" });
   }
 
-  const { data: membership } = await admin
-    .from("organization_members")
-    .select("organization_id")
-    .eq("organization_id", post.organization_id)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  if (cronAuthorized) {
+    if (
+      post.status !== "scheduled" ||
+      !post.scheduled_at ||
+      new Date(post.scheduled_at).getTime() > Date.now()
+    ) {
+      return json(409, { ok: false, error: "post_not_due" });
+    }
+  } else {
+    const { data: membership } = await admin
+      .from("organization_members")
+      .select("organization_id")
+      .eq("organization_id", post.organization_id)
+      .eq("user_id", user!.id)
+      .maybeSingle();
 
-  if (!membership) {
-    return json(403, { ok: false, error: "forbidden" });
+    if (!membership) {
+      return json(403, { ok: false, error: "forbidden" });
+    }
   }
 
   if (!Array.isArray(post.target_connection_ids) || post.target_connection_ids.length === 0) {
