@@ -5,6 +5,10 @@ import {
   getProviderConfig,
   isOAuthProvider,
 } from "../../../../../../lib/integrations/oauth/providers";
+import {
+  subscribeInstagramAccount,
+  subscriptionMetadata,
+} from "../../../../../../lib/integrations/instagram-subscription";
 import { isPlanKey, planAllowsProvider } from "../../../../../../lib/plans";
 import { createClient } from "../../../../../../lib/supabase/server";
 
@@ -148,6 +152,65 @@ export async function GET(request: Request, context: Context) {
 
     if (error || typeof data !== "string") {
       throw new Error("connection_store_failed");
+    }
+
+    if (rawProvider === "instagram") {
+      try {
+        const subscription = await subscribeInstagramAccount(
+          account.externalAccountId,
+          account.tokenBundle.access_token,
+        );
+
+        const metadata = {
+          ...account.metadata,
+          webhook_subscription: subscriptionMetadata(
+            subscription,
+            "oauth_connect",
+          ),
+        };
+
+        const { error: metadataError } = await supabase.rpc(
+          "omnibox_store_oauth_connection",
+          {
+            p_provider: rawProvider,
+            p_external_account_id: account.externalAccountId,
+            p_account_name: account.accountName,
+            p_handle: account.handle,
+            p_scopes: account.scopes,
+            p_secret_json: JSON.stringify(account.tokenBundle),
+            p_token_expires_at: account.expiresAt,
+            p_metadata: metadata,
+          },
+        );
+
+        if (metadataError) {
+          console.warn("Instagram webhook subscription metadata update failed", {
+            connectionId: data,
+          });
+        }
+
+        if (subscription.success) {
+          console.info("Instagram webhook subscription registered", {
+            connectionId: data,
+            messagesSubscribed: subscription.messagesSubscribed,
+            subscribedFieldCount: subscription.subscribedFields.length,
+          });
+        } else {
+          console.warn("Instagram webhook subscription registration failed", {
+            connectionId: data,
+            messagesSubscribed: subscription.messagesSubscribed,
+            error: subscription.error,
+          });
+        }
+      } catch (subscriptionError) {
+        console.warn("Instagram webhook subscription registration failed", {
+          connectionId: data,
+          error:
+            subscriptionError instanceof Error
+              ? subscriptionError.message
+              : "unknown_error",
+        });
+      }
     }
 
     const response = NextResponse.redirect(
