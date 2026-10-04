@@ -72,6 +72,104 @@
     #customer-info-panel.is-collapsed .customer-panel-body {
       display: none;
     }
+
+    @media (max-width: 1199px) and (min-width: 768px) {
+      #customer-info-panel {
+        width: 44px !important;
+        min-width: 44px !important;
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+        overflow: hidden;
+      }
+      #customer-info-panel .customer-panel-body {
+        display: none;
+      }
+      #status-sidebar {
+        width: 44px !important;
+        min-width: 44px !important;
+      }
+      #status-sidebar .status-sidebar-body {
+        display: none;
+      }
+      #chat-customer-handle {
+        max-width: 110px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+        vertical-align: bottom;
+      }
+    }
+
+    @media (max-width: 767px) {
+      body {
+        overflow: hidden;
+      }
+      #view-inbox {
+        display: block !important;
+        position: relative;
+      }
+      #status-sidebar {
+        display: none !important;
+      }
+      #thread-list-pane {
+        width: 100% !important;
+        height: 100% !important;
+        border-right: 0 !important;
+      }
+      #chat-pane {
+        display: none;
+        width: 100% !important;
+        height: 100% !important;
+      }
+      #view-inbox.mobile-chat-open #thread-list-pane {
+        display: none !important;
+      }
+      #view-inbox.mobile-chat-open #chat-pane {
+        display: flex !important;
+      }
+      #customer-info-panel {
+        display: none !important;
+      }
+      #active-chat-content > .chat-header {
+        min-height: 72px;
+        height: auto !important;
+        padding: 8px 10px !important;
+        gap: 8px;
+      }
+      #active-chat-content > .chat-header .chat-main-info {
+        min-width: 0;
+        flex: 1;
+      }
+      #active-chat-content > .chat-header .chat-actions {
+        max-width: 44%;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 4px;
+      }
+      #active-chat-content > .chat-header select {
+        max-width: 120px;
+        font-size: 10px;
+        padding: 5px 6px;
+      }
+      #chat-customer-name,
+      #chat-customer-handle,
+      #chat-recipient-account-badge {
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #messages-container {
+        padding: 12px !important;
+      }
+      .composer-actions {
+        align-items: stretch !important;
+      }
+      .composer-actions > div:first-child {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased h-screen flex flex-col overflow-hidden">
@@ -88,24 +186,24 @@
 
   <!-- グローバルヘッダー -->
   <header class="h-16 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between z-20 shrink-0">
-    <div class="flex items-center space-x-3">
+    <div class="flex items-center space-x-2 md:space-x-3 min-w-0">
       <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center text-white shadow-md shadow-teal-500/20">
         <i data-lucide="layers" class="w-6 h-6"></i>
       </div>
       <div>
-        <div class="flex items-center gap-2">
+        <div class="chat-actions flex items-center gap-2 shrink-0">
           <h1 class="font-bold text-lg text-slate-900 leading-none">OmniBox</h1>
           <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-medium flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-sync"></span>
             <span id="cloud-status-text">Cloud Sync 有効</span>
           </span>
         </div>
-        <p class="text-xs text-slate-500 mt-0.5">複数SNS一元管理 & 予約投稿ハブ</p>
+        <p class="hidden sm:block text-xs text-slate-500 mt-0.5 whitespace-nowrap">複数SNS一元管理 & 予約投稿ハブ</p>
       </div>
     </div>
 
     <!-- メインナビゲーションタブ -->
-    <nav class="hidden md:flex items-center space-x-1 bg-slate-100 p-1 rounded-xl">
+    <nav class="hidden xl:flex items-center space-x-1 bg-slate-100 p-1 rounded-xl shrink-0">
       <button onclick="switchView('inbox')" id="nav-inbox" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 bg-white text-teal-700 shadow-xs">
         <i data-lucide="inbox" class="w-4 h-4"></i>
         <span>受信箱</span>
@@ -176,7 +274,7 @@
   </header>
 
   <!-- モバイル用下部タブナビゲーション -->
-  <div class="md:hidden flex border-b border-slate-200 bg-white px-2 py-1.5 overflow-x-auto gap-1">
+  <div class="xl:hidden flex border-b border-slate-200 bg-white px-2 py-1.5 overflow-x-auto gap-1 shrink-0">
     <button onclick="switchView('inbox')" class="mobile-nav-btn text-xs px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 font-medium shrink-0 flex items-center gap-1.5">
       <i data-lucide="inbox" class="w-3.5 h-3.5"></i>受信箱
     </button>
@@ -273,8 +371,10 @@
       </aside>
 
       <!-- 中央: スレッド一覧 -->
-      <section class="w-full md:w-80 lg:w-96 bg-white border-r border-slate-200 flex flex-col shrink-0">
-        <div class="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <section id="thread-list-pane" class="w-full md:w-72 lg:w-80 xl:w-96 bg-white border-r border-slate-200 flex flex-col shrink-0">
+        <div class="p-3 border-b border-slate-100 bg-slate-50/50">
+          <div class="flex items-center justify-between gap-2">
+
           <div>
             <h2 class="font-bold text-sm text-slate-800">受信トレイ</h2>
             <p id="inbox-filter-label" class="text-[11px] text-slate-500">すべての窓口・すべてのステータス</p>
@@ -283,6 +383,19 @@
             <span class="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-sync"></span>自動更新
             </span>
+          </div>
+          </div>
+          <div class="md:hidden mt-2 grid grid-cols-[1fr_auto] gap-2">
+            <div class="relative">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+              <input id="mobile-search-input" type="search" placeholder="顧客名・メッセージ検索" oninput="syncMobileSearch(this.value)" class="w-full pl-8 pr-2 py-2 text-xs bg-white rounded-lg border border-slate-200 focus:outline-none focus:border-teal-500">
+            </div>
+            <select id="mobile-status-filter" onchange="filterByStatus(this.value)" class="text-xs border border-slate-200 bg-white rounded-lg px-2 py-1.5 text-slate-700">
+              <option value="all">すべて</option>
+              <option value="unread">未対応</option>
+              <option value="in_progress">対応中</option>
+              <option value="resolved">完了</option>
+            </select>
           </div>
         </div>
 
@@ -302,8 +415,11 @@
 
         <div id="active-chat-content" class="flex-1 flex flex-col h-full overflow-hidden hidden">
           <!-- スレッドヘッダー -->
-          <div class="h-16 px-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
-            <div class="flex items-center space-x-3">
+          <div class="chat-header h-16 px-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
+            <div class="chat-main-info flex items-center space-x-2 md:space-x-3 min-w-0">
+              <button type="button" onclick="closeMobileChat()" class="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 shrink-0" aria-label="受信一覧へ戻る">
+                <i data-lucide="chevron-left" class="w-5 h-5"></i>
+              </button>
               <div class="relative">
                 <img id="chat-customer-avatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100" class="w-10 h-10 rounded-full object-cover border border-slate-200">
                 <span id="chat-customer-channel-badge" class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] text-white"></span>
@@ -351,7 +467,7 @@
 
               <!-- 返信入力ドック -->
               <div class="bg-white border-t border-slate-200 p-3 md:p-4 shrink-0">
-                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div class="composer-actions flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div class="flex items-center gap-1.5 flex-wrap">
                     <button onclick="showAiComingSoon()" class="text-xs bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
                       <i data-lucide="sparkles" class="w-3 h-3 text-teal-600"></i>
@@ -403,10 +519,7 @@
 
             <!-- 顧客情報 & 社内メモ サイドパネル -->
             <div id="customer-info-panel" class="w-72 bg-white border-l border-slate-200 p-4 overflow-y-auto hidden lg:block shrink-0 relative">
-              <button type="button" onclick="toggleCustomerPanel()" class="absolute left-1 top-2 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-teal-700 hover:bg-slate-100" title="顧客カルテを最小化">
-                <i id="customer-panel-toggle-icon" data-lucide="panel-right-close" class="w-4 h-4"></i>
-              </button>
-              <div class="customer-panel-body pt-8">
+              <div class="customer-panel-body pt-2">
               <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">顧客カルテ</div>
               
               <div class="space-y-3 text-xs mb-6">
@@ -2227,6 +2340,9 @@
     }
 
     window.selectThread = async function(id) {
+      if (window.innerWidth < 768) {
+        document.getElementById('view-inbox')?.classList.add('mobile-chat-open');
+      }
       if (currentThreadId && currentThreadId !== id) {
         customerNameEditingThreadId = null;
       }
@@ -3630,6 +3746,34 @@
       renderThreadList();
     };
 
+    window.syncMobileSearch = function(value) {
+      const desktop = document.getElementById('search-input');
+      if (desktop) desktop.value = value;
+      searchQuery = value || '';
+      renderThreadList();
+    };
+
+    window.closeMobileChat = function() {
+      document.getElementById('view-inbox')?.classList.remove('mobile-chat-open');
+    };
+
+    function applyResponsiveDefaults() {
+      const width = window.innerWidth;
+      const customer = document.getElementById('customer-info-panel');
+      const status = document.getElementById('status-sidebar');
+
+      if (width >= 768 && width < 1200) {
+        customer?.classList.add('is-collapsed');
+        status?.classList.add('is-collapsed');
+      } else if (width >= 1200) {
+        status?.classList.remove('is-collapsed');
+      }
+
+      if (width >= 768) {
+        document.getElementById('view-inbox')?.classList.remove('mobile-chat-open');
+      }
+    }
+
     window.toggleSideInfoPanel = function() {
       toggleCustomerPanel();
     };
@@ -4323,6 +4467,8 @@
       renderTemplates('all');
       await initCloudAndAuth();
       handleOAuthReturnStatus();
+      applyResponsiveDefaults();
+      window.addEventListener('resize', applyResponsiveDefaults);
 
       const now = new Date();
       now.setHours(now.getHours() + 2);
