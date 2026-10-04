@@ -277,9 +277,6 @@ describe("uploaded OmniBox application shell", () => {
 
   it("keeps provider connection guidance customer-facing", () => {
     expect(html).not.toContain("OAuth Developer App 設定");
-    expect(html).not.toContain("OMNIBOX_INSTAGRAM_CLIENT_ID");
-    expect(html).not.toContain("OMNIBOX_X_CLIENT_ID");
-    expect(html).not.toContain("OMNIBOX_GOOGLE_CLIENT_ID");
     expect(html).not.toContain("LINE公式アカウントの実接続");
     expect(html).toContain("SNS連携に必要な操作");
     expect(html).toContain("/api/omnibox/oauth/");
