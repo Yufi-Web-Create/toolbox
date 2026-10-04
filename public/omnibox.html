@@ -2346,21 +2346,22 @@
             showToast('所属組織を確認できません。管理者にアカウント設定をご確認ください');
           } else {
             await loadProviderConnections();
-            const secondaryLoads = Promise.all([
+            await loadLiveInbox();
+            startLiveInboxRefresh();
+
+            void Promise.all([
               loadTemplates(),
               loadAssignableStaff(),
               loadSocialPosts()
             ]);
-            await secondaryLoads;
+
             if (!providerInboxSyncStarted) {
               providerInboxSyncStarted = true;
-              await Promise.all([
+              void Promise.all([
                 syncGoogleInbox({ silent: true, reloadInbox: false }),
                 syncXInbox({ silent: true, reloadInbox: false })
-              ]);
+              ]).then(() => loadLiveInbox(currentThreadId, { silent: true }));
             }
-            await loadLiveInbox();
-            startLiveInboxRefresh();
           }
         } else {
           stopLiveInboxRefresh();
@@ -4062,7 +4063,7 @@
         document.getElementById('new-post-content').value = '';
         selectedPostTargetIds.clear();
         clearSelectedPostImages();
-        showToast('デモ用の投稿を保存しました');
+        showPostSuccess(timing);
         return;
       }
 
@@ -4087,8 +4088,6 @@
         });
         const result = await response.json();
 
-        await loadSocialPosts();
-
         if (!response.ok || !result.ok) {
           throw new Error(
             result.message ||
@@ -4100,17 +4099,171 @@
 
         window.closeNewPostModal();
         document.getElementById('new-post-content').value = '';
+        const briefInput = document.getElementById('new-post-ai-brief');
+        if (briefInput) briefInput.value = '';
         selectedPostTargetIds.clear();
         clearSelectedPostImages();
-
-        showToast(
-          timing === 'schedule'
-            ? '予約投稿を保存しました。指定時刻に自動投稿します'
-            : 'SNSへの投稿が完了しました'
-        );
+        await loadSocialPosts();
+        showPostSuccess(timing);
       } catch (error) {
         showToast(error.message || '投稿処理に失敗しました');
       }
+    };
+
+    function postCalendarDate(post) {
+      const value = post.scheduledAtIso || post.publishedAtIso || post.createdAt;
+      const date = value ? new Date(value) : null;
+      return date && !Number.isNaN(date.getTime()) ? date : null;
+    }
+
+    function sameLocalDate(left, right) {
+      return left.getFullYear() === right.getFullYear() &&
+        left.getMonth() === right.getMonth() &&
+        left.getDate() === right.getDate();
+    }
+
+    function calendarDateKey(date) {
+      const pad = value => String(value).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function renderPublishCalendar() {
+      const grid = document.getElementById('publish-calendar-grid');
+      const title = document.getElementById('publish-calendar-title');
+      if (!grid || !title) return;
+
+      const year = publishCalendarCursor.getFullYear();
+      const month = publishCalendarCursor.getMonth();
+      title.textContent = `${year}年 ${month + 1}月`;
+
+      const first = new Date(year, month, 1);
+      const start = new Date(year, month, 1 - first.getDay());
+      const today = new Date();
+      const cells = [];
+
+      for (let index = 0; index < 42; index += 1) {
+        const date = new Date(start);
+        date.setDate(start.getDate() + index);
+        const inMonth = date.getMonth() === month;
+        const isToday = sameLocalDate(date, today);
+        const dayPosts = scheduledPosts.filter(post => {
+          const postDate = postCalendarDate(post);
+          return postDate ? sameLocalDate(postDate, date) : false;
+        });
+        const scheduledCount = dayPosts.filter(post => post.statusKey === 'scheduled').length;
+        const publishedCount = dayPosts.filter(post => post.statusKey === 'published' || post.statusKey === 'partial_failed').length;
+        const key = calendarDateKey(date);
+
+        cells.push(`
+          <button type="button" onclick="openNewPostModalForDate('${key}')" class="min-h-[92px] sm:min-h-[108px] border-r border-b border-slate-100 p-1.5 sm:p-2 text-left hover:bg-teal-50/50 transition ${inMonth ? 'bg-white' : 'bg-slate-50/70'}">
+            <div class="flex items-center justify-between gap-1">
+              <span class="w-6 h-6 flex items-center justify-center rounded-full text-[11px] font-semibold ${isToday ? 'bg-teal-600 text-white' : inMonth ? 'text-slate-700' : 'text-slate-300'}">${date.getDate()}</span>
+              ${dayPosts.length ? `<span class="text-[9px] text-slate-400">${dayPosts.length}件</span>` : ''}
+            </div>
+            <div class="mt-1 space-y-1">
+              ${scheduledCount ? `<div class="truncate rounded bg-amber-50 text-amber-800 px-1.5 py-1 text-[9px] font-semibold">予約 ${scheduledCount}</div>` : ''}
+              ${publishedCount ? `<div class="truncate rounded bg-emerald-50 text-emerald-700 px-1.5 py-1 text-[9px] font-semibold">投稿済 ${publishedCount}</div>` : ''}
+            </div>
+          </button>
+        `);
+      }
+
+      grid.innerHTML = cells.join('');
+      lucide.createIcons();
+    }
+
+    window.changePublishCalendarMonth = function(offset) {
+      publishCalendarCursor = new Date(
+        publishCalendarCursor.getFullYear(),
+        publishCalendarCursor.getMonth() + offset,
+        1
+      );
+      renderPublishCalendar();
+    };
+
+    window.openNewPostModalForDate = function(dateKey) {
+      window.openNewPostModal(dateKey);
+    };
+
+    window.generateAiPostDraft = async function() {
+      if (currentPlanFeatures.ai !== true) {
+        showToast('AI投稿アシスタントはプロ以上のプランで利用できます');
+        return;
+      }
+      if (isDemoSession) {
+        showToast('AI投稿アシスタントは実アカウントで利用できます');
+        return;
+      }
+
+      const brief = document.getElementById('new-post-ai-brief')?.value.trim() || '';
+      if (!brief) {
+        showToast('投稿に載せたい情報を入力してください');
+        return;
+      }
+
+      const button = document.getElementById('ai-post-draft-button');
+      const content = document.getElementById('new-post-content');
+      const original = button?.textContent || '文章を生成';
+
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'AI生成中...';
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/ai/post', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brief })
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok || typeof result.draft !== 'string') {
+          throw new Error(result.message || 'AI投稿文を生成できませんでした');
+        }
+
+        if (content) {
+          content.value = result.draft;
+          content.focus();
+        }
+        showToast('AI投稿文を作成しました。内容を確認してください');
+      } catch (error) {
+        showToast(error.message || 'AI投稿文を生成できませんでした');
+      } finally {
+        if (button) {
+          button.disabled = currentPlanFeatures.ai !== true;
+          button.textContent = original;
+        }
+      }
+    };
+
+    function showPostSuccess(timing) {
+      const modal = document.getElementById('post-success-modal');
+      const title = document.getElementById('post-success-title');
+      const message = document.getElementById('post-success-message');
+      if (!modal) return;
+
+      if (title) title.textContent =
+        timing === 'schedule' ? '予約投稿を設定しました' : '投稿が完了しました';
+      if (message) message.textContent =
+        timing === 'schedule'
+          ? '指定した日時に自動投稿します。投稿カレンダーを更新します。'
+          : 'SNSへの投稿が完了しました。投稿カレンダーを更新します。';
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+
+      window.clearTimeout(postSuccessReloadTimer);
+      postSuccessReloadTimer = window.setTimeout(() => {
+        window.location.reload();
+      }, 3500);
+    }
+
+    window.finishPostSuccess = function() {
+      window.clearTimeout(postSuccessReloadTimer);
+      window.location.reload();
     };
 
     function renderScheduledPosts() {
@@ -4666,18 +4819,32 @@
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
-    window.openNewPostModal = function() {
+    window.openNewPostModal = function(dateKey = '') {
       const modal = document.getElementById('new-post-modal');
       renderTargetAccountsCheckboxes();
       renderSelectedPostImages();
       modal.classList.remove('hidden');
+
       const input = document.getElementById('new-post-datetime');
+      const scheduleRadio = document.querySelector('input[name="post-timing"][value="schedule"]');
+      if (scheduleRadio) scheduleRadio.checked = true;
+
       if (input) {
-        const future = new Date(Date.now() + 60 * 60 * 1000);
-        future.setMinutes(Math.ceil(future.getMinutes() / 5) * 5, 0, 0);
-        input.min = toLocalDateTimeInputValue(new Date(Date.now() + 60 * 1000));
-        input.value = toLocalDateTimeInputValue(future);
+        const minimum = new Date(Date.now() + 60 * 1000);
+        input.min = toLocalDateTimeInputValue(minimum);
+
+        let target = new Date(Date.now() + 60 * 60 * 1000);
+        if (dateKey) {
+          const parsed = new Date(dateKey + 'T12:00:00');
+          if (!Number.isNaN(parsed.getTime())) target = parsed;
+        }
+        if (target.getTime() <= minimum.getTime()) {
+          target = new Date(minimum.getTime() + 60 * 60 * 1000);
+        }
+        target.setMinutes(Math.ceil(target.getMinutes() / 5) * 5, 0, 0);
+        input.value = toLocalDateTimeInputValue(target);
       }
+      lucide.createIcons();
     };
 
     window.closeNewPostModal = function() {
@@ -4686,7 +4853,7 @@
 
     window.openNewPostModalWithAiPrompt = function() {
       window.openNewPostModal();
-      window.generateAiPostDraftWithGemini();
+      document.getElementById('new-post-ai-brief')?.focus();
     };
 
     let toastTimeout;
