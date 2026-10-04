@@ -120,6 +120,31 @@
       #customer-info-panel {
         display: none !important;
       }
+      #customer-info-panel.mobile-open {
+        display: block !important;
+        position: absolute;
+        inset: 0;
+        width: 100% !important;
+        min-width: 100% !important;
+        height: 100%;
+        z-index: 45;
+        padding: 16px !important;
+        overflow-y: auto;
+        background: white;
+      }
+      #customer-info-panel.mobile-open .customer-panel-body {
+        display: block !important;
+      }
+      [id$="-modal"] > div {
+        max-height: 92vh;
+        overflow-y: auto;
+      }
+      #toast {
+        left: 12px;
+        right: 12px;
+        width: auto;
+        max-width: none;
+      }
       #active-chat-content > .chat-header {
         min-height: 72px;
         height: auto !important;
@@ -374,17 +399,22 @@
             </span>
           </div>
           </div>
-          <div class="md:hidden mt-2 grid grid-cols-[1fr_auto] gap-2">
+          <div class="md:hidden mt-2 space-y-2">
             <div class="relative">
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
-              <input id="mobile-search-input" type="search" placeholder="顧客名・メッセージ検索" oninput="syncMobileSearch(this.value)" class="w-full pl-8 pr-2 py-2 text-xs bg-white rounded-lg border border-slate-200 focus:outline-none focus:border-teal-500">
+              <input id="mobile-search-input" type="search" placeholder="顧客名・過去メッセージ・社内メモ検索" oninput="syncMobileSearch(this.value)" class="w-full pl-8 pr-2 py-2 text-xs bg-white rounded-lg border border-slate-200 focus:outline-none focus:border-teal-500">
             </div>
-            <select id="mobile-status-filter" onchange="filterByStatus(this.value)" class="text-xs border border-slate-200 bg-white rounded-lg px-2 py-1.5 text-slate-700">
-              <option value="all">すべて</option>
-              <option value="unread">未対応</option>
-              <option value="in_progress">対応中</option>
-              <option value="resolved">完了</option>
-            </select>
+            <div class="grid grid-cols-2 gap-2">
+              <select id="mobile-status-filter" onchange="filterByStatus(this.value)" class="min-w-0 text-xs border border-slate-200 bg-white rounded-lg px-2 py-1.5 text-slate-700">
+                <option value="all">全ステータス</option>
+                <option value="unread">未対応</option>
+                <option value="in_progress">対応中</option>
+                <option value="resolved">完了</option>
+              </select>
+              <select id="mobile-account-filter" onchange="filterByAccount(this.value)" class="min-w-0 text-xs border border-slate-200 bg-white rounded-lg px-2 py-1.5 text-slate-700">
+                <option value="all">全アカウント</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -438,7 +468,7 @@
                 <option value="">👤 未割り当て</option>
               </select>
 
-              <button onclick="toggleSideInfoPanel()" class="hidden md:inline-flex p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition" title="顧客カルテ・社内メモを表示">
+              <button onclick="toggleSideInfoPanel()" class="inline-flex p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition" title="顧客カルテ・社内メモを表示">
                 <i data-lucide="sidebar" class="w-4 h-4"></i>
               </button>
             </div>
@@ -496,6 +526,12 @@
             <!-- 顧客情報 & 社内メモ サイドパネル -->
             <div id="customer-info-panel" class="w-72 bg-white border-l border-slate-200 p-4 overflow-y-auto hidden lg:block shrink-0 relative">
               <div class="customer-panel-body pt-2">
+              <div class="md:hidden flex items-center justify-between mb-4">
+                <div class="font-bold text-sm text-slate-800">顧客カルテ</div>
+                <button type="button" onclick="toggleCustomerPanel()" class="p-2 rounded-lg text-slate-500 hover:bg-slate-100" aria-label="顧客カルテを閉じる">
+                  <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+              </div>
               <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">顧客カルテ</div>
               
               <div class="space-y-3 text-xs mb-6">
@@ -2028,6 +2064,14 @@
       const treeList = document.getElementById('account-tree-list');
       if (!treeList) return;
       treeList.innerHTML = '';
+      const mobileSelect = document.getElementById('mobile-account-filter');
+      if (mobileSelect) {
+        mobileSelect.innerHTML = '<option value="all">全アカウント</option>' +
+          connectedAccounts.map(acc =>
+            `<option value="${escapeHtml(acc.id)}">${escapeHtml(acc.accountName)}</option>`
+          ).join('');
+        mobileSelect.value = currentAccountFilter;
+      }
 
       const platforms = [
         { id: 'instagram', name: 'Instagram', dotColor: 'bg-pink-500' },
@@ -2290,6 +2334,7 @@
 
     window.selectThread = async function(id) {
       if (window.innerWidth < 768) {
+        document.getElementById('customer-info-panel')?.classList.remove('mobile-open');
         document.getElementById('view-inbox')?.classList.add('mobile-chat-open');
       }
       if (currentThreadId && currentThreadId !== id) {
@@ -3723,6 +3768,8 @@
           btn.classList.add('hover:bg-slate-100', 'text-slate-600');
         }
       });
+      const mobileStatus = document.getElementById('mobile-status-filter');
+      if (mobileStatus) mobileStatus.value = status;
       renderThreadList();
     };
 
@@ -3802,10 +3849,19 @@
       const panel = document.getElementById('customer-info-panel');
       const icon = document.getElementById('customer-panel-toggle-icon');
       if (!panel) return;
-      panel.classList.remove('hidden');
-      panel.classList.add('lg:block');
-      panel.classList.toggle('is-collapsed');
-      icon?.setAttribute('data-lucide', panel.classList.contains('is-collapsed') ? 'panel-right-open' : 'panel-right-close');
+
+      if (window.innerWidth < 768) {
+        panel.classList.toggle('mobile-open');
+        panel.classList.remove('is-collapsed');
+      } else {
+        panel.classList.remove('hidden');
+        panel.classList.add('lg:block');
+        panel.classList.toggle('is-collapsed');
+        icon?.setAttribute(
+          'data-lucide',
+          panel.classList.contains('is-collapsed') ? 'panel-right-open' : 'panel-right-close'
+        );
+      }
       lucide.createIcons();
     };
 
