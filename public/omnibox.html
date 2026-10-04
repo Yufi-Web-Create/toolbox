@@ -74,23 +74,6 @@
     }
 
     @media (max-width: 1199px) and (min-width: 768px) {
-      #customer-info-panel {
-        width: 44px !important;
-        min-width: 44px !important;
-        padding-left: 6px !important;
-        padding-right: 6px !important;
-        overflow: hidden;
-      }
-      #customer-info-panel .customer-panel-body {
-        display: none;
-      }
-      #status-sidebar {
-        width: 44px !important;
-        min-width: 44px !important;
-      }
-      #status-sidebar .status-sidebar-body {
-        display: none;
-      }
       #chat-customer-handle {
         max-width: 110px;
         overflow: hidden;
@@ -98,6 +81,12 @@
         white-space: nowrap;
         display: inline-block;
         vertical-align: bottom;
+      }
+      #chat-customer-name {
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
 
@@ -424,8 +413,8 @@
                 <img id="chat-customer-avatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100" class="w-10 h-10 rounded-full object-cover border border-slate-200">
                 <span id="chat-customer-channel-badge" class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] text-white"></span>
               </div>
-              <div>
-                <div class="flex items-center gap-2">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 min-w-0">
                   <h3 id="chat-customer-name" class="font-bold text-sm text-slate-800"></h3>
                   <span id="chat-customer-handle" class="text-xs text-slate-400"></span>
                   <span id="chat-status-pill" class="text-[10px] font-medium px-2 py-0.5 rounded-full"></span>
@@ -438,7 +427,7 @@
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="chat-actions flex items-center gap-2 shrink-0">
               <select id="chat-status-select" onchange="updateCurrentThreadStatus(this.value)" class="text-xs border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 text-slate-700 font-medium focus:outline-none focus:border-teal-500">
                 <option value="unread">🔴 未対応</option>
                 <option value="in_progress">🟡 対応中</option>
@@ -449,7 +438,7 @@
                 <option value="">👤 未割り当て</option>
               </select>
 
-              <button onclick="toggleSideInfoPanel()" class="p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition" title="顧客カルテ・社内メモを表示">
+              <button onclick="toggleSideInfoPanel()" class="hidden md:inline-flex p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition" title="顧客カルテ・社内メモを表示">
                 <i data-lucide="sidebar" class="w-4 h-4"></i>
               </button>
             </div>
@@ -460,23 +449,10 @@
             <div class="flex-1 flex flex-col overflow-hidden bg-slate-50">
               <div id="messages-container" class="flex-1 p-4 md:p-6 overflow-y-auto space-y-4"></div>
 
-              <div id="ai-loading-box" class="hidden px-4 py-2 bg-teal-50 border-t border-teal-200 flex items-center gap-2 text-xs text-teal-800">
-                <i data-lucide="sparkles" class="w-4 h-4 text-teal-600 animate-spin"></i>
-                <span id="ai-loading-text">Gemini AIが最適な返信文案を作成しています...</span>
-              </div>
-
               <!-- 返信入力ドック -->
               <div class="bg-white border-t border-slate-200 p-3 md:p-4 shrink-0">
                 <div class="composer-actions flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div class="flex items-center gap-1.5 flex-wrap">
-                    <button onclick="showAiComingSoon()" class="text-xs bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
-                      <i data-lucide="sparkles" class="w-3 h-3 text-teal-600"></i>
-                      <span>AI丁寧返信（準備中）</span>
-                    </button>
-                    <button onclick="showAiComingSoon()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
-                      <i data-lucide="smile" class="w-3 h-3 text-slate-500"></i>
-                      <span>親しみやすい返信（準備中）</span>
-                    </button>
                     <button onclick="openTemplateSelectorModal()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
                       <i data-lucide="file-text" class="w-3 h-3 text-slate-500"></i>
                       <span>定型文挿入</span>
@@ -1096,10 +1072,7 @@
       <div>
         <div class="flex items-center justify-between mb-1">
           <label class="text-xs font-bold text-slate-600">投稿本文</label>
-          <button onclick="showAiComingSoon()" class="text-xs text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1">
-            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-            <span>AI投稿アシスタント（準備中）</span>
-          </button>
+
         </div>
         <textarea id="new-post-content" rows="4" placeholder="フォロワーに届けたい情報を入力してください... #ハッシュタグ など" class="w-full text-xs md:text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 resize-none"></textarea>
       </div>
@@ -1999,42 +1972,6 @@
           updateActiveChatPane(current);
         } else if (threads.length > 0) {
           selectThread(threads[0].id);
-        }
-      }
-    }
-
-    async function callGeminiApi(systemPrompt, userPrompt) {
-      const apiKey = "";
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
-
-      const payload = {
-        contents: [{ parts: [{ text: userPrompt }] }],
-        systemInstruction: { parts: [{ text: systemPrompt }] }
-      };
-
-      let attempts = 0;
-      const maxAttempts = 3;
-      let delay = 1000;
-
-      while (attempts < maxAttempts) {
-        try {
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          if (!response.ok) throw new Error(`API error HTTP ${response.status}`);
-          const result = await response.json();
-          const candidate = result.candidates?.[0];
-          if (candidate?.content?.parts?.[0]?.text) {
-            return candidate.content.parts[0].text;
-          }
-          throw new Error('Empty response');
-        } catch (e) {
-          attempts++;
-          if (attempts >= maxAttempts) throw e;
-          await new Promise(r => setTimeout(r, delay));
-          delay *= 2;
         }
       }
     }
