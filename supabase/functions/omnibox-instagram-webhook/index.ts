@@ -170,12 +170,12 @@ Deno.serve(async (req) => {
     return json(200, { ok: true, accepted: 0 });
   }
 
-  const { data: matchingConnections } = await admin
+  const { data: activeConnections } = await admin
     .from("provider_connections")
     .select("id, organization_id, external_account_id")
     .eq("provider", "instagram")
     .eq("status", "active")
-    .in("external_account_id", accountIds);
+    .not("vault_secret_id", "is", null);
 
   const connectionSecrets = new Map<
     string,
@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
 
   let signatureValid = false;
 
-  for (const connection of matchingConnections ?? []) {
+  for (const connection of activeConnections ?? []) {
     const { data: secretValue } = await admin.rpc(
       "omnibox_get_provider_secret",
       { p_connection_id: connection.id },
@@ -214,6 +214,11 @@ Deno.serve(async (req) => {
   }
 
   if (!signatureValid) {
+    console.warn("Instagram webhook signature rejected", {
+      hasSignature: Boolean(signature),
+      activeConnectionCount: connectionSecrets.size,
+      accountIds,
+    });
     return json(401, { ok: false, error: "invalid_signature" });
   }
 
@@ -228,7 +233,13 @@ Deno.serve(async (req) => {
 
     const accountId = String(entry.id ?? "").trim();
     const connection = connectionSecrets.get(accountId);
-    if (!connection) continue;
+    if (!connection) {
+      console.warn("Instagram webhook account was not matched", {
+        accountId,
+        knownAccountCount: connectionSecrets.size,
+      });
+      continue;
+    }
 
     const messaging = Array.isArray(entry.messaging) ? entry.messaging : [];
 
