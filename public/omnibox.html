@@ -1918,7 +1918,6 @@
         };
         updateOAuthProviderStatus();
         onDataUpdated();
-        loadLineWebhookHealth();
         return true;
       }
 
@@ -1962,6 +1961,7 @@
 
         updateOAuthProviderStatus();
         onDataUpdated();
+        loadLineWebhookHealth();
         return true;
       } catch (error) {
         console.error('Provider connections load failed:', error);
@@ -3056,7 +3056,7 @@
         return;
       }
 
-      if (!thread.liveConversationId || !['line', 'instagram', 'email'].includes(thread.channel)) {
+      if (!thread.liveConversationId || !['line', 'instagram', 'email', 'x'].includes(thread.channel)) {
         showToast('このチャネルの実送信はまだ接続されていません');
         return;
       }
