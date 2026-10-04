@@ -43,8 +43,8 @@ Deno.serve(async (req) => {
     .eq("user_id", caller.id)
     .maybeSingle();
 
-  if (membershipError || !membership || membership.role !== "owner") {
-    return json(403, { ok: false, error: "owner_required" });
+  if (membershipError || !membership) {
+    return json(403, { ok: false, error: "membership_required" });
   }
 
   const { data: organization, error: organizationError } = await admin
@@ -90,6 +90,10 @@ Deno.serve(async (req) => {
     });
 
     return json(200, { ok: true, employees });
+  }
+
+  if (membership.role !== "owner") {
+    return json(403, { ok: false, error: "owner_required" });
   }
 
   let payload: Record<string, unknown>;
