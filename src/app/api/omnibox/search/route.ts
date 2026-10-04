@@ -43,7 +43,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const escaped = q.replace(/[%,]/g, (value) => "\" + value);
+    const escaped = q.replace(/[%_,()]/g, " ").trim();
     const pattern = `%${escaped}%`;
 
     const [conversationResult, messageResult, noteResult] = await Promise.all([
