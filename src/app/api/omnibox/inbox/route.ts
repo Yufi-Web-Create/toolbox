@@ -44,6 +44,7 @@ export async function GET(request: Request) {
       ok: true,
       conversations: inbox.conversations,
       messages: inbox.messages,
+      notes: inbox.notes,
       selectedConversation: inbox.selectedConversation,
     });
   } catch {
