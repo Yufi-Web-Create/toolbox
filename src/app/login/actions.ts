@@ -2,6 +2,11 @@
 
 import { redirect } from "next/navigation";
 
+import {
+  internalEmailForLoginId,
+  isValidLoginId,
+  normalizeLoginId,
+} from "../../lib/login-id";
 import { createClient } from "../../lib/supabase/server";
 import { getSafeNextPath } from "./validation";
 
@@ -10,12 +15,10 @@ export type LoginState = {
   message: string;
 };
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const CREDENTIAL_ERROR = "Email or password is incorrect.";
+const CREDENTIAL_ERROR = "IDまたはパスワードが正しくありません。";
 
 function getTextField(formData: FormData, name: string) {
   const value = formData.get(name);
-
   return typeof value === "string" ? value : "";
 }
 
@@ -23,41 +26,29 @@ export async function login(
   _previousState: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
-  const email = getTextField(formData, "email").trim();
+  const loginId = normalizeLoginId(getTextField(formData, "loginId"));
   const password = getTextField(formData, "password");
 
-  if (!email || !EMAIL_PATTERN.test(email)) {
-    return {
-      status: "error",
-      message: "Enter a valid email address.",
-    };
+  if (!isValidLoginId(loginId)) {
+    return { status: "error", message: "有効なログインIDを入力してください。" };
   }
 
   if (!password) {
-    return {
-      status: "error",
-      message: "Enter your password.",
-    };
+    return { status: "error", message: "パスワードを入力してください。" };
   }
 
   try {
     const supabase = await createClient();
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: internalEmailForLoginId(loginId),
       password,
     });
 
     if (error) {
-      return {
-        status: "error",
-        message: CREDENTIAL_ERROR,
-      };
+      return { status: "error", message: CREDENTIAL_ERROR };
     }
   } catch {
-    return {
-      status: "error",
-      message: CREDENTIAL_ERROR,
-    };
+    return { status: "error", message: CREDENTIAL_ERROR };
   }
 
   redirect(getSafeNextPath(getTextField(formData, "next")));
