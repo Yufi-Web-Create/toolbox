@@ -32,12 +32,23 @@ export type InboxMessage = {
   created_at: string;
 };
 
+export type InboxInternalNote = {
+  id: string;
+  organization_id: string;
+  conversation_id: string;
+  created_by: string;
+  author_name: string;
+  body: string;
+  created_at: string;
+};
+
 export type InboxSnapshot =
   | {
       success: true;
       conversations: InboxConversation[];
       selectedConversation: InboxConversation | null;
       messages: InboxMessage[];
+      notes: InboxInternalNote[];
     }
   | {
       success: false;
@@ -77,6 +88,7 @@ export async function getInboxSnapshot(
         conversations,
         selectedConversation: null,
         messages: [],
+        notes: [],
       };
     }
 
@@ -94,11 +106,24 @@ export async function getInboxSnapshot(
       return { success: false, message: INBOX_LOAD_ERROR };
     }
 
+    const { data: noteData, error: noteError } = await supabase
+      .from("internal_notes")
+      .select("id, organization_id, conversation_id, created_by, author_name, body, created_at")
+      .eq("organization_id", organizationId)
+      .eq("conversation_id", selectedConversation.id)
+      .order("created_at", { ascending: true })
+      .limit(200);
+
+    if (noteError || !Array.isArray(noteData)) {
+      return { success: false, message: INBOX_LOAD_ERROR };
+    }
+
     return {
       success: true,
       conversations,
       selectedConversation,
       messages: messageData as InboxMessage[],
+      notes: noteData as InboxInternalNote[],
     };
   } catch {
     return { success: false, message: INBOX_LOAD_ERROR };
