@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { getProviderConfig } from "../../../../../../lib/integrations/oauth/providers";
-import { createClient } from "../../../../../../lib/supabase/server";
+import { getProviderConfig } from "../../../../../lib/integrations/oauth/providers";
+import { createClient } from "../../../../../lib/supabase/server";
 
 export async function GET(request: Request) {
   try {
