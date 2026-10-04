@@ -235,7 +235,7 @@
 
     <!-- ユーザープロフィール & クイックアクション -->
     <div class="flex items-center gap-3">
-      <button onclick="openNewPostModal()" class="hidden sm:flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-3.5 py-2 rounded-lg text-sm font-medium transition shadow-xs">
+      <button id="header-new-post-button" onclick="openNewPostModal()" class="hidden sm:flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-3.5 py-2 rounded-lg text-sm font-medium transition shadow-xs">
         <i data-lucide="plus-circle" class="w-4 h-4"></i>
         <span>新規SNS投稿</span>
       </button>
@@ -1383,6 +1383,39 @@
       locationsIncluded: 1,
       shopify: true
     };
+    const planCatalog = {
+      lite: {
+        name: 'ライト',
+        price: '¥9,800/月',
+        description: '問い合わせ管理を小さく開始',
+        features: ['LINE・メール問い合わせ', '利用3名まで', 'SNS投稿なし']
+      },
+      standard: {
+        name: 'スタンダード',
+        price: '¥29,800/月',
+        description: '問い合わせとSNS投稿を一元化',
+        features: ['Instagram DM', 'SNS予約投稿', '利用人数無制限']
+      },
+      pro: {
+        name: 'プロ',
+        price: '¥44,800/月',
+        description: 'スタンダード + AI応答枠',
+        features: ['スタンダード全機能', 'AI応答 月500件', 'AI機能は現在開発中']
+      },
+      premium: {
+        name: 'プレミアム',
+        price: '¥98,000/月',
+        description: '多店舗・大規模運用向け',
+        features: ['AI応答 月1,500件', '3店舗分', '多店舗機能は今後実装']
+      },
+      enterprise: {
+        name: 'エンタープライズ',
+        price: '個別見積もり',
+        description: '専用環境・カスタマイズ',
+        features: ['全機能', '専用環境/SLA', '個別機能は今後実装']
+      }
+    };
+
     let providerInboxSyncStarted = false;
     let liveInboxTimer = null;
     let liveInboxRefreshInFlight = false;
@@ -1541,6 +1574,137 @@
       }
     ];
 
+    function providerAllowedByPlan(provider) {
+      if (provider === 'instagram') return currentPlanFeatures.instagramDm !== false;
+      if (provider === 'x') return currentPlanFeatures.xDm !== false;
+      return true;
+    }
+
+    function applyPlanAccess() {
+      const canPublish = currentPlanFeatures.socialPublishing !== false;
+
+      document.getElementById('nav-publish')?.classList.toggle('hidden', !canPublish);
+      document.querySelectorAll('.mobile-nav-btn[data-view="publish"]').forEach(btn => {
+        btn.classList.toggle('hidden', !canPublish);
+      });
+      document.getElementById('header-new-post-button')?.classList.toggle('hidden', !canPublish);
+
+      document.querySelectorAll('[data-oauth-provider]').forEach(button => {
+        const provider = button.dataset.oauthProvider;
+        const allowed = providerAllowedByPlan(provider);
+        button.classList.toggle('opacity-50', !allowed);
+        button.classList.toggle('cursor-not-allowed', !allowed);
+        button.setAttribute('aria-disabled', allowed ? 'false' : 'true');
+      });
+
+      if (!canPublish && !document.getElementById('view-publish')?.classList.contains('hidden')) {
+        window.switchView('inbox');
+      }
+
+      renderPlanSettings();
+      renderConnectedAccounts();
+      renderTargetAccountsCheckboxes();
+      updateOAuthProviderStatus();
+    }
+
+    function renderPlanSettings() {
+      const grid = document.getElementById('plan-options-grid');
+      const badge = document.getElementById('current-plan-badge');
+      if (!grid || !badge) return;
+
+      const current = planCatalog[currentPlan] || planCatalog.standard;
+      badge.textContent = current.name;
+
+      grid.innerHTML = Object.entries(planCatalog).map(([key, plan]) => {
+        const active = key === currentPlan;
+        return `
+          <button type="button" onclick="changeOrganizationPlan('${key}')" class="text-left p-3 rounded-xl border transition ${active ? 'border-violet-400 bg-violet-50 ring-1 ring-violet-200' : 'border-slate-200 bg-white hover:border-violet-300'}">
+            <div class="flex items-start justify-between gap-2">
+              <div class="font-bold text-xs ${active ? 'text-violet-800' : 'text-slate-800'}">${plan.name}</div>
+              ${active ? '<span class="text-[9px] px-1.5 py-0.5 rounded bg-violet-600 text-white">現在</span>' : ''}
+            </div>
+            <div class="text-sm font-bold text-slate-900 mt-1">${plan.price}</div>
+            <div class="text-[10px] text-slate-500 mt-1">${plan.description}</div>
+            <ul class="mt-2 space-y-1">
+              ${plan.features.map(feature => `<li class="text-[10px] text-slate-600">・${feature}</li>`).join('')}
+            </ul>
+          </button>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    window.changeOrganizationPlan = async function(plan) {
+      if (loggedInUser?.roleKey !== 'owner') {
+        showToast('プラン変更は管理者のみ行えます');
+        return;
+      }
+      if (!planCatalog[plan] || plan === currentPlan) return;
+
+      const next = planCatalog[plan];
+      if (!window.confirm(`${next.name}（${next.price}）へ変更しますか？\n現在は支払い処理なしで即時反映されます。`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/settings/plan', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'プランを変更できませんでした');
+        }
+
+        currentPlan = result.plan;
+        currentPlanFeatures = result.features || currentPlanFeatures;
+        if (currentOrganization) currentOrganization.plan = currentPlan;
+
+        applyPlanAccess();
+        await Promise.all([
+          loadProviderConnections(),
+          loadLiveInbox(null, { silent: true }),
+          currentPlanFeatures.socialPublishing ? loadSocialPosts() : Promise.resolve(true)
+        ]);
+        await window.loadEmployees();
+        showToast(`${planCatalog[currentPlan].name}へ変更しました`);
+      } catch (error) {
+        showToast(error.message || 'プランを変更できませんでした');
+      }
+    };
+
+    function renderOAuthSetupChecklist() {
+      const container = document.getElementById('oauth-setup-checklist');
+      if (!container) return;
+      const providers = [
+        ['instagram', 'Instagram / Meta', 'OMNIBOX_INSTAGRAM_CLIENT_ID', 'OMNIBOX_INSTAGRAM_CLIENT_SECRET'],
+        ['x', 'X', 'OMNIBOX_X_CLIENT_ID', 'OMNIBOX_X_CLIENT_SECRET'],
+        ['google', 'Google / Gmail', 'OMNIBOX_GOOGLE_CLIENT_ID', 'OMNIBOX_GOOGLE_CLIENT_SECRET']
+      ];
+
+      container.innerHTML = providers.map(([provider, label, clientId, secret]) => {
+        const configured = providerOAuthReadiness?.[provider]?.configured === true;
+        const callback = `${window.location.origin}/api/omnibox/oauth/${provider}/callback`;
+        return `
+          <div class="p-3 rounded-xl border ${configured ? 'border-emerald-100 bg-emerald-50/50' : 'border-amber-100 bg-amber-50/40'}">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="font-bold text-xs text-slate-800">${label}</div>
+              <span class="text-[10px] font-semibold ${configured ? 'text-emerald-700' : 'text-amber-700'}">${configured ? '設定済み' : '未設定'}</span>
+            </div>
+            <div class="mt-2 text-[10px] text-slate-500">Callback URL</div>
+            <div class="mt-1 flex flex-col sm:flex-row gap-2">
+              <code class="flex-1 min-w-0 text-[10px] break-all px-2 py-1.5 rounded bg-white border border-slate-200">${escapeHtml(callback)}</code>
+              <button type="button" onclick="copyToClipboard('${encodeURIComponent(callback)}'.replace(/%0A/g, ''))" class="shrink-0 text-[10px] px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600">コピー</button>
+            </div>
+            <div class="mt-2 text-[10px] text-slate-500 break-all">${clientId} / ${secret}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
     function updateOAuthProviderStatus() {
       const container = document.getElementById('oauth-provider-setup-status');
       if (!container) return;
@@ -1562,6 +1726,7 @@
       });
 
       container.innerHTML = rows.join('');
+      renderOAuthSetupChecklist();
     }
 
     async function loadProviderConnections() {
@@ -1973,6 +2138,7 @@
           requiresOrganizationSetup = session.requiresOrganizationSetup === true;
           isDemoSession = session.isDemo === true;
           updateHeaderUserUI();
+          applyPlanAccess();
 
           if (isDemoSession) {
             threads = structuredClone(defaultThreads);
@@ -2977,6 +3143,48 @@
 
     let pendingOAuthData = null;
 
+    window.renameConnectedAccount = async function(accId) {
+      const account = connectedAccounts.find(item => item.id === accId);
+      if (!account) return;
+
+      const name = window.prompt('連携アカウントの表示名を入力してください', account.accountName || '');
+      if (name === null) return;
+      const trimmed = name.trim();
+      if (!trimmed) {
+        showToast('表示名を入力してください');
+        return;
+      }
+
+      if (isDemoSession || !account.providerConnectionId) {
+        account.accountName = trimmed;
+        onDataUpdated();
+        showToast('連携アカウント名を変更しました');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/connections', {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            connectionId: account.providerConnectionId,
+            accountName: trimmed
+          })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || '連携アカウント名を変更できませんでした');
+        }
+
+        account.accountName = result.accountName || trimmed;
+        onDataUpdated();
+        showToast('連携アカウント名を変更しました');
+      } catch (error) {
+        showToast(error.message || '連携アカウント名を変更できませんでした');
+      }
+    };
+
     window.switchConnectTab = function(mode) {
       const btnOAuth = document.getElementById('connect-tab-oauth');
       const btnDirect = document.getElementById('connect-tab-direct');
@@ -3015,13 +3223,17 @@
       }
 
       const provider = platform === 'email' ? 'google' : platform;
+      if (!providerAllowedByPlan(provider)) {
+        showToast('このSNS連携はスタンダード以上のプランで利用できます');
+        return;
+      }
       if (!['instagram', 'x', 'google'].includes(provider)) {
         showToast('この連携方式には対応していません');
         return;
       }
 
       if (providerOAuthReadiness?.[provider]?.configured !== true) {
-        showToast('OmniBox側のOAuthアプリ設定がまだ完了していません');
+        showToast('OmniBox運営側のOAuth設定が未完了です。Developer AppのClient ID / Secretを設定してください');
         return;
       }
 
@@ -3792,7 +4004,12 @@
         activeNav.classList.remove('text-slate-600');
       }
 
-      if (viewName === 'analytics') updateAnalyticsView();
+      document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        const active = btn.dataset.view === viewName;
+        btn.classList.toggle('bg-teal-50', active);
+        btn.classList.toggle('text-teal-700', active);
+        btn.classList.toggle('text-slate-600', !active);
+      });
       if (viewName === 'templates' && loggedInUser && !isDemoSession) {
         loadTemplates();
       }
@@ -3857,7 +4074,10 @@
       const desktop = document.getElementById('search-input');
       if (desktop) desktop.value = value;
       searchQuery = value || '';
+      serverSearchConversationIds = null;
       renderThreadList();
+      window.clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = window.setTimeout(() => runServerSearch(searchQuery), 250);
     };
 
     window.closeMobileChat = function() {
@@ -4239,6 +4459,8 @@
         if (employeeOrgId) employeeOrgId.textContent = currentOrganization.loginId || '未設定';
       }
 
+      renderPlanSettings();
+      applyPlanAccess();
       window.switchSettingsTab(isOwner && tab === 'organization' ? 'organization' : 'account');
       if (isOwner && !requiresOrganizationSetup) {
         window.loadEmployees();
@@ -4362,7 +4584,17 @@
         }
 
         const employees = Array.isArray(result.employees) ? result.employees : [];
-        badge.textContent = `${employees.length}名`;
+        const totalUsers = employees.length + 1;
+        badge.textContent = currentPlan === 'lite'
+          ? `${totalUsers}/3名（管理者含む）`
+          : `${totalUsers}名（管理者含む）`;
+        const createButton = document.getElementById('employee-create-button');
+        if (createButton) {
+          const limitReached = currentPlan === 'lite' && totalUsers >= 3;
+          createButton.disabled = limitReached;
+          createButton.classList.toggle('opacity-50', limitReached);
+          createButton.title = limitReached ? 'ライトプランは管理者を含め3名までです' : '';
+        }
 
         if (employees.length === 0) {
           list.innerHTML = '<div class="text-xs text-slate-400 py-3">従業員アカウントはまだありません。</div>';
@@ -4430,7 +4662,7 @@
         document.getElementById('employee-create-email').value = '';
         document.getElementById('employee-create-password').value = '';
         await window.loadEmployees();
-        showToast(`従業員アカウントを作成しました。組織ID「${currentOrganization.loginId}」でログインできます`);
+        showToast('従業員アカウントを作成しました。メールアドレスとパスワードでログインできます');
       } catch (error) {
         showToast(error.message || '従業員アカウントを作成できませんでした');
       } finally {
@@ -4516,11 +4748,25 @@
       menu.classList.toggle('hidden');
     };
 
-    document.addEventListener('click', (e) => {
+    document.addEventListener('pointerdown', (e) => {
       const dropdown = document.getElementById('user-menu-dropdown');
-      if (dropdown && !dropdown.classList.contains('hidden')) {
-        const isTrigger = e.target.closest('#user-menu-trigger') || e.target.closest('#user-menu-dropdown');
-        if (!isTrigger) dropdown.classList.add('hidden');
+      if (!dropdown || dropdown.classList.contains('hidden')) return;
+
+      const target = e.target;
+      const insideMenu = target.closest?.('#user-menu-dropdown');
+      const trigger = target.closest?.('#user-menu-trigger');
+      if (!insideMenu && !trigger) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropdown.classList.add('hidden');
+      }
+    }, true);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.getElementById('user-menu-dropdown')?.classList.add('hidden');
+        document.getElementById('customer-info-panel')?.classList.remove('mobile-open');
+        document.querySelectorAll('[id$="-modal"]').forEach(modal => modal.classList.add('hidden'));
       }
     });
 
@@ -4574,7 +4820,9 @@
         const message =
           error === 'provider_not_configured'
             ? 'OmniBox側のOAuthアプリ設定が未完了です'
-            : error === 'owner_required'
+            : error === 'plan_upgrade_required'
+              ? 'このSNS連携は現在のプランでは利用できません'
+              : error === 'owner_required'
               ? 'SNS連携は管理者のみ行えます'
               : error === 'authorization_denied'
                 ? 'SNS側で連携がキャンセルされました'
@@ -4601,11 +4849,6 @@
       applyResponsiveDefaults();
       window.addEventListener('resize', applyResponsiveDefaults);
 
-      const now = new Date();
-      now.setHours(now.getHours() + 2);
-      const isoStr = now.toISOString().slice(0, 16);
-      const dtInput = document.getElementById('new-post-datetime');
-      if (dtInput) dtInput.value = isoStr;
     });
   </script>
 </body>
