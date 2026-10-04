@@ -145,6 +145,7 @@ export function getBridgeConfiguration(env = process.env) {
     supabasePublishableKey: env.SUPABASE_PUBLISHABLE_KEY?.trim() ?? "",
     organizationId: env.OMNIBOX_ORGANIZATION_ID?.trim() ?? "",
     signingPrivateKey: env.BRIDGE_SIGNING_PRIVATE_KEY_PEM ?? "",
+    providerBridgeKey: env.OMNIBOX_PROVIDER_BRIDGE_KEY?.trim() ?? "",
     port: Number.parseInt(env.PORT ?? "8787", 10) || 8787,
   };
 }
@@ -260,6 +261,34 @@ function decryptProviderConfig(config, encrypted) {
     decipher.final(),
   ]);
   return JSON.parse(plaintext.toString("utf8"));
+}
+
+function providerBridgeAuthorized(request, config) {
+  const provided = request.headers["x-omnibox-provider-key"];
+  const key = Array.isArray(provided) ? provided[0] : provided;
+  return Boolean(config.providerBridgeKey) && safeStringEqual(key, config.providerBridgeKey);
+}
+
+async function storeOperatorProviderConfig(fetchImpl, config, provider, providerConfig) {
+  const encrypted = encryptProviderConfig(config, providerConfig);
+  const { response } = await signedEdgeRequest(fetchImpl, config, {
+    action: "store-operator-config",
+    organizationId: config.organizationId,
+    provider,
+    ...encrypted,
+  });
+  if (!response.ok) throw new Error("operator config store failed");
+}
+
+async function loadOperatorProviderConfig(fetchImpl, config, provider) {
+  const { response, data } = await signedEdgeRequest(fetchImpl, config, {
+    action: "get-operator-config",
+    organizationId: config.organizationId,
+    provider,
+  });
+  if (response.status === 404) return null;
+  if (!response.ok || !data?.config) throw new Error("operator config lookup failed");
+  return decryptProviderConfig(config, data.config);
 }
 
 async function storeProviderConfig(fetchImpl, config, providerConfig) {
@@ -405,7 +434,7 @@ async function fetchLineProfile(fetchImpl, accessToken, userId) {
   }
 }
 
-export async function getLineWebhookStatus(fetchImpl, lineAccessToken) {
+async function getLineWebhookStatus(fetchImpl, lineAccessToken) {
   const response = await fetchImpl(
     "https://api.line.me/v2/bot/channel/webhook/endpoint",
     {
@@ -659,6 +688,110 @@ async function handleLineRepair({ request, response, config, fetchImpl }) {
   sendJson(response, result.ok ? 200 : 502, result);
 }
 
+
+async function handleOperatorLineConfigure({ request, response, config, fetchImpl }) {
+  if (!providerBridgeAuthorized(request, config)) {
+    sendJson(response, 401, { ok: false, error: "unauthorized" });
+    return;
+  }
+  let payload;
+  try { payload = await readJsonBody(request); }
+  catch {
+    sendJson(response, 400, { ok: false, error: "invalid_json" });
+    return;
+  }
+  const channelId = typeof payload?.channelId === "string" ? payload.channelId.trim() : "";
+  const channelSecret = typeof payload?.channelSecret === "string" ? payload.channelSecret.trim() : "";
+  if (!/^\d+$/.test(channelId) || channelSecret.length < 16 || channelSecret.length > 256) {
+    sendJson(response, 400, { ok: false, error: "invalid_line_credentials" });
+    return;
+  }
+  const providerConfig = { channelId, channelSecret };
+  let token;
+  try { token = await issueStatelessLineToken(fetchImpl, providerConfig); }
+  catch {
+    sendJson(response, 400, { ok: false, error: "line_credentials_rejected" });
+    return;
+  }
+  await storeProviderConfig(fetchImpl, config, providerConfig);
+  const result = await applyLineWebhook(fetchImpl, token);
+  sendJson(response, result.ok ? 200 : 502, result);
+}
+
+async function handleOperatorLineRepair({ request, response, config, fetchImpl }) {
+  if (!providerBridgeAuthorized(request, config)) {
+    sendJson(response, 401, { ok: false, error: "unauthorized" });
+    return;
+  }
+  let providerConfig;
+  try { providerConfig = await loadProviderConfig(fetchImpl, config, true); }
+  catch {
+    sendJson(response, 502, { ok: false, error: "config_lookup_failed" });
+    return;
+  }
+  if (!providerConfig) {
+    sendJson(response, 404, { ok: false, error: "line_not_connected" });
+    return;
+  }
+  let token;
+  try { token = await issueStatelessLineToken(fetchImpl, providerConfig); }
+  catch {
+    sendJson(response, 502, { ok: false, error: "line_credentials_rejected" });
+    return;
+  }
+  const result = await applyLineWebhook(fetchImpl, token);
+  sendJson(response, result.ok ? 200 : 502, result);
+}
+
+async function handleOperatorProviderConfigure({ request, response, config, fetchImpl }) {
+  if (!providerBridgeAuthorized(request, config)) {
+    sendJson(response, 401, { ok: false, error: "unauthorized" });
+    return;
+  }
+  let payload;
+  try { payload = await readJsonBody(request); }
+  catch {
+    sendJson(response, 400, { ok: false, error: "invalid_json" });
+    return;
+  }
+  const provider = typeof payload?.provider === "string" ? payload.provider.trim() : "";
+  const clientId = typeof payload?.clientId === "string" ? payload.clientId.trim() : "";
+  const clientSecret = typeof payload?.clientSecret === "string" ? payload.clientSecret.trim() : "";
+  const scopes = Array.isArray(payload?.scopes)
+    ? payload.scopes.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
+    : [];
+  if (!["instagram", "x", "google"].includes(provider) || !clientId || clientId.length > 512 || clientSecret.length < 4 || clientSecret.length > 1024) {
+    sendJson(response, 400, { ok: false, error: "invalid_provider_config" });
+    return;
+  }
+  await storeOperatorProviderConfig(fetchImpl, config, provider, { clientId, clientSecret, scopes });
+  sendJson(response, 200, { ok: true, provider, configured: true });
+}
+
+async function handleOperatorProviderGet({ request, response, config, fetchImpl }) {
+  if (!providerBridgeAuthorized(request, config)) {
+    sendJson(response, 401, { ok: false, error: "unauthorized" });
+    return;
+  }
+  let payload;
+  try { payload = await readJsonBody(request); }
+  catch {
+    sendJson(response, 400, { ok: false, error: "invalid_json" });
+    return;
+  }
+  const provider = typeof payload?.provider === "string" ? payload.provider.trim() : "";
+  if (!["instagram", "x", "google"].includes(provider)) {
+    sendJson(response, 400, { ok: false, error: "invalid_provider" });
+    return;
+  }
+  const providerConfig = await loadOperatorProviderConfig(fetchImpl, config, provider);
+  if (!providerConfig) {
+    sendJson(response, 200, { ok: true, provider, configured: false });
+    return;
+  }
+  sendJson(response, 200, { ok: true, provider, configured: true, config: providerConfig });
+}
+
 async function handleLineWebhook({ request, response, config, fetchImpl }) {
   if (!config.configured) {
     sendJson(response, 503, { ok: false, error: "bridge_not_configured" });
@@ -696,9 +829,23 @@ async function handleLineWebhook({ request, response, config, fetchImpl }) {
   const events = Array.isArray(payload?.events) ? payload.events : [];
   const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig);
 
+  const messageTypes = events
+    .filter((event) => event?.type === "message")
+    .map((event) => String(event?.message?.type ?? "unknown"));
+  if (messageTypes.length > 0) {
+    console.log(`LINE webhook message types: ${messageTypes.join(",")}`);
+  }
+
   for (const event of events) {
     const normalized = normalizeLineMessageEvent(event);
-    if (!normalized) continue;
+    if (!normalized) {
+      if (event?.type === "message") {
+        console.log(
+          `LINE webhook message ignored: type=${String(event?.message?.type ?? "unknown")} source=${String(event?.source?.type ?? "unknown")}`,
+        );
+      }
+      continue;
+    }
 
     const profile = await fetchLineProfile(
       fetchImpl,
@@ -714,7 +861,11 @@ async function handleLineWebhook({ request, response, config, fetchImpl }) {
       customerAvatarUrl: profile.pictureUrl,
     });
 
-    if (!persistResponse.ok) throw new Error("inbound persistence failed");
+    if (!persistResponse.ok) {
+      console.log(`LINE inbound persistence failed: type=${normalized.messageType}`);
+      throw new Error("inbound persistence failed");
+    }
+    console.log(`LINE inbound persisted: type=${normalized.messageType}`);
   }
 
   sendJson(response, 200, { ok: true });
@@ -922,6 +1073,27 @@ export function createLineBridgeServer({
         return;
       }
 
+
+      if (request.method === "POST" && url.pathname === "/internal/operator/line/configure") {
+        await handleOperatorLineConfigure({ request, response, config, fetchImpl });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/operator/line/repair") {
+        await handleOperatorLineRepair({ request, response, config, fetchImpl });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/operator/provider/configure") {
+        await handleOperatorProviderConfigure({ request, response, config, fetchImpl });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/operator/provider/get") {
+        await handleOperatorProviderGet({ request, response, config, fetchImpl });
+        return;
+      }
+
       if (request.method === "POST" && url.pathname === "/webhooks/line") {
         await handleLineWebhook({ request, response, config, fetchImpl });
         return;
@@ -938,12 +1110,8 @@ export function createLineBridgeServer({
       }
 
       sendJson(response, 404, { ok: false, error: "not_found" });
-    } catch (error) {
-      console.error("LINE bridge request failed", {
-        method: request.method,
-        path: (request.url || "").split("?")[0],
-        error: error instanceof Error ? error.message : "unknown_error",
-      });
+    } catch {
+      console.error("LINE bridge request failed");
       if (!response.headersSent) {
         sendJson(response, 500, { ok: false, error: "internal_error" });
       } else {
