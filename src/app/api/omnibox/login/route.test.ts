@@ -76,11 +76,10 @@ describe("OmniBox login API", () => {
     mocks.signOut.mockResolvedValue({ error: null });
   });
 
-  it("allows a member with matching organization ID", async () => {
+  it("auto-detects a member without requiring an organization ID", async () => {
     const response = await POST(
       request({
         loginType: "employee",
-        organizationId: "omnibox",
         email: "staff@example.com",
         password: "password123",
       }),
@@ -95,7 +94,7 @@ describe("OmniBox login API", () => {
     expect(mocks.signOut).not.toHaveBeenCalled();
   });
 
-  it("rejects a member when the organization ID does not match", async () => {
+  it("does not reject a valid member because of a stale organization ID input", async () => {
     const response = await POST(
       request({
         loginType: "employee",
@@ -105,8 +104,8 @@ describe("OmniBox login API", () => {
       }),
     );
 
-    expect(response.status).toBe(401);
-    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(200);
+    expect(mocks.signOut).not.toHaveBeenCalled();
   });
 
   it("auto-detects a member even when the UI submits administrator mode", async () => {
