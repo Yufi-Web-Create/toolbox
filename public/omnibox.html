@@ -722,57 +722,6 @@
           </button>
         </div>
 
-        <div class="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-md">
-          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-            <div>
-              <div class="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
-          <div class="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
-          <h3 class="text-sm font-bold text-slate-800">SNS連携に必要な操作</h3>
-          <p class="text-[11px] text-slate-500 mt-1 mb-3">運営側でDeveloper Appを一度準備した後、店舗・顧客側はOmniBoxから対象アカウントへログインして許可するだけの流れにします。</p>
-          <div class="space-y-2">
-            <details class="rounded-xl border border-slate-200 p-3">
-              <summary class="cursor-pointer text-xs font-bold text-slate-800">LINE公式アカウント</summary>
-              <ol class="mt-2 ml-4 list-decimal space-y-1.5 text-[11px] text-slate-600 leading-relaxed">
-                <li>LINE DevelopersでProviderを作成または選択し、Messaging APIチャネルを用意します。</li>
-                <li>Messaging APIチャネルのChannel IDとChannel Secretを確認します。</li>
-                <li>OmniBoxの「新規アカウントを追加」→「LINE」を選び、2つの値を入力します。</li>
-                <li>OmniBoxがWebhook URLを登録し、LINE側の疎通テストと有効状態を確認します。</li>
-                <li>受信が止まった場合のWebhook診断・復旧はOmniBox運営側で行います。</li>
-              </ol>
-            </details>
-            <details class="rounded-xl border border-slate-200 p-3">
-              <summary class="cursor-pointer text-xs font-bold text-slate-800">Instagram / Meta</summary>
-              <ol class="mt-2 ml-4 list-decimal space-y-1.5 text-[11px] text-slate-600 leading-relaxed">
-                <li>Meta側でInstagram Business連携に使うDeveloper Appを用意します。</li>
-                <li>OmniBox運営側で指定するCallback URLをDeveloper Appへ完全一致で登録します。</li>
-                <li>運営環境へClient ID / Client Secretを登録し、必要なInstagram権限を有効にします。</li>
-                <li>OmniBoxの「新規アカウントを追加」→「Instagram」から公式OAuth画面へ進み、対象アカウントで許可します。</li>
-                <li>本番公開時はMeta側のApp Review・権限審査・Webhook購読要件も確認します。</li>
-              </ol>
-            </details>
-            <details class="rounded-xl border border-slate-200 p-3">
-              <summary class="cursor-pointer text-xs font-bold text-slate-800">X</summary>
-              <ol class="mt-2 ml-4 list-decimal space-y-1.5 text-[11px] text-slate-600 leading-relaxed">
-                <li>X Developer Portalでアプリを用意し、OAuth 2.0を有効にします。</li>
-                <li>OmniBox運営側で指定するCallback URLを登録し、Client ID / Client Secretを運営環境へ設定します。</li>
-                <li>tweet.read / tweet.write / users.read / dm.read / dm.write / offline.access の利用権限を確認します。</li>
-                <li>OmniBoxの「新規アカウントを追加」→「X」からOAuth認証し、対象アカウントで許可します。</li>
-                <li>DM APIなど契約・アクセスレベルに依存する機能はX側の利用条件も確認します。</li>
-              </ol>
-            </details>
-            <details class="rounded-xl border border-slate-200 p-3">
-              <summary class="cursor-pointer text-xs font-bold text-slate-800">Google / Gmail</summary>
-              <ol class="mt-2 ml-4 list-decimal space-y-1.5 text-[11px] text-slate-600 leading-relaxed">
-                <li>Google Cloudでプロジェクトを用意し、Gmail APIを有効化します。</li>
-                <li>OAuth同意画面を設定し、Webアプリケーション用OAuth Clientを作成します。</li>
-                <li>OmniBox運営側で指定するCallback URLを承認済みリダイレクトURIへ完全一致で登録します。</li>
-                <li>Client ID / Client Secretを運営環境へ設定し、OmniBoxからGoogleアカウントで認可します。</li>
-                <li>gmail.readonly / gmail.send は審査対象になり得るため、本番運用前にGoogle側のOAuth検証要件を確認します。</li>
-              </ol>
-            </details>
-          </div>
-        </div>
-
         <div id="connected-accounts-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
       </div>
     </div>
