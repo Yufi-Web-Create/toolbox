@@ -201,6 +201,17 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).not.toContain('id="scheduled-nav-badge"');
   });
 
+  it("supports temporary AI quota, Japan holidays, and send safety checks", () => {
+    expect(html).toContain("AI_TRIAL_QUOTA_MAX");
+    expect(html).toContain("ai-reply-quota-label");
+    expect(html).toContain("ai-post-quota-label");
+    expect(html).toContain("buildJapanHolidays");
+    expect(html).toContain("振替休日");
+    expect(html).toContain("国民の休日");
+    expect(html).toContain("未入力の差し込み項目");
+    expect(html).toContain("post.statusKey === 'cancelled'");
+  });
+
   it("uses event-driven inbox refresh without production pseudo receive controls", () => {
     expect(html).toContain("startLiveInboxRefresh");
     expect(html).toContain("/api/omnibox/inbox/events");
