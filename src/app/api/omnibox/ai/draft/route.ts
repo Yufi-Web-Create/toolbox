@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getAiRuntimeConfig } from "../../../../../lib/ai-config";
 import {
   isPlanKey,
   planFeatures,
@@ -136,15 +137,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const gatewayToken =
-      process.env.AI_GATEWAY_API_KEY?.trim() ||
-      process.env.VERCEL_OIDC_TOKEN?.trim() ||
-      "";
-    const openAiKey = process.env.OPENAI_API_KEY?.trim() || "";
-    const useGateway = Boolean(gatewayToken);
-    const apiKey = useGateway ? gatewayToken : openAiKey;
+    const aiRuntime = await getAiRuntimeConfig();
 
-    if (!apiKey) {
+    if (!aiRuntime) {
       return NextResponse.json(
         {
           ok: false,
@@ -153,6 +148,9 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
+
+    const { apiKey, model } = aiRuntime;
+    const useGateway = aiRuntime.provider === "gateway";
 
     const messages = (messageData as MessageRow[]).reverse();
     const conversationText = messages
@@ -172,9 +170,6 @@ export async function POST(request: Request) {
     }
 
     const conversation = conversations[0];
-    const model =
-      process.env.OPENAI_MODEL?.trim() ||
-      (useGateway ? "openai/gpt-6-luna" : "gpt-6-luna");
     const endpoint = useGateway
       ? "https://ai-gateway.vercel.sh/v1/responses"
       : "https://api.openai.com/v1/responses";
