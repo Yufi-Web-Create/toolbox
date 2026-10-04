@@ -1061,50 +1061,6 @@
   </div>
 
   <!-- OAuth認証シミュレーション ポップアップダイアログ -->
-  <div id="oauth-popup-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
-      <div class="text-center space-y-2">
-        <div id="oauth-popup-icon" class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md"></div>
-        <div>
-          <h4 id="oauth-popup-title" class="font-bold text-base text-slate-800"></h4>
-          <p class="text-xs text-slate-500 mt-0.5">OmniBox が以下のアカウントへのアクセス権限をリクエストしています</p>
-        </div>
-      </div>
-
-      <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-center gap-3">
-        <img id="oauth-detected-avatar" src="" class="w-10 h-10 rounded-full object-cover border border-white shadow-xs">
-        <div class="truncate">
-          <span id="oauth-detected-name" class="font-bold text-xs text-slate-800 block truncate"></span>
-          <span id="oauth-detected-handle" class="text-[11px] text-slate-400 font-mono block truncate"></span>
-        </div>
-        <span class="ml-auto text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded shrink-0">ログイン済</span>
-      </div>
-
-      <div class="space-y-1.5 text-xs text-slate-600 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-        <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">許可されるアクセス権限:</div>
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
-          <span>メッセージ・DMの受信と自動通知</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
-          <span>OmniBoxからの顧客返信メッセージ送信</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
-          <span>指定した日時の予約投稿・フィード公開</span>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-2 pt-2">
-        <button onclick="closeOAuthPopup()" class="w-1/2 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl font-medium">キャンセル</button>
-        <button onclick="confirmOAuthConnection()" id="oauth-confirm-btn" class="w-1/2 py-2 text-xs font-bold text-white rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition">
-          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
-          <span>アクセスを許可</span>
-        </button>
-      </div>
-    </div>
-  </div>
 
   <!-- 新規SNS予約投稿モーダル -->
   <div id="new-post-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
@@ -3365,7 +3321,6 @@
       lucide.createIcons();
     }
 
-    let pendingOAuthData = null;
 
     window.renameConnectedAccount = async function(accId) {
       const account = connectedAccounts.find(item => item.id === accId);
@@ -3462,42 +3417,6 @@
       }
 
       window.location.href = `/api/omnibox/oauth/${provider}/start`;
-    };
-
-    window.closeOAuthPopup = function() {
-      document.getElementById('oauth-popup-modal').classList.add('hidden');
-      pendingOAuthData = null;
-    };
-
-    window.confirmOAuthConnection = async function() {
-      if (!pendingOAuthData) return;
-
-      const meta = getChannelMeta(pendingOAuthData.platform);
-      const newAcc = {
-        id: 'acc_' + Date.now(),
-        platform: pendingOAuthData.platform,
-        platformName: pendingOAuthData.platformName,
-        accountName: pendingOAuthData.name,
-        handle: pendingOAuthData.handle,
-        badgeColor: meta.color,
-        active: true,
-        connectedVia: 'oauth',
-        connectedAt: Date.now()
-      };
-
-      if (isCloudReady && db) {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', newAcc.id), newAcc);
-      } else {
-        connectedAccounts.push(newAcc);
-        renderAccountFilters();
-        renderConnectedAccounts();
-        renderTargetAccountsCheckboxes();
-        updateBadges();
-      }
-
-      window.closeOAuthPopup();
-      window.closeAddAccountModal();
-      showToast(`🎉 【${pendingOAuthData.platformName}】「${pendingOAuthData.name}」のログイン連携が完了しました！`);
     };
 
     window.updateDirectFormLabels = function() {
