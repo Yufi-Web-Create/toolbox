@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getInboxSnapshot } from "../../../../lib/inbox/server";
+import { isPlanKey, planAllowsProvider } from "../../../../lib/plans";
 import { createClient } from "../../../../lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -32,6 +33,15 @@ export async function GET(request: Request) {
     }
 
     const organizationId = memberships[0].organization_id;
+    const { data: organization } = await supabase
+      .from("organizations")
+      .select("plan_key")
+      .eq("id", organizationId)
+      .maybeSingle();
+    const plan = isPlanKey(organization?.plan_key)
+      ? organization.plan_key
+      : "standard";
+
     const url = new URL(request.url);
     const conversationId = url.searchParams.get("conversation");
     const inbox = await getInboxSnapshot(organizationId, conversationId);
@@ -40,12 +50,29 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, error: "inbox_unavailable" }, { status: 503 });
     }
 
+    const visibleConversations = inbox.conversations.filter((conversation) =>
+      planAllowsProvider(
+        plan,
+        conversation.provider === "email" ? "google" : conversation.provider,
+      ),
+    );
+    const selectedVisible =
+      inbox.selectedConversation &&
+      planAllowsProvider(
+        plan,
+        inbox.selectedConversation.provider === "email"
+          ? "google"
+          : inbox.selectedConversation.provider,
+      )
+        ? inbox.selectedConversation
+        : null;
+
     return NextResponse.json({
       ok: true,
-      conversations: inbox.conversations,
-      messages: inbox.messages,
-      notes: inbox.notes,
-      selectedConversation: inbox.selectedConversation,
+      conversations: visibleConversations,
+      messages: selectedVisible ? inbox.messages : [],
+      notes: selectedVisible ? inbox.notes : [],
+      selectedConversation: selectedVisible,
     });
   } catch {
     return NextResponse.json({ ok: false, error: "inbox_unavailable" }, { status: 503 });
