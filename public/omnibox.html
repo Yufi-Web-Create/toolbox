@@ -207,7 +207,7 @@
       <button onclick="switchView('inbox')" id="nav-inbox" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 bg-white text-teal-700 shadow-xs">
         <i data-lucide="inbox" class="w-4 h-4"></i>
         <span>受信箱</span>
-        <span id="unread-total-badge" class="ml-1 text-[11px] px-1.5 py-0.2 bg-teal-600 text-white rounded-full font-bold">0</span>
+        <span id="unread-total-badge" class="ml-1 text-[11px] px-1.5 py-0.2 bg-teal-600 text-white rounded-full font-bold">未読 0</span>
       </button>
       <button onclick="switchView('publish')" id="nav-publish" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-2">
         <i data-lucide="send" class="w-4 h-4"></i>
@@ -668,6 +668,7 @@
 
         <div class="flex items-center gap-2 overflow-x-auto pb-2">
           <button onclick="filterTemplates('all')" class="tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white" data-cat="all">すべて</button>
+          <button onclick="filterTemplates('general')" class="tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-cat="general">一般</button>
           <button onclick="filterTemplates('salon')" class="tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-cat="salon">美容・サロン</button>
           <button onclick="filterTemplates('restaurant')" class="tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-cat="restaurant">飲食・レストラン</button>
           <button onclick="filterTemplates('ec')" class="tmpl-category-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-600" data-cat="ec">EC・物販</button>
@@ -902,6 +903,7 @@
       <div id="connect-oauth-section" class="space-y-3">
         <p class="text-xs text-slate-600 leading-relaxed">
           連携したいプラットフォームのボタンを押し、公式ログイン画面でOmniBoxへのアクセスを許可してください。
+          「OmniBox運営側のOAuth設定未完了」と表示される場合は、利用者側ではなくOmniBox側のDeveloper App設定が必要です。
         </p>
         <div id="oauth-provider-setup-status" class="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
           OAuth接続状態を確認しています...
@@ -1349,6 +1351,8 @@
     let currentStatusFilter = 'all';
     let currentAccountFilter = 'all';
     let searchQuery = '';
+    let serverSearchConversationIds = null;
+    let searchDebounceTimer = null;
     let inputMode = 'reply';
 
     const defaultAccounts = [
@@ -1503,7 +1507,7 @@
         return `<div class="flex items-center justify-between gap-3 py-0.5">
           <span>${label}</span>
           <span class="${configured ? 'text-emerald-700' : 'text-amber-700'} font-semibold">
-            ${configured ? '接続可能' : 'OmniBox側のOAuth設定待ち'}
+            ${configured ? '接続可能' : 'OmniBox運営側のOAuth設定未完了'}
           </span>
         </div>`;
       });
@@ -2161,11 +2165,19 @@
 
         const matchesAccount = currentAccountFilter === 'all' ? true : t.accountId === currentAccountFilter;
 
-        const matchesSearch = searchQuery === '' ? true : (
+        const localMatchesSearch = searchQuery === '' ? true : (
           (t.customerName && t.customerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
           (t.lastMessage && t.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (t.tags && t.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
+          (t.tags && t.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))) ||
+          (t.messages && t.messages.some(message =>
+            String(message.text || '').toLowerCase().includes(searchQuery.toLowerCase())
+          ))
         );
+        const matchesSearch = searchQuery === ''
+          ? true
+          : serverSearchConversationIds instanceof Set
+            ? serverSearchConversationIds.has(t.liveConversationId || t.id)
+            : localMatchesSearch;
 
         return matchesStatus && matchesAccount && matchesSearch;
       });
@@ -2894,7 +2906,7 @@
 
             <div class="mt-4 grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-slate-600">
               <div>
-                <span class="text-[10px] text-slate-400 block">受信メッセージ数</span>
+                <span class="text-[10px] text-slate-400 block">受信会話数</span>
                 <span class="font-bold text-slate-800">${threadCount}件</span>
               </div>
               <div>
@@ -3463,6 +3475,7 @@
     }
 
     let currentTemplateCategory = 'all';
+    let templateEditingId = null;
 
     async function loadTemplates() {
       if (isDemoSession) {
@@ -3513,6 +3526,9 @@
                 <button onclick="window.copyToClipboard(decodeURIComponent('${encodedBody}'))" class="p-1.5 text-slate-400 hover:text-teal-600 rounded-lg hover:bg-teal-50" title="コピー">
                   <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                 </button>
+                <button onclick="editReplyTemplate('${tmpl.id}')" class="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50" title="編集">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
                 <button onclick="deleteReplyTemplate('${tmpl.id}')" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50" title="削除">
                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
@@ -3535,9 +3551,27 @@
       if (!panel) return;
       const shouldShow = typeof force === 'boolean' ? force : panel.classList.contains('hidden');
       panel.classList.toggle('hidden', !shouldShow);
+      if (!shouldShow && templateEditingId) {
+        templateEditingId = null;
+        document.getElementById('template-create-title').value = '';
+        document.getElementById('template-create-body').value = '';
+        document.getElementById('template-create-category').value = 'general';
+        document.getElementById('template-create-submit').textContent = '登録する';
+      }
       if (shouldShow) {
         document.getElementById('template-create-title')?.focus();
       }
+    };
+
+    window.editReplyTemplate = function(id) {
+      const tmpl = templates.find(item => item.id === id);
+      if (!tmpl) return;
+      templateEditingId = id;
+      document.getElementById('template-create-title').value = tmpl.title || '';
+      document.getElementById('template-create-category').value = tmpl.category || 'general';
+      document.getElementById('template-create-body').value = tmpl.body || '';
+      document.getElementById('template-create-submit').textContent = '更新する';
+      window.toggleTemplateCreatePanel(true);
     };
 
     window.createReplyTemplate = async function(e) {
@@ -3556,35 +3590,49 @@
 
       try {
         if (isDemoSession) {
-          templates.push({
-            id: 'demo-' + Date.now(),
-            title,
-            category,
-            body
-          });
+          if (templateEditingId) {
+            const existing = templates.find(item => item.id === templateEditingId);
+            if (existing) Object.assign(existing, { title, category, body });
+          } else {
+            templates.push({ id: 'demo-' + Date.now(), title, category, body });
+          }
         } else {
           const response = await fetch('/api/omnibox/templates', {
-            method: 'POST',
+            method: templateEditingId ? 'PATCH' : 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, category, body })
+            body: JSON.stringify({
+              ...(templateEditingId ? { id: templateEditingId } : {}),
+              title,
+              category,
+              body
+            })
           });
           const result = await response.json();
 
           if (!response.ok || !result.ok || !result.template) {
-            throw new Error(result.message || '定型文を登録できませんでした');
+            throw new Error(result.message || '定型文を保存できませんでした');
           }
 
-          templates.push(result.template);
+          if (templateEditingId) {
+            const index = templates.findIndex(item => item.id === templateEditingId);
+            if (index >= 0) templates[index] = result.template;
+          } else {
+            templates.push(result.template);
+          }
         }
 
+        const wasEditing = Boolean(templateEditingId);
+        templateEditingId = null;
         document.getElementById('template-create-title').value = '';
         document.getElementById('template-create-body').value = '';
+        document.getElementById('template-create-category').value = 'general';
+        button.textContent = '登録する';
         window.toggleTemplateCreatePanel(false);
         renderTemplates(currentTemplateCategory);
-        showToast(isDemoSession ? 'デモ用の定型文を追加しました' : '定型文を登録しました');
+        showToast(wasEditing ? '定型文を更新しました' : '定型文を登録しました');
       } catch (error) {
-        showToast(error.message || '定型文を登録できませんでした');
+        showToast(error.message || '定型文を保存できませんでした');
       } finally {
         button.disabled = false;
       }
@@ -3684,7 +3732,7 @@
       const progressCount = threads.filter(t => t.status === 'in_progress').length;
       const resolvedCount = threads.filter(t => t.status === 'resolved').length;
 
-      document.getElementById('unread-total-badge').textContent = unreadCount;
+      document.getElementById('unread-total-badge').textContent = '未読 ' + unreadCount;
       document.getElementById('badge-count-all').textContent = threads.length;
       document.getElementById('badge-count-unread').textContent = unreadCount;
       document.getElementById('badge-count-progress').textContent = progressCount;
@@ -3741,9 +3789,36 @@
       renderThreadList();
     };
 
+    async function runServerSearch(query) {
+      if (isDemoSession || !query.trim()) {
+        serverSearchConversationIds = null;
+        renderThreadList();
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/search?q=' + encodeURIComponent(query.trim()), {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok || !Array.isArray(result.conversationIds)) {
+          throw new Error(result.message || '検索できませんでした');
+        }
+        serverSearchConversationIds = new Set(result.conversationIds);
+      } catch (error) {
+        console.error('Full inbox search failed:', error);
+        serverSearchConversationIds = null;
+      }
+      renderThreadList();
+    }
+
     window.handleSearch = function() {
       searchQuery = document.getElementById('search-input').value;
+      serverSearchConversationIds = null;
       renderThreadList();
+      window.clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = window.setTimeout(() => runServerSearch(searchQuery), 250);
     };
 
     window.syncMobileSearch = function(value) {
@@ -3908,7 +3983,7 @@
       const inactive = 'py-2 rounded-lg text-slate-600 text-xs font-semibold flex items-center justify-center gap-1.5';
       adminButton.className = currentLoginType === 'admin' ? active : inactive;
       employeeButton.className = currentLoginType === 'employee' ? active : inactive;
-      organizationGroup.classList.toggle('hidden', currentLoginType !== 'employee');
+      organizationGroup.classList.add('hidden');
 
       if (currentAuthMode === 'login') {
         submitLabel.textContent = currentLoginType === 'employee' ? '従業員としてログイン' : '管理者としてログイン';
