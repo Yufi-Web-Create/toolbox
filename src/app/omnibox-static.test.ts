@@ -211,7 +211,7 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain('data-lucide="sticker"');
   });
 
-  it("contains syntactically valid connected module JavaScript", () => {
+  it("persists internal notes", () => {\n    expect(html).toContain("/api/omnibox/notes");\n    expect(html).toContain("社内共有メモを保存しました");\n    expect(html).toContain("payload.notes");\n  });\n\n  it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
     expect(() => new Function(match?.[1] ?? "")).not.toThrow();
