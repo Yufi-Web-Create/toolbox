@@ -1,7 +1,7 @@
 # Architecture Decision Register
 
 Status: ACTIVE
-Date: 2026-10-01
+Date: 2026-10-03
 
 This file contains short, binding technical decisions for Codex.
 When a task conflicts with this file, stop and report the conflict instead of choosing a different approach.
@@ -25,7 +25,7 @@ Decision: Node.js 24.
 Decision: npm.
 
 ## D-007 Hosting
-Decision: Vercel.
+Decision: Vercel hosts the user-facing Next.js application.
 
 ## D-008 Backend platform
 Decision: Supabase.
@@ -77,3 +77,6 @@ Decision: Use project `toolbox-dev` (ref `lrfjjqnsswrzuwpwtaei`) for development
 
 ## D-024 Product naming
 Decision: `toolbox` is an internal development/management codename only and is not the final customer-facing service name.
+
+## D-025 Render provider bridge
+Decision: The project owner has explicitly authorized Render as a trusted provider-webhook bridge runtime. The Next.js application remains hosted on Vercel. Render may receive verified provider webhooks and make provider API calls through provider adapters. It must not replace Supabase Auth or PostgreSQL RLS as the user/tenant authorization model. INBOX-001 initially limits this bridge to LINE.
