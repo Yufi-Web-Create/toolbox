@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { getAiRuntimeConfig } from "../../lib/ai-config";
@@ -9,16 +10,10 @@ import {
 } from "../../lib/master-auth";
 import {
   configureAiFromMaster,
-  configureLineFromMaster,
   configureOAuthProviderFromMaster,
   masterLogout,
-  repairLineFromMaster,
 } from "./actions";
 import styles from "./page.module.css";
-
-const BRIDGE_URL =
-  process.env.LINE_BRIDGE_URL?.trim() ||
-  "https://omnibox-line-bridge.onrender.com";
 
 const APP_ORIGIN =
   process.env.APP_URL?.trim() || "https://toolbox-pink-nine.vercel.app";
@@ -162,10 +157,6 @@ function ProviderForm({
 }
 
 const STATUS_MESSAGES: Record<string, string> = {
-  "line-saved": "LINEの接続情報を保存し、Webhookを再設定しました。",
-  "line-repaired": "LINE Webhookの再設定を実行しました。",
-  "line-invalid": "LINEのChannel ID / Channel Secretを確認してください。",
-  "line-error": "LINE設定を更新できませんでした。稼働状況を確認してください。",
   "instagram-saved": "Instagram / Meta のDeveloper App設定を保存しました。",
   "instagram-error": "Instagram / Meta の設定を保存できませんでした。",
   "x-saved": "X のDeveloper App設定を保存しました。",
@@ -187,15 +178,16 @@ export default async function MasterPage({
     redirect("/master-login");
   }
 
-  const [line, instagram, x, google, aiRuntime] = await Promise.all([
-    getLineHealth(),
+  const [instagram, x, google, aiRuntime] = await Promise.all([
     getProviderConfig("instagram", APP_ORIGIN),
     getProviderConfig("x", APP_ORIGIN),
     getProviderConfig("google", APP_ORIGIN),
     getAiRuntimeConfig(),
   ]);
-  const params = await searchParams;
-  const statusMessage = params.status ? STATUS_MESSAGES[params.status] : null;
+  await searchParams;
+  const cookieStore = await cookies();
+  const status = cookieStore.get("omnibox_master_status")?.value;
+  const statusMessage = status ? STATUS_MESSAGES[status] : null;
 
   return (
     <main className={styles.page}>
@@ -329,110 +321,6 @@ export default async function MasterPage({
                   {aiRuntime?.source === "stored"
                     ? "AI設定を更新・接続確認"
                     : "AI設定を保存・接続確認"}
-                </button>
-              </form>
-            </div>
-          </article>
-
-          <article className={styles.card + " " + styles.cardWide}>
-            <div className={styles.cardTitleRow}>
-              <h2>LINE Messaging API</h2>
-              <State
-                ready={
-                  line.available &&
-                  line.lineConnected &&
-                  line.lineApiReachable === true &&
-                  line.webhookActive === true &&
-                  line.webhookMatches === true
-                }
-                readyText="正常"
-                pendingText="要確認"
-              />
-            </div>
-
-            <div className={styles.lineLayout}>
-              <div>
-                <div className={styles.rows}>
-                  <div className={styles.row}>
-                    <span>Bridge</span>
-                    <State ready={line.available && line.configured} readyText="稼働中" />
-                  </div>
-                  <div className={styles.row}>
-                    <span>LINE接続情報</span>
-                    <State ready={line.lineConnected} />
-                  </div>
-                  <div className={styles.row}>
-                    <span>LINE API疎通</span>
-                    <State
-                      ready={line.lineApiReachable === true}
-                      readyText="確認済み"
-                      pendingText={line.lineApiReachable === null ? "未診断" : "要確認"}
-                    />
-                  </div>
-                  <div className={styles.row}>
-                    <span>Webhook有効</span>
-                    <State
-                      ready={line.webhookActive === true}
-                      readyText="有効"
-                      pendingText={line.webhookActive === null ? "未診断" : "無効"}
-                    />
-                  </div>
-                  <div className={styles.row}>
-                    <span>Webhook URL一致</span>
-                    <State
-                      ready={line.webhookMatches === true}
-                      readyText="一致"
-                      pendingText={line.webhookMatches === null ? "未診断" : "不一致"}
-                    />
-                  </div>
-                  {line.webhookUrl ? (
-                    <div className={styles.row}>
-                      <span>現在のWebhook</span>
-                      <span className={styles.value}>{line.webhookUrl}</span>
-                    </div>
-                  ) : null}
-                </div>
-                <form action={repairLineFromMaster} className={styles.inlineForm}>
-                  <button className={styles.secondaryButton} type="submit">
-                    Webhookを診断・再設定
-                  </button>
-                </form>
-              </div>
-
-              <form action={configureLineFromMaster} className={styles.form} autoComplete="off">
-                <label className={styles.field}>
-                  <span>Channel ID</span>
-                  <input
-                    name="channelId"
-                    inputMode="numeric"
-                    placeholder="LINE Developers の Channel ID"
-                    autoComplete="off"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    data-1p-ignore="true"
-                    data-lpignore="true"
-                    required
-                  />
-                </label>
-                <label className={styles.field}>
-                  <span>Channel Secret</span>
-                  <input
-                    name="channelSecret"
-                    type="password"
-                    placeholder="Messaging API の Channel Secret"
-                    autoComplete="new-password"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    data-1p-ignore="true"
-                    data-lpignore="true"
-                    required
-                  />
-                </label>
-                <p className={styles.note}>
-                  保存すると認証情報を暗号化して更新し、Webhook URLの登録と疎通確認まで実行します。
-                </p>
-                <button className={styles.primaryButton} type="submit">
-                  LINE設定を保存・接続
                 </button>
               </form>
             </div>
