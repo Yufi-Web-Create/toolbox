@@ -328,7 +328,7 @@
         <div class="p-3 border-b border-slate-100">
           <div class="relative">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-            <input type="text" id="search-input" placeholder="顧客名、本文、タグ検索..." oninput="handleSearch()" class="w-full pl-9 pr-3 py-2 text-xs bg-slate-100 focus:bg-white rounded-lg border border-transparent focus:border-teal-500 focus:outline-none transition">
+            <input type="search" id="search-input" name="omnibox_inbox_search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="顧客名、本文、タグ検索..." oninput="handleSearch()" class="w-full pl-9 pr-3 py-2 text-xs bg-slate-100 focus:bg-white rounded-lg border border-transparent focus:border-teal-500 focus:outline-none transition">
           </div>
         </div>
 
@@ -404,14 +404,14 @@
           </div>
           <div class="flex items-center gap-1">
             <span class="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-sync"></span>自動更新
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-sync"></span>リアルタイム受信
             </span>
           </div>
           </div>
           <div class="md:hidden mt-2 space-y-2">
             <div class="relative">
               <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
-              <input id="mobile-search-input" type="search" placeholder="顧客名・過去メッセージ・社内メモ検索" oninput="syncMobileSearch(this.value)" class="w-full pl-8 pr-2 py-2 text-xs bg-white rounded-lg border border-slate-200 focus:outline-none focus:border-teal-500">
+              <input id="mobile-search-input" name="omnibox_mobile_inbox_search" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="顧客名・過去メッセージ・社内メモ検索" oninput="syncMobileSearch(this.value)" class="w-full pl-8 pr-2 py-2 text-xs bg-white rounded-lg border border-slate-200 focus:outline-none focus:border-teal-500">
             </div>
             <div class="grid grid-cols-2 gap-2">
               <select id="mobile-status-filter" onchange="filterByStatus(this.value)" class="min-w-0 text-xs border border-slate-200 bg-white rounded-lg px-2 py-1.5 text-slate-700">
@@ -517,7 +517,7 @@
                     <i data-lucide="lock" class="w-3 h-3 text-amber-600"></i>
                     <span>全スタッフにリアルタイム共有される社内メモです（お客様には送信されません）</span>
                   </div>
-                  <textarea id="message-input" rows="2" placeholder="返信メッセージを入力... (Enterで改行 / ⌘+Enter・Ctrl+Enterで送信)" onkeydown="handleInputKeyDown(event)" class="w-full text-xs md:text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition resize-none"></textarea>
+                  <textarea id="message-input" rows="2" placeholder="返信メッセージを入力... (Enterで改行 / ⌘+Enter・Ctrl+Enterで送信)" oninput="saveComposerDraft()" onkeydown="handleInputKeyDown(event)" class="w-full text-xs md:text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition resize-none"></textarea>
                   
                   <div class="flex items-center justify-between mt-2">
                     <div class="flex items-center gap-2 text-slate-400 text-xs">
@@ -634,7 +634,7 @@
             <div class="bg-gradient-to-br from-teal-500 to-emerald-600 text-white p-5 rounded-2xl shadow-sm">
               <div class="flex items-center gap-2 mb-2 font-bold text-sm">
                 <i data-lucide="sparkles" class="w-4 h-4 text-teal-200"></i>
-                <span>Gemini AI 投稿アシスタント</span>
+                <span>AI投稿アシスタント</span>
               </div>
               <p class="text-xs text-teal-50 leading-relaxed mb-4">
                 キャンペーン告知、新メニュー紹介、定休日アナウンスなどの投稿文と最適なハッシュタグを瞬時に自動生成します。
@@ -1092,9 +1092,17 @@
       </div>
 
       <div>
-        <label class="text-xs font-bold text-slate-600 mb-1 block">投稿画像URL <span class="font-normal text-slate-400">（Instagramを含む場合は必須）</span></label>
-        <input id="new-post-media-url" type="url" placeholder="https://example.com/image.jpg" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500">
-        <p class="text-[10px] text-slate-400 mt-1">現在は公開アクセス可能な画像URLに対応しています。Xのテキスト投稿では空欄で構いません。</p>
+        <div class="flex items-center justify-between gap-3 mb-1">
+          <label class="text-xs font-bold text-slate-600">投稿画像 <span class="font-normal text-slate-400">（Instagramは必須）</span></label>
+          <span id="post-image-count" class="text-[10px] text-slate-400">0枚</span>
+        </div>
+        <label class="flex items-center justify-center gap-2 min-h-20 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition text-xs text-slate-500">
+          <i data-lucide="image-plus" class="w-4 h-4"></i>
+          <span>画像を選択</span>
+          <input id="new-post-media-files" type="file" accept="image/jpeg,image/png,image/webp" multiple class="hidden" onchange="handlePostImageSelection(event)">
+        </label>
+        <p id="post-image-limit-help" class="text-[10px] text-slate-400 mt-1">Instagramは最大10枚、Xを含む投稿は最大4枚。選択後に順番を入れ替えられます。</p>
+        <div id="post-image-preview-list" class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2"></div>
       </div>
 
       <div>
@@ -1257,7 +1265,7 @@
             <label class="text-xs font-bold text-slate-600 block mb-1">メールアドレス</label>
             <div class="relative">
               <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-              <input type="email" id="auth-input-email" required placeholder="yamada@company.com" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
+              <input type="email" id="auth-input-email" name="omnibox_login_email" autocomplete="username" required placeholder="yamada@company.com" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
             </div>
           </div>
 
@@ -1268,7 +1276,7 @@
             </div>
             <div class="relative">
               <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-              <input type="password" id="auth-input-password" required placeholder="••••••••••••" class="w-full text-xs pl-9 pr-10 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
+              <input type="password" id="auth-input-password" name="omnibox_login_password" autocomplete="current-password" required placeholder="••••••••••••" class="w-full text-xs pl-9 pr-10 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
               <button type="button" onclick="toggleAuthPasswordVisibility()" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
                 <i data-lucide="eye" class="w-4 h-4" id="auth-eye-icon"></i>
               </button>
@@ -1382,7 +1390,8 @@
 
     let providerInboxSyncStarted = false;
     let instagramWebhookConnectionId = null;
-    let liveInboxTimer = null;
+    let liveInboxEventSource = null;
+    let liveInboxEventDebounceTimer = null;
     let liveInboxRefreshInFlight = false;
     let liveInboxInitialized = false;
     let liveInboxLastSeen = new Map();
@@ -1403,6 +1412,8 @@
     let serverSearchConversationIds = null;
     let searchDebounceTimer = null;
     let inputMode = 'reply';
+    let selectedPostImages = [];
+    const selectedPostTargetIds = new Set();
 
     const defaultAccounts = [
       {
@@ -1907,19 +1918,27 @@
 
     function startLiveInboxRefresh() {
       stopLiveInboxRefresh();
-      if (isDemoSession || !loggedInUser) return;
+      if (isDemoSession || !loggedInUser || !window.EventSource) return;
 
-      const refresh = async () => {
-        if (liveInboxRefreshInFlight || !loggedInUser) return;
-        liveInboxRefreshInFlight = true;
-        try {
-          await loadLiveInbox(currentThreadId, { silent: true });
-        } finally {
-          liveInboxRefreshInFlight = false;
-        }
+      liveInboxEventSource = new window.EventSource('/api/omnibox/inbox/events');
+
+      const scheduleRefresh = () => {
+        window.clearTimeout(liveInboxEventDebounceTimer);
+        liveInboxEventDebounceTimer = window.setTimeout(async () => {
+          if (liveInboxRefreshInFlight || !loggedInUser) return;
+          liveInboxRefreshInFlight = true;
+          try {
+            await loadLiveInbox(currentThreadId, { silent: true });
+          } finally {
+            liveInboxRefreshInFlight = false;
+          }
+        }, 120);
       };
 
-      liveInboxTimer = window.setInterval(refresh, 1500);
+      liveInboxEventSource.addEventListener('inbox', scheduleRefresh);
+      liveInboxEventSource.onerror = () => {
+        // EventSource reconnects automatically. Keep the current UI state intact.
+      };
 
       document.removeEventListener('visibilitychange', handleInboxVisibilityRefresh);
       document.addEventListener('visibilitychange', handleInboxVisibilityRefresh);
@@ -1937,10 +1956,12 @@
     }
 
     function stopLiveInboxRefresh() {
-      if (liveInboxTimer) {
-        window.clearInterval(liveInboxTimer);
-        liveInboxTimer = null;
+      if (liveInboxEventSource) {
+        liveInboxEventSource.close();
+        liveInboxEventSource = null;
       }
+      window.clearTimeout(liveInboxEventDebounceTimer);
+      liveInboxEventDebounceTimer = null;
       document.removeEventListener('visibilitychange', handleInboxVisibilityRefresh);
     }
 
@@ -2044,23 +2065,10 @@
           newlyUpdatedConversationIds.some(id => id !== currentThreadId);
 
         if (hasNewInquiry) {
-          currentStatusFilter = 'all';
-          currentAccountFilter = 'all';
-          searchQuery = '';
-          serverSearchConversationIds = null;
-
-          const searchInput = document.getElementById('inbox-search-input');
-          if (searchInput) searchInput.value = '';
-
-          const newestNewConversation = conversations.find(conversation =>
-            newConversationIds.includes(conversation.id)
-          );
-          if (newestNewConversation?.id) {
-            currentThreadId = newestNewConversation.id;
-          }
-
           showToast('新しい問い合わせを受信しました');
-        } else if (selectedId) {
+        }
+
+        if (!currentThreadId && selectedId) {
           currentThreadId = selectedId;
         }
 
@@ -2198,6 +2206,7 @@
       }
 
       try {
+        const mediaUrls = await uploadSelectedPostImages();
         const response = await fetch('/api/omnibox/posts', {
           credentials: 'same-origin',
           cache: 'no-store'
@@ -2341,7 +2350,6 @@
     function onDataUpdated() {
       renderAccountFilters();
       renderConnectedAccounts();
-      renderTargetAccountsCheckboxes();
       renderThreadList();
       renderPublishChannelsSummary();
       updateBadges();
@@ -2664,7 +2672,9 @@
           }))
         ].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
 
-        updateActiveChatPane(thread);
+        if (currentThreadId === id) {
+          updateActiveChatPane(thread);
+        }
 
         if (!thread.avatar) {
           await window.refreshCustomerProfile(thread);
@@ -2679,6 +2689,11 @@
     }
 
     window.selectThread = async function(id) {
+      const composerBeforeSwitch = document.getElementById('message-input');
+      if (composerBeforeSwitch && currentThreadId) {
+        composerDrafts[inputMode]?.set(currentThreadId, composerBeforeSwitch.value);
+      }
+
       if (window.innerWidth < 768) {
         document.getElementById('customer-info-panel')?.classList.remove('mobile-open');
         document.getElementById('view-inbox')?.classList.add('mobile-chat-open');
@@ -2697,6 +2712,7 @@
 
       if (thread.liveConversationId) {
         thread = await loadConversationDetail(id) || thread;
+        if (currentThreadId !== id) return;
         thread.unreadCount = 0;
         updateActiveChatPane(thread);
         renderThreadList();
@@ -3151,6 +3167,12 @@
       } catch (error) {
         showToast(error.message || '担当者を更新できませんでした');
       }
+    };
+
+    window.saveComposerDraft = function() {
+      const input = document.getElementById('message-input');
+      if (!input || !currentThreadId) return;
+      composerDrafts[inputMode]?.set(currentThreadId, input.value);
     };
 
     window.setInputMode = function(mode) {
@@ -3728,34 +3750,160 @@
       }
     };
 
+    function publishableAccounts() {
+      return connectedAccounts.filter(acc =>
+        acc.provider === 'instagram' ||
+        acc.provider === 'x' ||
+        (isDemoSession && ['instagram', 'x'].includes(acc.platform))
+      );
+    }
+
+    function getPostImageLimit() {
+      const hasX = Array.from(selectedPostTargetIds).some(id => {
+        const account = getAccountById(id);
+        return account.provider === 'x' || account.platform === 'x';
+      });
+      return hasX ? 4 : 10;
+    }
+
+    window.handlePostTargetChange = function(checkbox) {
+      if (checkbox.checked) selectedPostTargetIds.add(checkbox.value);
+      else selectedPostTargetIds.delete(checkbox.value);
+
+      const limit = getPostImageLimit();
+      if (selectedPostImages.length > limit) {
+        selectedPostImages.slice(limit).forEach(item => URL.revokeObjectURL(item.previewUrl));
+        selectedPostImages = selectedPostImages.slice(0, limit);
+        renderSelectedPostImages();
+        showToast(`Xを含む投稿では画像は${limit}枚までです`);
+      }
+      renderPostImageLimitHelp();
+    };
+
+    function renderPostImageLimitHelp() {
+      const help = document.getElementById('post-image-limit-help');
+      if (!help) return;
+      const limit = getPostImageLimit();
+      help.textContent = limit === 4
+        ? 'Xを含むため画像は最大4枚です。ドラッグまたは矢印で順番を変更できます。'
+        : 'Instagramは最大10枚です。ドラッグまたは矢印で順番を変更できます。';
+    }
+
+    window.handlePostImageSelection = function(event) {
+      const input = event?.target;
+      const files = Array.from(input?.files || []).filter(file =>
+        ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+      );
+      const limit = getPostImageLimit();
+
+      selectedPostImages.forEach(item => URL.revokeObjectURL(item.previewUrl));
+      selectedPostImages = files.slice(0, limit).map(file => ({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        file,
+        previewUrl: URL.createObjectURL(file)
+      }));
+
+      if (files.length > limit) {
+        showToast(`選択できる画像は最大${limit}枚です`);
+      }
+      renderSelectedPostImages();
+      if (input) input.value = '';
+    };
+
+    window.movePostImage = function(index, direction) {
+      const next = index + direction;
+      if (index < 0 || next < 0 || index >= selectedPostImages.length || next >= selectedPostImages.length) return;
+      const [item] = selectedPostImages.splice(index, 1);
+      selectedPostImages.splice(next, 0, item);
+      renderSelectedPostImages();
+    };
+
+    window.removePostImage = function(index) {
+      const [removed] = selectedPostImages.splice(index, 1);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      renderSelectedPostImages();
+    };
+
+    let draggedPostImageIndex = null;
+    window.startPostImageDrag = function(event, index) {
+      draggedPostImageIndex = index;
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+    };
+    window.dropPostImage = function(event, index) {
+      event.preventDefault();
+      if (draggedPostImageIndex === null || draggedPostImageIndex === index) return;
+      const [item] = selectedPostImages.splice(draggedPostImageIndex, 1);
+      selectedPostImages.splice(index, 0, item);
+      draggedPostImageIndex = null;
+      renderSelectedPostImages();
+    };
+
+    function renderSelectedPostImages() {
+      const container = document.getElementById('post-image-preview-list');
+      const count = document.getElementById('post-image-count');
+      if (count) count.textContent = `${selectedPostImages.length}枚`;
+      if (!container) return;
+
+      container.innerHTML = selectedPostImages.map((item, index) => `
+        <div draggable="true" ondragstart="startPostImageDrag(event, ${index})" ondragover="event.preventDefault()" ondrop="dropPostImage(event, ${index})" class="relative rounded-xl border border-slate-200 bg-white p-1.5 cursor-move">
+          <img src="${item.previewUrl}" alt="投稿画像 ${index + 1}" class="w-full aspect-square object-cover rounded-lg">
+          <div class="absolute top-2 left-2 text-[9px] font-bold bg-slate-900/75 text-white rounded-full px-1.5 py-0.5">${index + 1}</div>
+          <div class="grid grid-cols-3 gap-1 mt-1">
+            <button type="button" onclick="movePostImage(${index}, -1)" class="text-[10px] py-1 rounded bg-slate-100 hover:bg-slate-200" ${index === 0 ? 'disabled' : ''}>←</button>
+            <button type="button" onclick="removePostImage(${index})" class="text-[10px] py-1 rounded bg-red-50 text-red-600 hover:bg-red-100">削除</button>
+            <button type="button" onclick="movePostImage(${index}, 1)" class="text-[10px] py-1 rounded bg-slate-100 hover:bg-slate-200" ${index === selectedPostImages.length - 1 ? 'disabled' : ''}>→</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function clearSelectedPostImages() {
+      selectedPostImages.forEach(item => URL.revokeObjectURL(item.previewUrl));
+      selectedPostImages = [];
+      renderSelectedPostImages();
+    }
+
+    async function uploadSelectedPostImages() {
+      if (selectedPostImages.length === 0) return [];
+      const form = new FormData();
+      selectedPostImages.forEach(item => form.append('files', item.file, item.file.name));
+      const response = await fetch('/api/omnibox/media', {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: form
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok || !Array.isArray(result.urls)) {
+        throw new Error(result.message || '画像をアップロードできませんでした');
+      }
+      return result.urls;
+    }
+
     function renderTargetAccountsCheckboxes() {
       const list = document.getElementById('post-target-accounts-list');
       if (!list) return;
       list.innerHTML = '';
 
-      connectedAccounts.forEach(acc => {
+      publishableAccounts().forEach(acc => {
         const meta = getChannelMeta(acc.platform);
-        const publishable =
-          isDemoSession ||
-          acc.provider === 'x' ||
-          acc.provider === 'instagram';
+        const checked = selectedPostTargetIds.has(acc.id);
         const label = document.createElement('label');
-        label.className =
-          'flex items-center gap-2 text-xs font-medium p-2.5 rounded-xl border transition ' +
-          (publishable
-            ? 'bg-slate-50 border-slate-200 cursor-pointer hover:bg-slate-100'
-            : 'bg-slate-50/50 border-slate-100 cursor-not-allowed opacity-55');
+        label.className = 'flex items-center gap-2 text-xs font-medium p-2.5 rounded-xl border transition bg-slate-50 border-slate-200 cursor-pointer hover:bg-slate-100';
         label.innerHTML = `
-          <input type="checkbox" name="post-target-acc" value="${acc.id}" ${publishable ? '' : 'disabled'} class="rounded text-teal-600 focus:ring-teal-500">
+          <input type="checkbox" name="post-target-acc" value="${acc.id}" ${checked ? 'checked' : ''} onchange="handlePostTargetChange(this)" class="rounded text-teal-600 focus:ring-teal-500">
           <span class="w-2 h-2 rounded-full ${meta.color} shrink-0"></span>
           <div class="truncate min-w-0">
-            <span class="text-slate-800 block truncate">${acc.accountName}</span>
-            <span class="text-[10px] text-slate-400 block truncate">${acc.handle}</span>
+            <span class="text-slate-800 block truncate">${escapeHtml(acc.accountName)}</span>
+            <span class="text-[10px] text-slate-400 block truncate">${escapeHtml(acc.handle)}</span>
           </div>
-          ${publishable ? '' : '<span class="ml-auto text-[9px] text-slate-400 shrink-0">投稿未対応</span>'}
         `;
         list.appendChild(label);
       });
+
+      if (publishableAccounts().length === 0) {
+        list.innerHTML = '<div class="col-span-full text-xs text-slate-400 p-3 bg-slate-50 rounded-xl">InstagramまたはXを接続すると投稿できます。</div>';
+      }
+      renderPostImageLimitHelp();
     }
 
     function renderPublishChannelsSummary() {
@@ -3763,7 +3911,7 @@
       if (!container) return;
       container.innerHTML = '';
 
-      connectedAccounts.forEach(acc => {
+      publishableAccounts().forEach(acc => {
         const meta = getChannelMeta(acc.platform);
         const item = document.createElement('div');
         item.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50';
@@ -3780,7 +3928,6 @@
 
     window.submitNewPost = async function() {
       const content = document.getElementById('new-post-content').value.trim();
-      const mediaUrl = document.getElementById('new-post-media-url')?.value.trim() || '';
       const timing =
         document.querySelector('input[name="post-timing"]:checked')?.value === 'now'
           ? 'now'
@@ -3795,6 +3942,8 @@
       const checkedBoxes = Array.from(
         document.querySelectorAll('input[name="post-target-acc"]:checked')
       );
+      selectedPostTargetIds.clear();
+      checkedBoxes.forEach(cb => selectedPostTargetIds.add(cb.value));
       if (checkedBoxes.length === 0) {
         showToast('最低1つの投稿先アカウントを選択してください');
         return;
@@ -3807,8 +3956,20 @@
       const includesInstagram = selectedAccounts.some(
         acc => acc.provider === 'instagram' || acc.platform === 'instagram'
       );
-      if (includesInstagram && !mediaUrl) {
-        showToast('Instagram投稿には公開画像URLを入力してください');
+      if (includesInstagram && selectedPostImages.length === 0) {
+        showToast('Instagram投稿には画像を選択してください');
+        return;
+      }
+
+      const includesX = selectedAccounts.some(
+        acc => acc.provider === 'x' || acc.platform === 'x'
+      );
+      if (includesX && selectedPostImages.length > 4) {
+        showToast('X投稿の画像は4枚までです');
+        return;
+      }
+      if (includesInstagram && selectedPostImages.length > 10) {
+        showToast('Instagram投稿の画像は10枚までです');
         return;
       }
 
@@ -3821,10 +3982,12 @@
         const selectedAccountNames = selectedAccounts.map(
           acc => `${acc.platformName} (${acc.accountName})`
         );
+        const mediaUrls = selectedPostImages.map(item => item.previewUrl);
         scheduledPosts.unshift({
           id: 'post-' + Date.now(),
           content,
-          mediaUrl,
+          mediaUrl: mediaUrls[0] || '',
+          mediaUrls,
           channels: selectedAccountNames,
           scheduledAt: timing === 'schedule' ? dt.replace('T', ' ') : '今すぐ',
           status: timing === 'schedule' ? '予約中' : '公開完了',
@@ -3834,7 +3997,8 @@
         renderScheduledPosts();
         window.closeNewPostModal();
         document.getElementById('new-post-content').value = '';
-        document.getElementById('new-post-media-url').value = '';
+        selectedPostTargetIds.clear();
+        clearSelectedPostImages();
         showToast('デモ用の投稿を保存しました');
         return;
       }
@@ -3850,7 +4014,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             content,
-            mediaUrl,
+            mediaUrls,
             targetConnectionIds,
             timing,
             scheduledAt:
@@ -3872,7 +4036,8 @@
 
         window.closeNewPostModal();
         document.getElementById('new-post-content').value = '';
-        document.getElementById('new-post-media-url').value = '';
+        selectedPostTargetIds.clear();
+        clearSelectedPostImages();
 
         showToast(
           timing === 'schedule'
@@ -4395,6 +4560,8 @@
 
     window.openNewPostModal = function() {
       const modal = document.getElementById('new-post-modal');
+      renderTargetAccountsCheckboxes();
+      renderSelectedPostImages();
       modal.classList.remove('hidden');
       const input = document.getElementById('new-post-datetime');
       if (input) {
