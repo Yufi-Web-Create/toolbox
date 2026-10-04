@@ -20,16 +20,29 @@ export async function GET() {
     });
 
     if (!response.ok) {
-      return NextResponse.json({ ok: false, lineConnected: false });
+      return NextResponse.json({
+        ok: false,
+        bridgeReady: false,
+        lineConnected: false,
+      });
     }
 
-    const health = await response.json();
+    const health = (await response.json()) as Record<string, unknown>;
     return NextResponse.json({
       ok: true,
       bridgeReady: health.configured === true,
       lineConnected: health.lineConnected === true,
+      lineApiReachable: health.lineApiReachable === true,
+      webhookActive: health.webhookActive === true,
+      webhookMatches: health.webhookMatches === true,
+      webhookUrl:
+        typeof health.webhookUrl === "string" ? health.webhookUrl : null,
     });
   } catch {
-    return NextResponse.json({ ok: false, lineConnected: false });
+    return NextResponse.json({
+      ok: false,
+      bridgeReady: false,
+      lineConnected: false,
+    });
   }
 }
