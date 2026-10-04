@@ -893,8 +893,8 @@
                 <input id="settings-account-name" type="text" maxlength="100" required class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500">
               </div>
               <div>
-                <label class="text-xs font-bold text-slate-600 block mb-1.5">メールアドレス</label>
-                <input id="settings-account-email" type="email" readonly class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-500">
+                <label class="text-xs font-bold text-slate-600 block mb-1.5">ログインID</label>
+                <input id="settings-account-login-id" type="text" readonly class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-500">
                 <p class="text-[10px] text-slate-400 mt-1">ログインIDは他アカウントと重複しません。</p>
               </div>
               <div>
@@ -5284,7 +5284,7 @@
 
       document.getElementById('settings-role-label').textContent = isOwner ? '管理者' : '従業員';
       document.getElementById('settings-account-name').value = loggedInUser?.name || '';
-      document.getElementById('settings-account-email').value = loggedInUser?.email || '';
+      document.getElementById('settings-account-login-id').value = loggedInUser?.loginId || '';
       document.getElementById('settings-account-password').value = '';
 
       const initialBanner = document.getElementById('settings-initial-organization-banner');
