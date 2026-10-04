@@ -179,7 +179,26 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("Xを含む投稿は最大4枚");
     expect(html).toContain("movePostImage");
     expect(html).not.toContain("new-post-media-url");
-    expect(html).toContain("指定時刻に自動投稿します");
+  });
+
+  it("provides a publish calendar, AI composer, and completion modal", () => {
+    expect(html).toContain('id="publish-calendar-grid"');
+    expect(html).toContain("openNewPostModalForDate");
+    expect(html).toContain("changePublishCalendarMonth");
+    expect(html).toContain('id="new-post-ai-brief"');
+    expect(html).toContain("/api/omnibox/ai/post");
+    expect(html).toContain('id="post-success-modal"');
+    expect(html).toContain("showPostSuccess");
+    expect(html).toContain("window.location.reload()");
+    expect(html).not.toContain("bg-gradient-to-br from-teal-500 to-emerald-600 text-white p-5 rounded-2xl shadow-sm");
+  });
+
+  it("persists the active view and keeps mobile inbox hidden on other views", () => {
+    expect(html).toContain("omnibox_active_view");
+    expect(html).toContain("restoreActiveView");
+    expect(html).toContain("#view-inbox:not(.hidden)");
+    expect(html).toContain(".view-panel.hidden");
+    expect(html).not.toContain('id="scheduled-nav-badge"');
   });
 
   it("uses event-driven inbox refresh without production pseudo receive controls", () => {
@@ -237,6 +256,8 @@ describe("uploaded OmniBox application shell", () => {
   it("guards inbox search from credential autofill and explains Instagram requests", () => {
     expect(html).toContain('name="omnibox_inbox_search"');
     expect(html).toContain('autocomplete="off"');
+    expect(html).toContain("readonly onpointerdown=\"activateInboxSearch(this)\"");
+    expect(html).toContain('id="auth-input-email" name="omnibox_login_email" autocomplete="username" disabled');
     expect(html).toContain("looksLikeCredentialAutofill");
     expect(html).toContain("Instagram 初回メッセージ");
     expect(html).toContain("返信する（Requestsなら承認）");
