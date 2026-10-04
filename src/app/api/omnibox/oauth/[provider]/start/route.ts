@@ -7,11 +7,28 @@ import {
   getProviderConfig,
   isOAuthProvider,
 } from "../../../../../../lib/integrations/oauth/providers";
+import { isPlanKey, planAllowsProvider } from "../../../../../../lib/plans";
 import { createClient } from "../../../../../../lib/supabase/server";
 
 type Context = { params: Promise<{ provider: string }> };
 
 function returnUrl(request: Request, provider: string, error: string) {
+  const organizationId = memberships[0].organization_id;
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("plan_key")
+    .eq("id", organizationId)
+    .maybeSingle();
+  const plan = isPlanKey(organization?.plan_key)
+    ? organization.plan_key
+    : "standard";
+
+  if (!planAllowsProvider(plan, rawProvider)) {
+    return NextResponse.redirect(
+      returnUrl(request, rawProvider, "plan_upgrade_required"),
+    );
+  }
+
   const origin = new URL(request.url).origin;
   const url = new URL("/omnibox.html", origin);
   url.searchParams.set("oauth_error", error);
@@ -38,7 +55,7 @@ export async function GET(request: Request, context: Context) {
 
   const { data: memberships } = await supabase
     .from("organization_members")
-    .select("role")
+    .select("organization_id, role")
     .eq("user_id", userId)
     .limit(1);
 
