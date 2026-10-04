@@ -35,21 +35,24 @@ export function LoginForm({ callbackErrorMessage, nextPath }: LoginFormProps) {
         <input name="next" type="hidden" value={nextPath} />
 
         <label className={styles.field}>
-          <span>メールアドレス（社内・店舗アカウント）</span>
+          <span>ログインID</span>
           <input
-            autoComplete="email"
-            id="email"
-            name="email"
+            autoComplete="username"
+            autoCapitalize="none"
+            id="loginId"
+            name="loginId"
             required
-            type="email"
-            placeholder="yamada@company.com"
+            minLength={3}
+            maxLength={32}
+            type="text"
+            placeholder="hajimari_admin"
           />
         </label>
 
         <label className={styles.field}>
           <div className={styles.labelRow}>
             <span>パスワード</span>
-            <Link href="/forgot-password">パスワードをお忘れですか？</Link>
+            <span>8文字以上</span>
           </div>
           <div className={styles.passwordWrap}>
             <input
