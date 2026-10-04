@@ -1998,6 +1998,7 @@
         const conversations = Array.isArray(payload.conversations) ? payload.conversations : [];
         const selectedId = payload.selectedConversation?.id || conversationId || null;
         const selectedMessages = Array.isArray(payload.messages) ? payload.messages : [];
+        const selectedNotes = Array.isArray(payload.notes) ? payload.notes : [];
 
         const previousIds = new Set(threads.map(thread => thread.liveConversationId || thread.id));
         const previousLastSeen = new Map(liveInboxLastSeen);
