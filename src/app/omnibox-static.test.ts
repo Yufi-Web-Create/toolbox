@@ -238,8 +238,8 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain('name="omnibox_inbox_search"');
     expect(html).toContain('autocomplete="off"');
     expect(html).toContain("looksLikeCredentialAutofill");
-    expect(html).toContain("Instagram メッセージリクエスト");
-    expect(html).toContain("返信して承認");
+    expect(html).toContain("Instagram 初回メッセージ");
+    expect(html).toContain("返信する（Requestsなら承認）");
   });
 
   it("does not expose fake AI generation before AI is connected", () => {
