@@ -62,7 +62,12 @@ export async function GET(request: Request) {
         supabaseUrl,
       ).toString(),
       verifyToken,
-      subscribedFields: ["messages"],
+      subscribedFields: [
+        "messages",
+        "messaging_postbacks",
+        "messaging_seen",
+        "message_reactions",
+      ],
     });
   } catch {
     return NextResponse.json(
