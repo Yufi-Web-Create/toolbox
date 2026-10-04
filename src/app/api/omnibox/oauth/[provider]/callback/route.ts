@@ -5,6 +5,7 @@ import {
   getProviderConfig,
   isOAuthProvider,
 } from "../../../../../../lib/integrations/oauth/providers";
+import { isPlanKey, planAllowsProvider } from "../../../../../../lib/plans";
 import { createClient } from "../../../../../../lib/supabase/server";
 
 type Context = { params: Promise<{ provider: string }> };
@@ -91,6 +92,33 @@ export async function GET(request: Request, context: Context) {
 
     if (!userId) {
       throw new Error("login_required");
+    }
+
+    const { data: memberships } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", userId)
+      .limit(1);
+
+    const organizationId =
+      Array.isArray(memberships) && memberships.length === 1
+        ? memberships[0].organization_id
+        : null;
+
+    const { data: organization } = organizationId
+      ? await supabase
+          .from("organizations")
+          .select("plan_key")
+          .eq("id", organizationId)
+          .maybeSingle()
+      : { data: null };
+
+    const plan = isPlanKey(organization?.plan_key)
+      ? organization.plan_key
+      : "standard";
+
+    if (!planAllowsProvider(plan, rawProvider)) {
+      throw new Error("plan_upgrade_required");
     }
 
     const config = getProviderConfig(rawProvider, requestUrl.origin);
