@@ -93,15 +93,35 @@ Deno.serve(async (req) => {
       return json(400, { ok: false, error: "invalid_config_payload" });
     }
 
-    const { error } = await supabase.from("provider_connections").upsert({
+    const { data: existingConnection, error: connectionLookupError } =
+      await supabase
+        .from("provider_connections")
+        .select("id")
+        .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+        .eq("provider", "line")
+        .maybeSingle();
+
+    if (connectionLookupError) {
+      return json(500, { ok: false, error: "config_lookup_failed" });
+    }
+
+    const configPayload = {
       organization_id: ALLOWED_ORGANIZATION_ID,
       provider: "line",
       encrypted_key: encryptedKey,
       encrypted_payload: encryptedPayload,
       iv,
       auth_tag: authTag,
+      status: "active",
       updated_at: new Date().toISOString(),
-    }, { onConflict: "organization_id,provider" });
+    };
+
+    const { error } = existingConnection?.id
+      ? await supabase
+          .from("provider_connections")
+          .update(configPayload)
+          .eq("id", existingConnection.id)
+      : await supabase.from("provider_connections").insert(configPayload);
 
     if (error) return json(500, { ok: false, error: "config_store_failed" });
     return json(200, { ok: true });
@@ -122,7 +142,19 @@ Deno.serve(async (req) => {
   }
 
   if (payload.action === "inbound") {
-    const { data: existingConversation } = await supabase
+    const { data: lineConnection, error: connectionError } = await supabase
+      .from("provider_connections")
+      .select("id")
+      .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+      .eq("provider", "line")
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (connectionError || !lineConnection?.id) {
+      return json(500, { ok: false, error: "line_connection_missing" });
+    }
+
+    const { data: existingConversation, error: existingError } = await supabase
       .from("conversations")
       .select("id, customer_name_source")
       .eq("organization_id", ALLOWED_ORGANIZATION_ID)
@@ -130,9 +162,14 @@ Deno.serve(async (req) => {
       .eq("provider_thread_id", payload.providerThreadId)
       .maybeSingle();
 
+    if (existingError) {
+      return json(500, { ok: false, error: "conversation_lookup_failed" });
+    }
+
     const conversationPayload: Record<string, unknown> = {
       organization_id: ALLOWED_ORGANIZATION_ID,
       provider: "line",
+      provider_connection_id: lineConnection.id,
       provider_thread_id: payload.providerThreadId,
       customer_external_id: payload.customerExternalId,
       customer_avatar_url: payload.customerAvatarUrl || null,
@@ -148,19 +185,35 @@ Deno.serve(async (req) => {
       conversationPayload.customer_name_source = "provider";
     }
 
-    const { data: conversation, error: conversationError } = await supabase
-      .from("conversations")
-      .upsert(conversationPayload, { onConflict: "organization_id,provider,provider_thread_id" })
-      .select("id")
-      .single();
+    let conversationId = existingConversation?.id ?? null;
 
-    if (conversationError || !conversation?.id) {
-      return json(500, { ok: false, error: "conversation_persist_failed" });
+    if (conversationId) {
+      const { error: updateError } = await supabase
+        .from("conversations")
+        .update(conversationPayload)
+        .eq("id", conversationId)
+        .eq("organization_id", ALLOWED_ORGANIZATION_ID);
+
+      if (updateError) {
+        return json(500, { ok: false, error: "conversation_persist_failed" });
+      }
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from("conversations")
+        .insert(conversationPayload)
+        .select("id")
+        .single();
+
+      if (insertError || !inserted?.id) {
+        return json(500, { ok: false, error: "conversation_persist_failed" });
+      }
+      conversationId = inserted.id;
     }
 
     const { error: messageError } = await supabase.from("messages").upsert({
       organization_id: ALLOWED_ORGANIZATION_ID,
-      conversation_id: conversation.id,
+      conversation_id: conversationId,
+      provider_connection_id: lineConnection.id,
       provider_message_id: payload.providerMessageId,
       direction: "inbound",
       body: payload.body,
@@ -172,7 +225,7 @@ Deno.serve(async (req) => {
     });
 
     if (messageError) return json(500, { ok: false, error: "message_persist_failed" });
-    return json(200, { ok: true, conversationId: conversation.id });
+    return json(200, { ok: true, conversationId });
   }
 
   if (payload.action === "profile") {
