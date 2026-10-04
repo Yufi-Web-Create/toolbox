@@ -52,7 +52,7 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain('id="view-settings"');
     expect(html).toContain('id="menu-organization-settings"');
     expect(html).toContain('id="settings-initial-organization-banner"');
-    expect(html).toContain("組織ID（従業員ログイン用）");
+    expect(html).toContain("組織を識別する管理用ID");
     expect(html).toContain("loggedInUser.roleKey !== 'owner'");
     expect(html).toContain("/api/omnibox/settings/account");
     expect(html).toContain("/api/omnibox/settings/organization");
@@ -61,16 +61,18 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("ログアウト");
   });
 
-  it("supports employee login with organization ID", () => {
+  it("supports employee login with organization auto-detection", () => {
     expect(html).toContain('id="auth-input-organization"');
     expect(html).toContain("switchLoginType('employee')");
-    expect(html).toContain("organizationId");
+    expect(html).toContain("所属組織はログイン後に自動判定されます");
     expect(html).toContain("従業員としてログイン");
   });
 
-  it("keeps the full account area clickable", () => {
+  it("keeps the full account area clickable and closes the menu safely", () => {
     expect(html).toContain('id="user-menu-trigger"');
-    expect(html).toContain("e.target.closest('#user-menu-trigger')");
+    expect(html).toContain("pointerdown");
+    expect(html).toContain("target.closest?.('#user-menu-trigger')");
+    expect(html).toContain("e.key === 'Escape'");
   });
 
   it("provides real quick demo sessions for administrator and staff", () => {
@@ -110,7 +112,7 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("renameEmployee");
     expect(html).toContain("resetEmployeePassword");
     expect(html).toContain("deleteEmployeeAccount");
-    expect(html).toContain("ログイン用組織ID");
+    expect(html).toContain("管理者含む");
   });
 
   it("keeps alerts above the authentication portal", () => {
@@ -252,6 +254,33 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("templateEditingId");
     expect(html).toContain('data-cat="general"');
     expect(html).toContain("カーソル位置に挿入しました");
+  });
+
+  it("supports plan selection and plan-based feature locking", () => {
+    expect(html).toContain("ご契約プラン");
+    expect(html).toContain("/api/omnibox/settings/plan");
+    expect(html).toContain("changeOrganizationPlan");
+    expect(html).toContain("applyPlanAccess");
+    expect(html).toContain("currentPlanFeatures");
+  });
+
+  it("supports renaming connected account display names", () => {
+    expect(html).toContain("renameConnectedAccount");
+    expect(html).toContain("連携アカウント名を変更しました");
+    expect(html).toContain("providerConnectionId");
+  });
+
+  it("removes redundant cloud-sync and product tagline labels", () => {
+    expect(html).not.toContain("Cloud Sync 有効");
+    expect(html).not.toContain("複数SNS一元管理 & 予約投稿ハブ");
+  });
+
+  it("shows OAuth operator setup requirements and callbacks", () => {
+    expect(html).toContain("OAuth Developer App 設定");
+    expect(html).toContain("OMNIBOX_INSTAGRAM_CLIENT_ID");
+    expect(html).toContain("OMNIBOX_X_CLIENT_ID");
+    expect(html).toContain("OMNIBOX_GOOGLE_CLIENT_ID");
+    expect(html).toContain("/api/omnibox/oauth/");
   });
 
   it("contains syntactically valid connected module JavaScript", () => {
