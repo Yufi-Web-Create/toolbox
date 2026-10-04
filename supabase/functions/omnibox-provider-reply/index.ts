@@ -47,6 +47,49 @@ function mimeHeader(value: string) {
         "?=";
 }
 
+async function refreshXToken(bundle: Record<string, unknown>) {
+  const refreshToken =
+    typeof bundle.refresh_token === "string" ? bundle.refresh_token : "";
+  const clientId =
+    typeof bundle.omnibox_client_id === "string"
+      ? bundle.omnibox_client_id
+      : "";
+  const clientSecret =
+    typeof bundle.omnibox_client_secret === "string"
+      ? bundle.omnibox_client_secret
+      : "";
+
+  if (!refreshToken || !clientId || !clientSecret) return null;
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: clientId,
+  });
+
+  const response = await fetch("https://api.x.com/2/oauth2/token", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      authorization: "Basic " + btoa(clientId + ":" + clientSecret),
+    },
+    body,
+  });
+
+  if (!response.ok) return null;
+  const refreshed = await response.json();
+  if (typeof refreshed?.access_token !== "string") return null;
+
+  return {
+    ...bundle,
+    ...refreshed,
+    refresh_token:
+      typeof refreshed.refresh_token === "string"
+        ? refreshed.refresh_token
+        : refreshToken,
+  } as Record<string, unknown>;
+}
+
 async function refreshGoogleToken(
   bundle: Record<string, unknown>,
   clientId: string,
@@ -288,6 +331,33 @@ Deno.serve(async (req) => {
   }
 
   if (conversation.provider === "x") {
+    const expiresAt = connection.token_expires_at
+      ? new Date(connection.token_expires_at).getTime()
+      : 0;
+
+    if (!accessToken || (expiresAt && expiresAt < Date.now() + 60_000)) {
+      const refreshed = await refreshXToken(bundle);
+      if (!refreshed) {
+        return json(409, { ok: false, error: "x_token_refresh_failed" });
+      }
+
+      bundle = refreshed;
+      accessToken = String(refreshed.access_token ?? "");
+      const expiresIn =
+        typeof refreshed.expires_in === "number"
+          ? refreshed.expires_in
+          : null;
+      const nextExpiry = expiresIn
+        ? new Date(Date.now() + expiresIn * 1000).toISOString()
+        : null;
+
+      await admin.rpc("omnibox_replace_provider_secret", {
+        p_connection_id: connection.id,
+        p_secret_json: JSON.stringify(refreshed),
+        p_token_expires_at: nextExpiry,
+      });
+    }
+
     if (!accessToken || !conversation.customer_external_id) {
       return json(409, { ok: false, error: "x_token_missing" });
     }
