@@ -416,11 +416,19 @@ export async function exchangeOAuthCode(
   code: string,
   verifier: string,
 ) {
-  if (config.provider === "instagram") {
-    return await exchangeInstagram(config, code);
-  }
-  if (config.provider === "x") {
-    return await exchangeX(config, code, verifier);
-  }
-  return await exchangeGoogle(config, code, verifier);
+  const account =
+    config.provider === "instagram"
+      ? await exchangeInstagram(config, code)
+      : config.provider === "x"
+        ? await exchangeX(config, code, verifier)
+        : await exchangeGoogle(config, code, verifier);
+
+  return {
+    ...account,
+    tokenBundle: {
+      ...account.tokenBundle,
+      omnibox_client_id: config.clientId,
+      omnibox_client_secret: config.clientSecret,
+    },
+  };
 }
