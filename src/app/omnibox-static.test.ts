@@ -275,11 +275,13 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).not.toContain("複数SNS一元管理 & 予約投稿ハブ");
   });
 
-  it("shows OAuth operator setup requirements and callbacks", () => {
-    expect(html).toContain("OAuth Developer App 設定");
-    expect(html).toContain("OMNIBOX_INSTAGRAM_CLIENT_ID");
-    expect(html).toContain("OMNIBOX_X_CLIENT_ID");
-    expect(html).toContain("OMNIBOX_GOOGLE_CLIENT_ID");
+  it("keeps provider connection guidance customer-facing", () => {
+    expect(html).not.toContain("OAuth Developer App 設定");
+    expect(html).not.toContain("OMNIBOX_INSTAGRAM_CLIENT_ID");
+    expect(html).not.toContain("OMNIBOX_X_CLIENT_ID");
+    expect(html).not.toContain("OMNIBOX_GOOGLE_CLIENT_ID");
+    expect(html).not.toContain("LINE公式アカウントの実接続");
+    expect(html).toContain("SNS連携に必要な操作");
     expect(html).toContain("/api/omnibox/oauth/");
   });
 
