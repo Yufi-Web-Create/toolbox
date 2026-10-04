@@ -1166,8 +1166,23 @@
         </div>
 
         <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-1">
-          <div><strong>購読フィールド:</strong> <span id="instagram-webhook-fields" class="font-mono">messages</span></div>
-          <div>Meta側でWebhook検証が完了すると、新しいInstagram DMがOmniBoxの受信箱へ自動で入ります。</div>
+          <div><strong>Webhookフィールド:</strong> <span id="instagram-webhook-fields" class="font-mono">messages</span></div>
+          <div>Metaアプリ側のWebhook設定に加えて、接続したInstagramアカウントごとのWebhook購読が必要です。</div>
+        </div>
+
+        <div class="p-3 rounded-xl border border-slate-200 bg-white space-y-2">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <div class="text-[11px] font-bold text-slate-700">アカウントWebhook購読</div>
+              <div id="instagram-subscription-status" class="text-[11px] text-slate-500 mt-0.5">確認中...</div>
+            </div>
+            <button id="instagram-subscription-register-button" type="button" onclick="registerInstagramWebhookSubscription()" class="px-3 py-2 text-xs font-semibold text-white bg-pink-600 hover:bg-pink-700 rounded-xl disabled:opacity-50">
+              Webhook購読を再登録
+            </button>
+          </div>
+          <div class="text-[10px] text-slate-400">
+            登録後に Meta の subscribed_apps を再確認し、messages が含まれているか表示します。
+          </div>
         </div>
       </div>
 
@@ -1366,6 +1381,7 @@
     };
 
     let providerInboxSyncStarted = false;
+    let instagramWebhookConnectionId = null;
     let liveInboxTimer = null;
     let liveInboxRefreshInFlight = false;
     let liveInboxInitialized = false;
@@ -3298,7 +3314,7 @@
                     <i data-lucide="refresh-cw" class="w-3 h-3"></i><span>X DMを同期</span>
                   </button>`
               : acc.provider === 'instagram'
-                ? `<button onclick="showInstagramWebhookInfo()" class="text-pink-600 font-medium hover:underline flex items-center gap-1">
+                ? `<button onclick="showInstagramWebhookInfo('${acc.providerConnectionId || ''}')" class="text-pink-600 font-medium hover:underline flex items-center gap-1">
                     <i data-lucide="radio" class="w-3 h-3"></i><span>DM受信設定</span>
                   </button>`
                 : `<button onclick="window.testSyncAccount('${acc.id}')" class="text-teal-600 font-medium hover:underline flex items-center gap-1">
@@ -3505,20 +3521,56 @@
       }
     };
 
-    window.showInstagramWebhookInfo = async function() {
+    function renderInstagramSubscriptionStatus(result) {
+      const status = document.getElementById('instagram-subscription-status');
+      if (!status) return;
+
+      const fields = Array.isArray(result?.subscribedFields)
+        ? result.subscribedFields
+        : [];
+      const hasMessages = result?.messagesSubscribed === true;
+
+      if (hasMessages) {
+        status.innerHTML = `
+          <span class="text-emerald-700 font-semibold">messages 購読済み</span>
+          <span class="block text-[10px] text-slate-400 mt-0.5">${escapeHtml(fields.join(', ') || 'messages')}</span>
+        `;
+      } else {
+        status.innerHTML = `
+          <span class="text-amber-700 font-semibold">messages が未購読です</span>
+          <span class="block text-[10px] text-slate-400 mt-0.5">${fields.length ? escapeHtml(fields.join(', ')) : 'subscribed_apps に有効な購読がありません'}</span>
+        `;
+      }
+    }
+
+    window.showInstagramWebhookInfo = async function(connectionId) {
       if (loggedInUser?.roleKey !== 'owner') {
         showToast('Instagram受信設定は管理者のみ確認できます');
         return;
       }
+      if (!connectionId) {
+        showToast('Instagram接続情報を確認できませんでした');
+        return;
+      }
+
+      instagramWebhookConnectionId = connectionId;
 
       try {
-        const response = await fetch('/api/omnibox/instagram/webhook-info', {
-          credentials: 'same-origin',
-          cache: 'no-store'
-        });
-        const result = await response.json();
+        const [infoResponse, subscriptionResponse] = await Promise.all([
+          fetch('/api/omnibox/instagram/webhook-info', {
+            credentials: 'same-origin',
+            cache: 'no-store'
+          }),
+          fetch('/api/omnibox/instagram/subscription?connectionId=' + encodeURIComponent(connectionId), {
+            credentials: 'same-origin',
+            cache: 'no-store'
+          })
+        ]);
 
-        if (!response.ok || !result.ok) {
+        const result = await infoResponse.json();
+        const subscription = await subscriptionResponse.json();
+
+        if (!infoResponse.ok || !result.ok) {
           throw new Error(result.message || 'Instagram受信設定を確認できませんでした');
         }
 
@@ -3526,6 +3578,15 @@
         document.getElementById('instagram-webhook-token').value = result.verifyToken || '';
         document.getElementById('instagram-webhook-fields').textContent =
           Array.isArray(result.subscribedFields) ? result.subscribedFields.join(', ') : 'messages';
+
+        if (subscriptionResponse.ok && subscription.ok) {
+          renderInstagramSubscriptionStatus(subscription);
+        } else {
+          renderInstagramSubscriptionStatus({
+            subscribedFields: [],
+            messagesSubscribed: false
+          });
+        }
 
         const modal = document.getElementById('instagram-webhook-modal');
         modal.classList.remove('hidden');
@@ -3536,7 +3597,50 @@
       }
     };
 
+    window.registerInstagramWebhookSubscription = async function() {
+      if (!instagramWebhookConnectionId) {
+        showToast('Instagram接続情報を確認できませんでした');
+        return;
+      }
+
+      const button = document.getElementById('instagram-subscription-register-button');
+      const original = button?.textContent || 'Webhook購読を再登録';
+      if (button) {
+        button.disabled = true;
+        button.textContent = '登録中...';
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/instagram/subscription', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connectionId: instagramWebhookConnectionId })
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'Webhook購読を再登録できませんでした');
+        }
+
+        renderInstagramSubscriptionStatus(result);
+        showToast(
+          result.messagesSubscribed
+            ? 'InstagramのWebhook購読を再登録しました'
+            : '購読登録は完了しましたが、messages を確認できませんでした'
+        );
+      } catch (error) {
+        showToast(error.message || 'Webhook購読を再登録できませんでした');
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = original;
+        }
+      }
+    };
+
     window.closeInstagramWebhookInfo = function() {
+      instagramWebhookConnectionId = null;
       const modal = document.getElementById('instagram-webhook-modal');
       modal.classList.add('hidden');
       modal.classList.remove('flex');
