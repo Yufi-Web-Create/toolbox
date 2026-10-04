@@ -295,6 +295,7 @@ Deno.serve(async (req) => {
             subject,
             gmail_message_id: messageId,
             gmail_thread_id: threadId,
+            rfc822_message_id: headers.get("message-id") ?? "",
           },
         },
       );
