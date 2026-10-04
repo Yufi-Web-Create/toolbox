@@ -151,8 +151,46 @@ Deno.serve(async (req) => {
   }
 
   if (payload.object !== "instagram" || !Array.isArray(payload.entry)) {
+    console.info("Instagram webhook ignored payload shape", {
+      object: payload.object ?? null,
+      hasEntryArray: Array.isArray(payload.entry),
+      topLevelKeys: Object.keys(payload).sort(),
+    });
     return json(200, { ok: true, ignored: true });
   }
+
+  console.info("Instagram webhook payload shape", {
+    object: payload.object,
+    entryCount: payload.entry.length,
+    entries: payload.entry.slice(0, 3).map((rawEntry) => {
+      const entry =
+        rawEntry && typeof rawEntry === "object"
+          ? (rawEntry as Record<string, unknown>)
+          : {};
+      const messaging = Array.isArray(entry.messaging) ? entry.messaging : [];
+      return {
+        entryKeys: Object.keys(entry).sort(),
+        entryIdPresent: Boolean(entry.id),
+        messagingCount: messaging.length,
+        messagingShapes: messaging.slice(0, 3).map((rawEvent) => {
+          const event =
+            rawEvent && typeof rawEvent === "object"
+              ? (rawEvent as Record<string, unknown>)
+              : {};
+          const message =
+            event.message && typeof event.message === "object"
+              ? (event.message as Record<string, unknown>)
+              : null;
+          return {
+            eventKeys: Object.keys(event).sort(),
+            hasSender: Boolean(event.sender),
+            hasRecipient: Boolean(event.recipient),
+            messageKeys: message ? Object.keys(message).sort() : [],
+          };
+        }),
+      };
+    }),
+  });
 
   const accountIds = [
     ...new Set(
