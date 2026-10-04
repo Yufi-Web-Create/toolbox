@@ -3,7 +3,8 @@ import { createClient } from "../supabase/server";
 export type InboxConversation = {
   id: string;
   organization_id: string;
-  provider: "line";
+  provider: "line" | "instagram" | "x" | "email";
+  provider_connection_id: string | null;
   provider_thread_id: string;
   customer_external_id: string;
   customer_display_name: string;
@@ -20,6 +21,7 @@ export type InboxMessage = {
   id: string;
   organization_id: string;
   conversation_id: string;
+  provider_connection_id: string | null;
   provider_message_id: string | null;
   direction: "inbound" | "outbound";
   body: string;
@@ -50,7 +52,7 @@ export async function getInboxSnapshot(
     const { data: conversationData, error: conversationError } = await supabase
       .from("conversations")
       .select(
-        "id, organization_id, provider, provider_thread_id, customer_external_id, customer_display_name, customer_avatar_url, customer_name_source, status, last_message_preview, last_message_at, created_at, updated_at",
+        "id, organization_id, provider, provider_connection_id, provider_thread_id, customer_external_id, customer_display_name, customer_avatar_url, customer_name_source, status, last_message_preview, last_message_at, created_at, updated_at",
       )
       .eq("organization_id", organizationId)
       .order("last_message_at", { ascending: false })
@@ -78,7 +80,7 @@ export async function getInboxSnapshot(
     const { data: messageData, error: messageError } = await supabase
       .from("messages")
       .select(
-        "id, organization_id, conversation_id, provider_message_id, direction, body, sent_by_user_id, created_at",
+        "id, organization_id, conversation_id, provider_connection_id, provider_message_id, direction, body, sent_by_user_id, created_at",
       )
       .eq("organization_id", organizationId)
       .eq("conversation_id", selectedConversation.id)
