@@ -18,57 +18,6 @@ import styles from "./page.module.css";
 const APP_ORIGIN =
   process.env.APP_URL?.trim() || "https://toolbox-pink-nine.vercel.app";
 
-type LineHealth = {
-  available: boolean;
-  configured: boolean;
-  lineConnected: boolean;
-  lineApiReachable: boolean | null;
-  webhookActive: boolean | null;
-  webhookMatches: boolean | null;
-  webhookUrl: string | null;
-};
-
-async function getLineHealth(): Promise<LineHealth> {
-  try {
-    const response = await fetch(new URL("/health", BRIDGE_URL), {
-      cache: "no-store",
-    });
-    const data = response.ok
-      ? ((await response.json()) as Record<string, unknown>)
-      : {};
-
-    return {
-      available: response.ok,
-      configured: data.configured === true,
-      lineConnected: data.lineConnected === true,
-      lineApiReachable:
-        typeof data.lineApiReachable === "boolean"
-          ? data.lineApiReachable
-          : null,
-      webhookActive:
-        typeof data.webhookActive === "boolean"
-          ? data.webhookActive
-          : null,
-      webhookMatches:
-        typeof data.webhookMatches === "boolean"
-          ? data.webhookMatches
-          : null,
-      webhookUrl:
-        typeof data.webhookUrl === "string" ? data.webhookUrl : null,
-    };
-  } catch {
-    return {
-      available: false,
-      configured: false,
-      lineConnected: false,
-      lineApiReachable: null,
-      webhookActive: null,
-      webhookMatches: null,
-      webhookUrl: null,
-    };
-  }
-}
-
 function State({
   ready,
   readyText = "設定済み",
