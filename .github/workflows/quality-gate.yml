@@ -31,6 +31,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Check OmniBox inline JavaScript
+        run: npm run check:inline-js
+
       - name: Test
         run: npm test
 
