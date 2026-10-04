@@ -269,51 +269,26 @@ function providerBridgeAuthorized(request, config) {
   return Boolean(config.providerBridgeKey) && safeStringEqual(key, config.providerBridgeKey);
 }
 
-async function operatorConfigRpc(fetchImpl, config, functionName, payload) {
-  const response = await fetchImpl(
-    `${config.supabaseUrl}/rest/v1/rpc/${functionName}`,
-    {
-      method: "POST",
-      headers: {
-        apikey: config.supabasePublishableKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-  let data = null;
-  try { data = await response.json(); } catch {}
-  return { response, data };
-}
-
 async function storeOperatorProviderConfig(fetchImpl, config, provider, providerConfig) {
   const encrypted = encryptProviderConfig(config, providerConfig);
-  const { response } = await operatorConfigRpc(
-    fetchImpl,
-    config,
-    "omnibox_operator_config_set",
-    {
-      p_key: config.providerBridgeKey,
-      p_provider: provider,
-      p_encrypted_key: encrypted.encryptedKey,
-      p_encrypted_payload: encrypted.encryptedPayload,
-      p_iv: encrypted.iv,
-      p_auth_tag: encrypted.authTag,
-    },
-  );
+  const { response } = await signedEdgeRequest(fetchImpl, config, {
+    action: "store-operator-config",
+    organizationId: config.organizationId,
+    provider,
+    ...encrypted,
+  });
   if (!response.ok) throw new Error("operator config store failed");
 }
 
 async function loadOperatorProviderConfig(fetchImpl, config, provider) {
-  const { response, data } = await operatorConfigRpc(
-    fetchImpl,
-    config,
-    "omnibox_operator_config_get",
-    { p_key: config.providerBridgeKey, p_provider: provider },
-  );
-  if (!response.ok) throw new Error("operator config lookup failed");
-  const row = Array.isArray(data) ? data[0] : null;
-  return row ? decryptProviderConfig(config, row) : null;
+  const { response, data } = await signedEdgeRequest(fetchImpl, config, {
+    action: "get-operator-config",
+    organizationId: config.organizationId,
+    provider,
+  });
+  if (response.status === 404) return null;
+  if (!response.ok || !data?.config) throw new Error("operator config lookup failed");
+  return decryptProviderConfig(config, data.config);
 }
 
 async function storeProviderConfig(fetchImpl, config, providerConfig) {
