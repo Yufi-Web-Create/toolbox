@@ -3945,35 +3945,7 @@
       }
     }
 
-    window.switchAuthTab = function(mode) {
-      currentAuthMode = mode;
-      const tabLogin = document.getElementById('auth-tab-login');
-      const tabRegister = document.getElementById('auth-tab-register');
-      const nameGroup = document.getElementById('auth-name-group');
-      const loginTypeGroup = document.getElementById('auth-login-type-group');
-      const organizationGroup = document.getElementById('auth-organization-group');
-      const submitLabel = document.getElementById('auth-submit-label');
-
-      if (mode === 'login') {
-        tabLogin.className = 'flex-1 py-2 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
-        tabRegister.className = 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
-        nameGroup.classList.add('hidden');
-        loginTypeGroup.classList.remove('hidden');
-        organizationGroup.classList.add('hidden');
-        submitLabel.textContent = currentLoginType === 'employee' ? '従業員としてログイン' : '管理者としてログイン';
-      } else {
-        tabRegister.className = 'flex-1 py-2 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
-        tabLogin.className = 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
-        nameGroup.classList.remove('hidden');
-        loginTypeGroup.classList.add('hidden');
-        organizationGroup.classList.add('hidden');
-        submitLabel.textContent = '管理者アカウントを作成';
-      }
-      lucide.createIcons();
-    };
-
-    window.switchLoginType = function(type) {
-      currentLoginType = type === 'employee' ? 'employee' : 'admin';
+    function renderLoginTypeState() {
       const adminButton = document.getElementById('auth-login-type-admin');
       const employeeButton = document.getElementById('auth-login-type-employee');
       const organizationGroup = document.getElementById('auth-organization-group');
@@ -3981,14 +3953,57 @@
 
       const active = 'py-2 rounded-lg bg-white text-slate-800 shadow-xs text-xs font-semibold flex items-center justify-center gap-1.5';
       const inactive = 'py-2 rounded-lg text-slate-600 text-xs font-semibold flex items-center justify-center gap-1.5';
-      adminButton.className = currentLoginType === 'admin' ? active : inactive;
-      employeeButton.className = currentLoginType === 'employee' ? active : inactive;
-      organizationGroup.classList.add('hidden');
+
+      if (adminButton) {
+        adminButton.className = currentLoginType === 'admin' ? active : inactive;
+        adminButton.setAttribute('aria-pressed', currentLoginType === 'admin' ? 'true' : 'false');
+      }
+      if (employeeButton) {
+        employeeButton.className = currentLoginType === 'employee' ? active : inactive;
+        employeeButton.setAttribute('aria-pressed', currentLoginType === 'employee' ? 'true' : 'false');
+      }
+      organizationGroup?.classList.add('hidden');
+
+      if (submitLabel && currentAuthMode === 'login') {
+        submitLabel.textContent =
+          currentLoginType === 'employee'
+            ? '従業員としてログイン'
+            : '管理者としてログイン';
+      }
+
+      lucide.createIcons();
+    }
+
+    window.switchAuthTab = function(mode) {
+      currentAuthMode = mode === 'register' ? 'register' : 'login';
+      const tabLogin = document.getElementById('auth-tab-login');
+      const tabRegister = document.getElementById('auth-tab-register');
+      const nameGroup = document.getElementById('auth-name-group');
+      const loginTypeGroup = document.getElementById('auth-login-type-group');
+      const organizationGroup = document.getElementById('auth-organization-group');
+      const submitLabel = document.getElementById('auth-submit-label');
 
       if (currentAuthMode === 'login') {
-        submitLabel.textContent = currentLoginType === 'employee' ? '従業員としてログイン' : '管理者としてログイン';
+        tabLogin.className = 'flex-1 py-2 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
+        tabRegister.className = 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
+        nameGroup.classList.add('hidden');
+        loginTypeGroup.classList.remove('hidden');
+        organizationGroup.classList.add('hidden');
+        renderLoginTypeState();
+      } else {
+        tabRegister.className = 'flex-1 py-2 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
+        tabLogin.className = 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
+        nameGroup.classList.remove('hidden');
+        loginTypeGroup.classList.add('hidden');
+        organizationGroup.classList.add('hidden');
+        submitLabel.textContent = '管理者アカウントを作成';
+        lucide.createIcons();
       }
-      lucide.createIcons();
+    };
+
+    window.switchLoginType = function(type) {
+      currentLoginType = type === 'employee' ? 'employee' : 'admin';
+      renderLoginTypeState();
     };
 
     window.toggleAuthPasswordVisibility = function() {
