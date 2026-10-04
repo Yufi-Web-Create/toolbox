@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
@@ -22,8 +23,16 @@ async function requireMaster() {
   }
 }
 
-function masterUrl(status: string) {
-  return "/master?status=" + encodeURIComponent(status);
+async function redirectWithStatus(status: string): Promise<never> {
+  const cookieStore = await cookies();
+  cookieStore.set("omnibox_master_status", status, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/master",
+    maxAge: 15,
+  });
+  redirect("/master");
 }
 
 async function operatorBridgeRequest(path: string, payload: Record<string, unknown>) {
@@ -57,7 +66,7 @@ export async function configureAiFromMaster(formData: FormData) {
   const model = String(formData.get("model") ?? "").trim() || "gpt-6-luna";
 
   if (apiKey.length > 512 || model.length > 128 || !/^[a-z0-9][a-z0-9._:/-]*$/i.test(model)) {
-    redirect(masterUrl("ai-invalid"));
+    await redirectWithStatus("ai-invalid");
   }
 
   const result = await operatorBridgeRequest("/internal/operator/ai/configure", {
@@ -66,44 +75,15 @@ export async function configureAiFromMaster(formData: FormData) {
   });
 
   revalidatePath("/master");
-  redirect(
-    masterUrl(
-      result.ok
-        ? "ai-saved"
-        : result.error === "invalid_ai_key" ||
-            result.error === "ai_key_rejected" ||
-            result.error === "invalid_ai_model"
-          ? "ai-invalid"
-          : "ai-error",
-    ),
+  await redirectWithStatus(
+    result.ok
+      ? "ai-saved"
+      : result.error === "invalid_ai_key" ||
+          result.error === "ai_key_rejected" ||
+          result.error === "invalid_ai_model"
+        ? "ai-invalid"
+        : "ai-error",
   );
-}
-
-export async function configureLineFromMaster(formData: FormData) {
-  await requireMaster();
-
-  const channelId = String(formData.get("channelId") ?? "").trim();
-  const channelSecret = String(formData.get("channelSecret") ?? "").trim();
-
-  if (!/^\d+$/.test(channelId) || channelSecret.length < 16) {
-    redirect(masterUrl("line-invalid"));
-  }
-
-  const result = await operatorBridgeRequest("/internal/operator/line/configure", {
-    channelId,
-    channelSecret,
-  });
-
-  revalidatePath("/master");
-  redirect(masterUrl(result.ok ? "line-saved" : "line-error"));
-}
-
-export async function repairLineFromMaster() {
-  await requireMaster();
-
-  const result = await operatorBridgeRequest("/internal/operator/line/repair", {});
-  revalidatePath("/master");
-  redirect(masterUrl(result.ok ? "line-repaired" : "line-error"));
 }
 
 export async function configureOAuthProviderFromMaster(formData: FormData) {
@@ -118,7 +98,7 @@ export async function configureOAuthProviderFromMaster(formData: FormData) {
     .filter(Boolean);
 
   if (!["instagram", "x", "google"].includes(provider) || !clientId || !clientSecret) {
-    redirect(masterUrl("provider-invalid"));
+    await redirectWithStatus("provider-invalid");
   }
 
   const result = await operatorBridgeRequest("/internal/operator/provider/configure", {
@@ -129,7 +109,7 @@ export async function configureOAuthProviderFromMaster(formData: FormData) {
   });
 
   revalidatePath("/master");
-  redirect(masterUrl(result.ok ? provider + "-saved" : provider + "-error"));
+  await redirectWithStatus(result.ok ? provider + "-saved" : provider + "-error");
 }
 
 export async function masterLogout() {
