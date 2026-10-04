@@ -129,6 +129,24 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).not.toContain("X (旧Twitter アカウント連携)</option>");
   });
 
+  it("maps live inbox conversations across LINE Instagram and email", () => {
+    expect(html).toContain("conversation.provider_connection_id");
+    expect(html).toContain("provider === 'email' ? 'email' : provider");
+    expect(html).toContain("matchedAccount?.id");
+  });
+
+  it("synchronizes connected Gmail inboxes through the real API route", () => {
+    expect(html).toContain("/api/omnibox/google/sync");
+    expect(html).toContain("syncGoogleInbox");
+    expect(html).toContain("account.provider === 'google'");
+  });
+
+  it("sends replies from live LINE Instagram and email conversations", () => {
+    expect(html).toContain("['line', 'instagram', 'email'].includes(thread.channel)");
+    expect(html).toContain("/api/omnibox/reply");
+    expect(html).toContain("getChannelMeta(thread.channel).name");
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
