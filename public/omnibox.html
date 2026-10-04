@@ -1221,6 +1221,7 @@
     let requiresOrganizationSetup = false;
     let isDemoSession = false;
     let providerOAuthReadiness = {};
+    let providerInboxSyncStarted = false;
 
     let threads = [];
     let connectedAccounts = [];
@@ -1490,13 +1491,23 @@
               }))
             : [];
 
+          const provider = conversation.provider || 'line';
+          const channel = provider === 'email' ? 'email' : provider;
+          const matchedAccount = connectedAccounts.find(account =>
+            conversation.provider_connection_id
+              ? account.providerConnectionId === conversation.provider_connection_id
+              : provider === 'line' && account.provider === 'line'
+          );
+          const meta = getChannelMeta(channel);
+
           return {
             id: conversation.id,
             liveConversationId: conversation.id,
-            accountId: 'acc_line_live',
-            customerName: conversation.customer_display_name || 'LINEユーザー',
+            accountId: matchedAccount?.id || ('provider_' + provider),
+            providerConnectionId: conversation.provider_connection_id || null,
+            customerName: conversation.customer_display_name || '問い合わせユーザー',
             customerHandle: conversation.customer_external_id || '',
-            channel: 'line',
+            channel,
             avatar: conversation.customer_avatar_url || '',
             customerNameSource: conversation.customer_name_source || 'provider',
             status: conversation.status === 'completed' ? 'resolved' : conversation.status,
@@ -1504,7 +1515,7 @@
             lastMessage: conversation.last_message_preview || '',
             lastTime: formatLiveTime(conversation.last_message_at),
             unreadCount: conversation.status === 'unread' ? 1 : 0,
-            tags: ['LINE', '実データ'],
+            tags: [meta.name, matchedAccount?.accountName || '実データ'],
             notes: [],
             messages,
             updatedAt: new Date(conversation.last_message_at).getTime() || Date.now()
@@ -1545,6 +1556,43 @@
         hour: '2-digit',
         minute: '2-digit'
       });
+    }
+
+    async function syncGoogleInbox({ silent = true, reloadInbox = false } = {}) {
+      if (isDemoSession) return { ok: true, imported: 0 };
+
+      const hasGoogle = connectedAccounts.some(account => account.provider === 'google');
+      if (!hasGoogle) return { ok: true, imported: 0 };
+
+      try {
+        const response = await fetch('/api/omnibox/google/sync', {
+          method: 'POST',
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'Gmailを同期できませんでした');
+        }
+
+        if (reloadInbox) {
+          await loadLiveInbox();
+        }
+
+        if (!silent) {
+          showToast(result.imported > 0
+            ? `Gmailを同期しました（${result.imported}件を確認）`
+            : 'Gmailは最新の状態です');
+        }
+
+        return result;
+      } catch (error) {
+        if (!silent) {
+          showToast(error.message || 'Gmailを同期できませんでした');
+        }
+        return { ok: false, imported: 0 };
+      }
     }
 
     async function initCloudAndAuth() {
@@ -1591,6 +1639,10 @@
           } else {
             await loadTemplates();
             await loadProviderConnections();
+            if (!providerInboxSyncStarted) {
+              providerInboxSyncStarted = true;
+              await syncGoogleInbox({ silent: true, reloadInbox: false });
+            }
             await loadLiveInbox();
           }
         } else {
@@ -1606,6 +1658,7 @@
         currentOrganization = null;
         requiresOrganizationSetup = false;
         isDemoSession = false;
+        providerInboxSyncStarted = false;
         threads = [];
         connectedAccounts = [];
         onDataUpdated();
@@ -2507,7 +2560,7 @@
           </div>
 
           <div class="mt-4 pt-3 border-t border-slate-100 text-xs flex justify-between items-center">
-            <button onclick="window.testSyncAccount('${acc.accountName}')" class="text-teal-600 font-medium hover:underline flex items-center gap-1">
+            <button onclick="window.testSyncAccount('${acc.id}')" class="text-teal-600 font-medium hover:underline flex items-center gap-1">
               <i data-lucide="refresh-cw" class="w-3 h-3"></i>
               <span>再同期・疎通テスト</span>
             </button>
@@ -2697,9 +2750,24 @@
       }
     };
 
-    window.testSyncAccount = async function(name) {
+    window.testSyncAccount = async function(accId) {
+      const account = connectedAccounts.find(item => item.id === accId);
+      if (!account) return;
+
+      if (account.provider === 'google') {
+        await syncGoogleInbox({ silent: false, reloadInbox: true });
+        return;
+      }
+
       await loadProviderConnections();
-      showToast(`「${name}」の連携状態を更新しました`);
+
+      if (account.provider === 'instagram') {
+        showToast(`「${account.accountName}」はWebhook受信待機中です`);
+      } else if (account.provider === 'line') {
+        showToast(`「${account.accountName}」のLINE接続状態を更新しました`);
+      } else {
+        showToast(`「${account.accountName}」の連携状態を更新しました`);
+      }
     };
 
     window.removeAccount = async function(accId) {
@@ -3400,6 +3468,10 @@
           if (!isDemoSession) {
             await loadTemplates();
             await loadProviderConnections();
+            if (!providerInboxSyncStarted) {
+              providerInboxSyncStarted = true;
+              await syncGoogleInbox({ silent: true, reloadInbox: false });
+            }
           }
           await loadLiveInbox();
           window.switchView('inbox');
