@@ -2290,7 +2290,7 @@
         return;
       }
 
-      if (thread.channel !== 'line' || !thread.liveConversationId) {
+      if (!thread.liveConversationId || !['line', 'instagram', 'email'].includes(thread.channel)) {
         showToast('このチャネルの実送信はまだ接続されていません');
         return;
       }
@@ -2323,10 +2323,11 @@
           renderThreadList();
           updateBadges();
         }
-        showToast('LINEへ返信を送信しました');
+        const channelName = getChannelMeta(thread.channel).name;
+        showToast(`${channelName}へ返信を送信しました`);
       } catch (error) {
-        console.error('LINE reply failed:', error);
-        showToast(error.message || 'LINEへの返信を送信できませんでした');
+        console.error('Provider reply failed:', error);
+        showToast(error.message || '返信を送信できませんでした');
       } finally {
         sendButton.disabled = false;
         sendButton.innerHTML = originalHtml;
