@@ -161,6 +161,14 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("X DMを同期");
   });
 
+  it("uses real social publishing and scheduled post APIs", () => {
+    expect(html).toContain("/api/omnibox/posts");
+    expect(html).toContain("new-post-media-url");
+    expect(html).toContain("Instagram投稿には公開画像URL");
+    expect(html).toContain("指定時刻に自動投稿します");
+    expect(html).toContain("投稿未対応");
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
