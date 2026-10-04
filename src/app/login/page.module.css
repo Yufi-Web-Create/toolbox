@@ -34,8 +34,20 @@
   border: 1px solid rgba(255,255,255,.28);
   border-radius: 16px;
   background: rgba(255,255,255,.12);
+  color: inherit;
+  cursor: pointer;
   font-size: 28px;
   font-weight: 700;
+  text-decoration: none;
+  transition: transform .16s ease, background .16s ease;
+}
+
+.logoMark:hover,
+.logoMark:focus-visible {
+  background: rgba(255,255,255,.2);
+  transform: translateY(-1px);
+  outline: 2px solid rgba(255,255,255,.5);
+  outline-offset: 2px;
 }
 
 .hero h1 {
@@ -200,4 +212,12 @@
   color: #94a3b8;
   font-size: 10px;
   text-align: center;
+}
+
+
+.masterHint {
+  margin: -2px 0 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.6;
 }
