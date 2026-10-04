@@ -51,11 +51,7 @@ async function refreshXToken(bundle: Record<string, unknown>) {
       "content-type": "application/x-www-form-urlencoded",
       authorization:
         "Basic " +
-        btoa(
-          encodeURIComponent(clientId) +
-            ":" +
-            encodeURIComponent(clientSecret),
-        ),
+        btoa(clientId + ":" + clientSecret),
     },
     body,
   });
