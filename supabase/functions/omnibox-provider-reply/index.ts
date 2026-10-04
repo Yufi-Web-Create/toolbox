@@ -287,6 +287,45 @@ Deno.serve(async (req) => {
     return json(200, { ok: true, provider: "email" });
   }
 
+  if (conversation.provider === "x") {
+    if (!accessToken || !conversation.customer_external_id) {
+      return json(409, { ok: false, error: "x_token_missing" });
+    }
+
+    const endpoint =
+      "https://api.x.com/2/dm_conversations/with/" +
+      encodeURIComponent(conversation.customer_external_id) +
+      "/messages";
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer " + accessToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ text: message }),
+    });
+
+    if (!response.ok) {
+      return json(502, { ok: false, error: "x_send_failed" });
+    }
+
+    const sent = await response.json();
+    const providerMessageId =
+      typeof sent?.data?.dm_event_id === "string" && sent.data.dm_event_id
+        ? "x:" + connection.id + ":" + sent.data.dm_event_id
+        : "x:" + connection.id + ":out:" + crypto.randomUUID();
+
+    await admin.rpc("omnibox_record_external_outbound", {
+      p_conversation_id: conversation.id,
+      p_provider_message_id: providerMessageId,
+      p_body: message,
+      p_sent_by_user_id: user.id,
+    });
+
+    return json(200, { ok: true, provider: "x" });
+  }
+
   if (conversation.provider === "instagram") {
     if (!accessToken || !connection.external_account_id) {
       return json(409, { ok: false, error: "instagram_token_missing" });
