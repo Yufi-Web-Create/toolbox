@@ -1,16 +1,25 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { getProviderConfig } from "../../lib/integrations/oauth/providers";
 import {
   hasMasterSession,
   isMasterConfigured,
 } from "../../lib/master-auth";
-import { masterLogout } from "./actions";
+import {
+  configureLineFromMaster,
+  configureOAuthProviderFromMaster,
+  masterLogout,
+  repairLineFromMaster,
+} from "./actions";
 import styles from "./page.module.css";
 
 const BRIDGE_URL =
   process.env.LINE_BRIDGE_URL?.trim() ||
   "https://omnibox-line-bridge.onrender.com";
+
+const APP_ORIGIN =
+  process.env.APP_URL?.trim() || "https://toolbox-pink-nine.vercel.app";
 
 type LineHealth = {
   available: boolean;
@@ -79,12 +88,99 @@ function State({
   );
 }
 
-export default async function MasterPage() {
+function ProviderForm({
+  provider,
+  title,
+  clientId,
+  scopes,
+  callbackUrl,
+  configured,
+}: {
+  provider: "instagram" | "x" | "google";
+  title: string;
+  clientId: string;
+  scopes: string[];
+  callbackUrl: string;
+  configured: boolean;
+}) {
+  return (
+    <article className={styles.card}>
+      <div className={styles.cardTitleRow}>
+        <h2>{title}</h2>
+        <State ready={configured} />
+      </div>
+      <form action={configureOAuthProviderFromMaster} className={styles.form}>
+        <input name="provider" type="hidden" value={provider} />
+        <label className={styles.field}>
+          <span>Client ID</span>
+          <input
+            name="clientId"
+            defaultValue={clientId}
+            placeholder="Developer App の Client ID"
+            required
+          />
+        </label>
+        <label className={styles.field}>
+          <span>Client Secret</span>
+          <input
+            name="clientSecret"
+            type="password"
+            placeholder={configured ? "変更するときだけ新しいSecretを入力" : "Client Secret"}
+            required
+          />
+        </label>
+        <label className={styles.field}>
+          <span>Scopes</span>
+          <textarea
+            name="scopes"
+            defaultValue={scopes.join("\n")}
+            rows={provider === "google" ? 6 : 5}
+          />
+        </label>
+        <div className={styles.callbackBox}>
+          <span>Callback URL</span>
+          <code>{callbackUrl}</code>
+        </div>
+        <button className={styles.primaryButton} type="submit">
+          {configured ? "設定を更新" : "設定を保存"}
+        </button>
+      </form>
+    </article>
+  );
+}
+
+const STATUS_MESSAGES: Record<string, string> = {
+  "line-saved": "LINEの接続情報を保存し、Webhookを再設定しました。",
+  "line-repaired": "LINE Webhookの再設定を実行しました。",
+  "line-invalid": "LINEのChannel ID / Channel Secretを確認してください。",
+  "line-error": "LINE設定を更新できませんでした。稼働状況を確認してください。",
+  "instagram-saved": "Instagram / Meta のDeveloper App設定を保存しました。",
+  "instagram-error": "Instagram / Meta の設定を保存できませんでした。",
+  "x-saved": "X のDeveloper App設定を保存しました。",
+  "x-error": "X の設定を保存できませんでした。",
+  "google-saved": "Google / Gmail のDeveloper App設定を保存しました。",
+  "google-error": "Google / Gmail の設定を保存できませんでした。",
+  "provider-invalid": "Client ID / Client Secretを確認してください。",
+};
+
+export default async function MasterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   if (!(await hasMasterSession())) {
     redirect("/master-login");
   }
 
-  const line = await getLineHealth();
+  const [line, instagram, x, google] = await Promise.all([
+    getLineHealth(),
+    getProviderConfig("instagram", APP_ORIGIN),
+    getProviderConfig("x", APP_ORIGIN),
+    getProviderConfig("google", APP_ORIGIN),
+  ]);
+  const params = await searchParams;
+  const statusMessage = params.status ? STATUS_MESSAGES[params.status] : null;
+
   const gatewayConfigured = Boolean(
     process.env.AI_GATEWAY_API_KEY?.trim() ||
       process.env.VERCEL_OIDC_TOKEN?.trim(),
@@ -94,18 +190,6 @@ export default async function MasterPage() {
   const aiModel =
     process.env.OPENAI_MODEL?.trim() ||
     (gatewayConfigured ? "openai/gpt-6-luna" : "gpt-6-luna");
-  const instagramConfigured = Boolean(
-    process.env.OMNIBOX_INSTAGRAM_CLIENT_ID?.trim() &&
-      process.env.OMNIBOX_INSTAGRAM_CLIENT_SECRET?.trim(),
-  );
-  const xConfigured = Boolean(
-    process.env.OMNIBOX_X_CLIENT_ID?.trim() &&
-      process.env.OMNIBOX_X_CLIENT_SECRET?.trim(),
-  );
-  const googleConfigured = Boolean(
-    process.env.OMNIBOX_GOOGLE_CLIENT_ID?.trim() &&
-      process.env.OMNIBOX_GOOGLE_CLIENT_SECRET?.trim(),
-  );
 
   return (
     <main className={styles.page}>
@@ -114,7 +198,9 @@ export default async function MasterPage() {
           <div>
             <p className={styles.eyebrow}>OmniBox Operations</p>
             <h1>運営側 設定・稼働確認</h1>
-            <p>秘密値そのものは表示せず、設定有無と接続状態だけを確認できます。</p>
+            <p>
+              SNS連携に必要なDeveloper App設定と稼働状態を、ここで一元管理します。
+            </p>
           </div>
           <div className={styles.actions}>
             <Link className={styles.link} href="/omnibox.html">
@@ -127,6 +213,10 @@ export default async function MasterPage() {
             </form>
           </div>
         </header>
+
+        {statusMessage ? (
+          <div className={styles.notice}>{statusMessage}</div>
+        ) : null}
 
         <section className={styles.grid}>
           <article className={styles.card}>
@@ -141,9 +231,6 @@ export default async function MasterPage() {
                 <span className={styles.ready}>ログイン中</span>
               </div>
             </div>
-            <p className={styles.note}>
-              パスワードはサーバー環境変数で管理し、ブラウザには署名済みセッションだけを保存します。
-            </p>
           </article>
 
           <article className={styles.card}>
@@ -168,81 +255,160 @@ export default async function MasterPage() {
                 <span className={styles.value}>{aiModel}</span>
               </div>
             </div>
-            <p className={styles.note}>
-              AI対応プランの受信箱から返信案を作成します。生成した文章は自動送信されません。
-            </p>
           </article>
 
           <article className={styles.card + " " + styles.cardWide}>
-            <h2>LINE Messaging API</h2>
-            <div className={styles.rows}>
-              <div className={styles.row}>
-                <span>Bridge</span>
-                <State ready={line.available && line.configured} readyText="稼働中" />
-              </div>
-              <div className={styles.row}>
-                <span>LINE接続情報</span>
-                <State ready={line.lineConnected} />
-              </div>
-              <div className={styles.row}>
-                <span>LINE API疎通</span>
-                <State
-                  ready={line.lineApiReachable === true}
-                  readyText="確認済み"
-                  pendingText={line.lineApiReachable === null ? "未診断" : "要確認"}
-                />
-              </div>
-              <div className={styles.row}>
-                <span>Webhook有効</span>
-                <State
-                  ready={line.webhookActive === true}
-                  readyText="有効"
-                  pendingText={line.webhookActive === null ? "未診断" : "無効"}
-                />
-              </div>
-              <div className={styles.row}>
-                <span>Webhook URL一致</span>
-                <State
-                  ready={line.webhookMatches === true}
-                  readyText="一致"
-                  pendingText={line.webhookMatches === null ? "未診断" : "不一致"}
-                />
-              </div>
-              {line.webhookUrl ? (
-                <div className={styles.row}>
-                  <span>現在のWebhook</span>
-                  <span className={styles.value}>{line.webhookUrl}</span>
+            <div className={styles.cardTitleRow}>
+              <h2>LINE Messaging API</h2>
+              <State
+                ready={
+                  line.available &&
+                  line.lineConnected &&
+                  line.lineApiReachable === true &&
+                  line.webhookActive === true &&
+                  line.webhookMatches === true
+                }
+                readyText="正常"
+                pendingText="要確認"
+              />
+            </div>
+
+            <div className={styles.lineLayout}>
+              <div>
+                <div className={styles.rows}>
+                  <div className={styles.row}>
+                    <span>Bridge</span>
+                    <State ready={line.available && line.configured} readyText="稼働中" />
+                  </div>
+                  <div className={styles.row}>
+                    <span>LINE接続情報</span>
+                    <State ready={line.lineConnected} />
+                  </div>
+                  <div className={styles.row}>
+                    <span>LINE API疎通</span>
+                    <State
+                      ready={line.lineApiReachable === true}
+                      readyText="確認済み"
+                      pendingText={line.lineApiReachable === null ? "未診断" : "要確認"}
+                    />
+                  </div>
+                  <div className={styles.row}>
+                    <span>Webhook有効</span>
+                    <State
+                      ready={line.webhookActive === true}
+                      readyText="有効"
+                      pendingText={line.webhookActive === null ? "未診断" : "無効"}
+                    />
+                  </div>
+                  <div className={styles.row}>
+                    <span>Webhook URL一致</span>
+                    <State
+                      ready={line.webhookMatches === true}
+                      readyText="一致"
+                      pendingText={line.webhookMatches === null ? "未診断" : "不一致"}
+                    />
+                  </div>
+                  {line.webhookUrl ? (
+                    <div className={styles.row}>
+                      <span>現在のWebhook</span>
+                      <span className={styles.value}>{line.webhookUrl}</span>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
+                <form action={repairLineFromMaster} className={styles.inlineForm}>
+                  <button className={styles.secondaryButton} type="submit">
+                    Webhookを診断・再設定
+                  </button>
+                </form>
+              </div>
+
+              <form action={configureLineFromMaster} className={styles.form}>
+                <label className={styles.field}>
+                  <span>Channel ID</span>
+                  <input
+                    name="channelId"
+                    inputMode="numeric"
+                    placeholder="LINE Developers の Channel ID"
+                    required
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Channel Secret</span>
+                  <input
+                    name="channelSecret"
+                    type="password"
+                    placeholder="Messaging API の Channel Secret"
+                    required
+                  />
+                </label>
+                <p className={styles.note}>
+                  保存すると認証情報を暗号化して更新し、Webhook URLの登録と疎通確認まで実行します。
+                </p>
+                <button className={styles.primaryButton} type="submit">
+                  LINE設定を保存・接続
+                </button>
+              </form>
             </div>
           </article>
 
-          <article className={styles.card}>
-            <h2>SNS Developer App</h2>
-            <div className={styles.rows}>
-              <div className={styles.row}>
-                <span>Instagram / Meta</span>
-                <State ready={instagramConfigured} />
-              </div>
-              <div className={styles.row}>
-                <span>X</span>
-                <State ready={xConfigured} />
-              </div>
-              <div className={styles.row}>
-                <span>Google / Gmail</span>
-                <State ready={googleConfigured} />
-              </div>
-            </div>
-          </article>
+          <ProviderForm
+            provider="instagram"
+            title="Instagram / Meta"
+            clientId={instagram?.clientId ?? ""}
+            scopes={
+              instagram?.scopes ?? [
+                "instagram_business_basic",
+                "instagram_business_manage_messages",
+                "instagram_business_content_publish",
+              ]
+            }
+            callbackUrl={`${APP_ORIGIN}/api/omnibox/oauth/instagram/callback`}
+            configured={Boolean(instagram)}
+          />
+
+          <ProviderForm
+            provider="x"
+            title="X"
+            clientId={x?.clientId ?? ""}
+            scopes={
+              x?.scopes ?? [
+                "tweet.read",
+                "tweet.write",
+                "users.read",
+                "dm.read",
+                "dm.write",
+                "offline.access",
+              ]
+            }
+            callbackUrl={`${APP_ORIGIN}/api/omnibox/oauth/x/callback`}
+            configured={Boolean(x)}
+          />
+
+          <ProviderForm
+            provider="google"
+            title="Google / Gmail"
+            clientId={google?.clientId ?? ""}
+            scopes={
+              google?.scopes ?? [
+                "openid",
+                "email",
+                "profile",
+                "https://www.googleapis.com/auth/gmail.readonly",
+                "https://www.googleapis.com/auth/gmail.send",
+              ]
+            }
+            callbackUrl={`${APP_ORIGIN}/api/omnibox/oauth/google/callback`}
+            configured={Boolean(google)}
+          />
 
           <article className={styles.card}>
-            <h2>接続作業</h2>
+            <h2>店舗側の接続操作</h2>
             <p className={styles.note}>
-              顧客側の接続操作はOmniBoxの「接続アカウント」に集約しています。各サービスのDeveloper Consoleで必要な準備とCallback URLも同画面に表示します。
+              Developer Appの設定はこの運営画面で管理します。設定完了後、店舗側はOmniBoxの「接続アカウント」から公式認証画面へ進んでアカウントを許可するだけです。
             </p>
             <div className={styles.actions}>
               <Link className={styles.link} href="/omnibox.html">
-                接続アカウントを確認
+                接続アカウントを開く
               </Link>
             </div>
           </article>
