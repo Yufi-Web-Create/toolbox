@@ -1943,7 +1943,7 @@
         }
         assignableStaff = result.employees.map(employee => ({
           id: employee.id,
-          name: employee.name || employee.email || '従業員'
+          name: employee.name || employee.loginId || '従業員'
         }));
         renderAssigneeOptions();
         return true;
@@ -2325,11 +2325,11 @@
 
         if (session.authenticated && session.user) {
           loggedInUser = {
-            name: session.user.name || session.user.email?.split('@')[0] || 'スタッフ',
+            name: session.user.name || session.user.loginId || 'スタッフ',
             loginId: session.user.loginId || '',
             role: session.user.role || '従業員',
             roleKey: session.user.roleKey || 'member',
-            avatar: (session.user.name || session.user.email || '担').slice(0, 1)
+            avatar: (session.user.name || session.user.loginId || '担').slice(0, 1)
           };
           currentOrganization = session.organization || null;
           currentPlan = currentOrganization?.plan || 'standard';
@@ -4863,8 +4863,8 @@
       const input = document.getElementById('search-input');
       const value = input?.value || '';
       const looksLikeCredentialAutofill =
-        loggedInUser?.email &&
-        value.trim().toLowerCase() === loggedInUser.email.trim().toLowerCase();
+        loggedInUser?.loginId &&
+        value.trim().toLowerCase() === loggedInUser.loginId.trim().toLowerCase();
 
       if (looksLikeCredentialAutofill) {
         input.value = '';
@@ -4883,8 +4883,8 @@
 
     window.syncMobileSearch = function(value) {
       const looksLikeCredentialAutofill =
-        loggedInUser?.email &&
-        String(value || '').trim().toLowerCase() === loggedInUser.email.trim().toLowerCase();
+        loggedInUser?.loginId &&
+        String(value || '').trim().toLowerCase() === loggedInUser.loginId.trim().toLowerCase();
       const safeValue = looksLikeCredentialAutofill ? '' : (value || '');
       const desktop = document.getElementById('search-input');
       if (desktop) desktop.value = safeValue;
