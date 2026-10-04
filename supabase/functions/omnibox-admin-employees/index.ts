@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
 
   const { data: organization, error: organizationError } = await admin
     .from("organizations")
-    .select("id, created_by")
+    .select("id, created_by, plan_key")
     .eq("id", membership.organization_id)
     .maybeSingle();
 
@@ -104,6 +104,26 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === "POST") {
+    const planKey =
+      typeof organization.plan_key === "string"
+        ? organization.plan_key
+        : "standard";
+
+    if (planKey === "lite") {
+      const { count, error: countError } = await admin
+        .from("organization_members")
+        .select("user_id", { count: "exact", head: true })
+        .eq("organization_id", organization.id);
+
+      if (countError) {
+        return json(500, { ok: false, error: "members_load_failed" });
+      }
+
+      if ((count ?? 0) >= 3) {
+        return json(403, { ok: false, error: "plan_user_limit_reached" });
+      }
+    }
+
     const name = typeof payload.name === "string" ? payload.name.trim() : "";
     const email =
       typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
