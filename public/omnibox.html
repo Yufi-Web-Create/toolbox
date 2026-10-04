@@ -1043,6 +1043,12 @@
       </div>
 
       <div>
+        <label class="text-xs font-bold text-slate-600 mb-1 block">投稿画像URL <span class="font-normal text-slate-400">（Instagramを含む場合は必須）</span></label>
+        <input id="new-post-media-url" type="url" placeholder="https://example.com/image.jpg" class="w-full text-xs p-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500">
+        <p class="text-[10px] text-slate-400 mt-1">現在は公開アクセス可能な画像URLに対応しています。Xのテキスト投稿では空欄で構いません。</p>
+      </div>
+
+      <div>
         <label class="text-xs font-bold text-slate-600 mb-1 block">公開タイミング</label>
         <div class="grid grid-cols-2 gap-3">
           <label class="flex items-center gap-2 text-xs border border-slate-200 p-2.5 rounded-xl cursor-pointer">
@@ -1677,10 +1683,77 @@
       }
     }
 
+    function socialPostStatusLabel(status) {
+      return {
+        scheduled: '予約中',
+        publishing: '投稿中',
+        published: '公開完了',
+        partial_failed: '一部失敗',
+        failed: '失敗',
+        cancelled: '取消済'
+      }[status] || status;
+    }
+
+    async function loadSocialPosts() {
+      if (isDemoSession) {
+        renderScheduledPosts();
+        return true;
+      }
+
+      try {
+        const response = await fetch('/api/omnibox/posts', {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.ok || !Array.isArray(result.posts)) {
+          throw new Error(result.message || '投稿一覧を読み込めませんでした');
+        }
+
+        scheduledPosts = result.posts.map(post => {
+          const targets = Array.isArray(post.target_connection_ids)
+            ? post.target_connection_ids
+            : [];
+          const channels = targets.map(connectionId => {
+            const account = connectedAccounts.find(
+              item => item.providerConnectionId === connectionId
+            );
+            return account
+              ? `${account.platformName} (${account.accountName})`
+              : '連携アカウント';
+          });
+
+          return {
+            id: post.id,
+            content: post.content,
+            mediaUrl: post.media_url || '',
+            channels,
+            scheduledAt: post.scheduled_at
+              ? new Date(post.scheduled_at).toLocaleString('ja-JP')
+              : (post.published_at
+                  ? new Date(post.published_at).toLocaleString('ja-JP')
+                  : '今すぐ'),
+            status: socialPostStatusLabel(post.status),
+            statusKey: post.status,
+            lastError: post.last_error || '',
+            results: Array.isArray(post.results) ? post.results : [],
+            createdAt: post.created_at
+          };
+        });
+
+        renderScheduledPosts();
+        return true;
+      } catch (error) {
+        showToast(error.message || '投稿一覧を読み込めませんでした');
+        return false;
+      }
+    }
+
     async function initCloudAndAuth() {
       threads = [];
       connectedAccounts = [];
-      scheduledPosts = [...defaultScheduledPosts];
+      scheduledPosts = [];
       isCloudReady = false;
       db = null;
       auth = null;
@@ -1708,7 +1781,9 @@
           if (isDemoSession) {
             threads = structuredClone(defaultThreads);
             connectedAccounts = structuredClone(defaultAccounts);
+            scheduledPosts = structuredClone(defaultScheduledPosts);
             renderTemplates('all');
+            renderScheduledPosts();
             onDataUpdated();
           } else if (requiresOrganizationSetup && loggedInUser.roleKey === 'owner') {
             onDataUpdated();
@@ -1721,6 +1796,7 @@
           } else {
             await loadTemplates();
             await loadProviderConnections();
+            await loadSocialPosts();
             if (!providerInboxSyncStarted) {
               providerInboxSyncStarted = true;
               await Promise.all([
@@ -2973,15 +3049,24 @@
 
       connectedAccounts.forEach(acc => {
         const meta = getChannelMeta(acc.platform);
+        const publishable =
+          isDemoSession ||
+          acc.provider === 'x' ||
+          acc.provider === 'instagram';
         const label = document.createElement('label');
-        label.className = 'flex items-center gap-2 text-xs font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition';
+        label.className =
+          'flex items-center gap-2 text-xs font-medium p-2.5 rounded-xl border transition ' +
+          (publishable
+            ? 'bg-slate-50 border-slate-200 cursor-pointer hover:bg-slate-100'
+            : 'bg-slate-50/50 border-slate-100 cursor-not-allowed opacity-55');
         label.innerHTML = `
-          <input type="checkbox" name="post-target-acc" value="${acc.id}" checked class="rounded text-teal-600 focus:ring-teal-500">
+          <input type="checkbox" name="post-target-acc" value="${acc.id}" ${publishable ? '' : 'disabled'} class="rounded text-teal-600 focus:ring-teal-500">
           <span class="w-2 h-2 rounded-full ${meta.color} shrink-0"></span>
-          <div class="truncate">
+          <div class="truncate min-w-0">
             <span class="text-slate-800 block truncate">${acc.accountName}</span>
             <span class="text-[10px] text-slate-400 block truncate">${acc.handle}</span>
           </div>
+          ${publishable ? '' : '<span class="ml-auto text-[9px] text-slate-400 shrink-0">投稿未対応</span>'}
         `;
         list.appendChild(label);
       });
@@ -3009,42 +3094,108 @@
 
     window.submitNewPost = async function() {
       const content = document.getElementById('new-post-content').value.trim();
+      const mediaUrl = document.getElementById('new-post-media-url')?.value.trim() || '';
+      const timing =
+        document.querySelector('input[name="post-timing"]:checked')?.value === 'now'
+          ? 'now'
+          : 'schedule';
       const dt = document.getElementById('new-post-datetime').value;
+
       if (!content) {
         showToast('投稿本文を入力してください');
         return;
       }
 
-      const checkedBoxes = document.querySelectorAll('input[name="post-target-acc"]:checked');
+      const checkedBoxes = Array.from(
+        document.querySelectorAll('input[name="post-target-acc"]:checked')
+      );
       if (checkedBoxes.length === 0) {
         showToast('最低1つの投稿先アカウントを選択してください');
         return;
       }
 
-      const selectedAccountNames = Array.from(checkedBoxes).map(cb => {
-        const acc = getAccountById(cb.value);
-        return `${acc.platformName} (${acc.accountName})`;
-      });
+      const selectedAccounts = checkedBoxes
+        .map(cb => getAccountById(cb.value))
+        .filter(Boolean);
 
-      const newPost = {
-        id: 'post-' + Date.now(),
-        content: content,
-        channels: selectedAccountNames,
-        scheduledAt: dt ? dt.replace('T', ' ') : '今すぐ配信',
-        status: dt ? '予約中' : '公開完了',
-        createdAt: Date.now()
-      };
-
-      if (isCloudReady && db) {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'scheduled_posts', newPost.id), newPost);
-      } else {
-        scheduledPosts.unshift(newPost);
-        renderScheduledPosts();
+      const includesInstagram = selectedAccounts.some(
+        acc => acc.provider === 'instagram' || acc.platform === 'instagram'
+      );
+      if (includesInstagram && !mediaUrl) {
+        showToast('Instagram投稿には公開画像URLを入力してください');
+        return;
       }
 
-      window.closeNewPostModal();
-      document.getElementById('new-post-content').value = '';
-      showToast(`${selectedAccountNames.length}個のアカウントへ予約投稿をスケジュールしました！`);
+      if (timing === 'schedule' && !dt) {
+        showToast('予約日時を指定してください');
+        return;
+      }
+
+      if (isDemoSession) {
+        const selectedAccountNames = selectedAccounts.map(
+          acc => `${acc.platformName} (${acc.accountName})`
+        );
+        scheduledPosts.unshift({
+          id: 'post-' + Date.now(),
+          content,
+          mediaUrl,
+          channels: selectedAccountNames,
+          scheduledAt: timing === 'schedule' ? dt.replace('T', ' ') : '今すぐ',
+          status: timing === 'schedule' ? '予約中' : '公開完了',
+          statusKey: timing === 'schedule' ? 'scheduled' : 'published',
+          createdAt: Date.now()
+        });
+        renderScheduledPosts();
+        window.closeNewPostModal();
+        document.getElementById('new-post-content').value = '';
+        document.getElementById('new-post-media-url').value = '';
+        showToast('デモ用の投稿を保存しました');
+        return;
+      }
+
+      const targetConnectionIds = selectedAccounts
+        .map(acc => acc.providerConnectionId)
+        .filter(Boolean);
+
+      try {
+        const response = await fetch('/api/omnibox/posts', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content,
+            mediaUrl,
+            targetConnectionIds,
+            timing,
+            scheduledAt:
+              timing === 'schedule' ? new Date(dt).toISOString() : null
+          })
+        });
+        const result = await response.json();
+
+        await loadSocialPosts();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(
+            result.message ||
+            (result.partial
+              ? '一部のSNSへの投稿に失敗しました'
+              : 'SNSへ投稿できませんでした')
+          );
+        }
+
+        window.closeNewPostModal();
+        document.getElementById('new-post-content').value = '';
+        document.getElementById('new-post-media-url').value = '';
+
+        showToast(
+          timing === 'schedule'
+            ? '予約投稿を保存しました。指定時刻に自動投稿します'
+            : 'SNSへの投稿が完了しました'
+        );
+      } catch (error) {
+        showToast(error.message || '投稿処理に失敗しました');
+      }
     };
 
     function renderScheduledPosts() {
@@ -3072,13 +3223,16 @@
               </span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-[10px] px-2 py-0.5 rounded-full ${post.status === '公開完了' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'} font-bold">${post.status}</span>
-              <button onclick="window.cancelPost('${post.id}')" class="text-xs text-red-500 hover:text-red-700 p-1" title="予約を取り消す">
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
-              </button>
+              <span class="text-[10px] px-2 py-0.5 rounded-full ${post.statusKey === 'published' ? 'bg-emerald-100 text-emerald-800' : post.statusKey === 'failed' || post.statusKey === 'partial_failed' ? 'bg-red-100 text-red-700' : post.statusKey === 'cancelled' ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-800'} font-bold">${post.status}</span>
+              ${post.statusKey === 'scheduled' ? `
+                <button onclick="window.cancelPost('${post.id}')" class="text-xs text-red-500 hover:text-red-700 p-1" title="予約を取り消す">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>` : ''}
             </div>
           </div>
-          <p class="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 whitespace-pre-wrap">${post.content}</p>
+          <p class="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 whitespace-pre-wrap">${escapeHtml(post.content)}</p>
+          ${post.mediaUrl ? `<div class="mt-2 text-[10px] text-slate-400 truncate">画像: ${escapeHtml(post.mediaUrl)}</div>` : ''}
+          ${post.lastError ? `<div class="mt-2 text-[10px] text-red-600">エラー: ${escapeHtml(post.lastError)}</div>` : ''}
         `;
         container.appendChild(card);
       });
@@ -3086,13 +3240,32 @@
     }
 
     window.cancelPost = async function(postId) {
-      if (isCloudReady && db) {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'scheduled_posts', postId));
-      } else {
+      if (isDemoSession) {
         scheduledPosts = scheduledPosts.filter(p => p.id !== postId);
         renderScheduledPosts();
+        showToast('デモ用の予約投稿を取り消しました');
+        return;
       }
-      showToast('予約投稿を取り消しました');
+
+      try {
+        const response = await fetch(
+          '/api/omnibox/posts?id=' + encodeURIComponent(postId),
+          {
+            method: 'DELETE',
+            credentials: 'same-origin'
+          }
+        );
+        const result = await response.json();
+
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || '予約投稿を取り消せませんでした');
+        }
+
+        await loadSocialPosts();
+        showToast('予約投稿を取り消しました');
+      } catch (error) {
+        showToast(error.message || '予約投稿を取り消せませんでした');
+      }
     };
 
     function escapeHtml(value) {
@@ -3388,6 +3561,9 @@
       }
       if (viewName === 'channels' && loggedInUser && !isDemoSession) {
         loadProviderConnections();
+      }
+      if (viewName === 'publish' && loggedInUser && !isDemoSession) {
+        loadSocialPosts();
       }
       lucide.createIcons();
     };
