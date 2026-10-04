@@ -12,7 +12,51 @@ import { createClient } from "../../../../../../lib/supabase/server";
 
 type Context = { params: Promise<{ provider: string }> };
 
-function returnUrl(request: Request, provider: string, error: string) {
+function returnUrl(request: Request, provider: string, error: string): URL {
+  const origin = new URL(request.url).origin;
+  const url = new URL("/omnibox.html", origin);
+  url.searchParams.set("oauth_error", error);
+  url.searchParams.set("provider", provider);
+  return url;
+}
+
+export async function GET(request: Request, context: Context) {
+  const { provider: rawProvider } = await context.params;
+  if (!isOAuthProvider(rawProvider)) {
+    return NextResponse.redirect(
+      returnUrl(request, rawProvider, "unsupported_provider"),
+    );
+  }
+
+  const supabase = await createClient();
+  const { data: claims, error: claimsError } = await supabase.auth.getClaims();
+  const userId =
+    !claimsError && typeof claims?.claims?.sub === "string"
+      ? claims.claims.sub
+      : null;
+
+  if (!userId) {
+    return NextResponse.redirect(
+      returnUrl(request, rawProvider, "login_required"),
+    );
+  }
+
+  const { data: memberships } = await supabase
+    .from("organization_members")
+    .select("organization_id, role")
+    .eq("user_id", userId)
+    .limit(1);
+
+  if (
+    !Array.isArray(memberships) ||
+    memberships.length !== 1 ||
+    memberships[0].role !== "owner"
+  ) {
+    return NextResponse.redirect(
+      returnUrl(request, rawProvider, "owner_required"),
+    );
+  }
+
   const organizationId = memberships[0].organization_id;
   const { data: organization } = await supabase
     .from("organizations")
@@ -27,44 +71,6 @@ function returnUrl(request: Request, provider: string, error: string) {
     return NextResponse.redirect(
       returnUrl(request, rawProvider, "plan_upgrade_required"),
     );
-  }
-
-  const origin = new URL(request.url).origin;
-  const url = new URL("/omnibox.html", origin);
-  url.searchParams.set("oauth_error", error);
-  url.searchParams.set("provider", provider);
-  return url;
-}
-
-export async function GET(request: Request, context: Context) {
-  const { provider: rawProvider } = await context.params;
-  if (!isOAuthProvider(rawProvider)) {
-    return NextResponse.redirect(returnUrl(request, rawProvider, "unsupported_provider"));
-  }
-
-  const supabase = await createClient();
-  const { data: claims, error: claimsError } = await supabase.auth.getClaims();
-  const userId =
-    !claimsError && typeof claims?.claims?.sub === "string"
-      ? claims.claims.sub
-      : null;
-
-  if (!userId) {
-    return NextResponse.redirect(returnUrl(request, rawProvider, "login_required"));
-  }
-
-  const { data: memberships } = await supabase
-    .from("organization_members")
-    .select("organization_id, role")
-    .eq("user_id", userId)
-    .limit(1);
-
-  if (
-    !Array.isArray(memberships) ||
-    memberships.length !== 1 ||
-    memberships[0].role !== "owner"
-  ) {
-    return NextResponse.redirect(returnUrl(request, rawProvider, "owner_required"));
   }
 
   const origin = new URL(request.url).origin;
