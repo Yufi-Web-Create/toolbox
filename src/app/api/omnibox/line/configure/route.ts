@@ -52,22 +52,36 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token ?? "";
+    const bridgeKey = process.env.OMNIBOX_PROVIDER_BRIDGE_KEY?.trim() ?? "";
 
-    if (!accessToken) {
-      return NextResponse.json(
-        { ok: false, message: "ログインが必要です。" },
-        { status: 401 },
-      );
-    }
+    let bridgePath = "/internal/operator/line/configure";
+    let bridgeHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
 
-    const response = await fetch(new URL("/internal/line/configure", BRIDGE_URL), {
-      method: "POST",
-      headers: {
+    if (bridgeKey) {
+      bridgeHeaders["x-omnibox-provider-key"] = bridgeKey;
+    } else {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token ?? "";
+
+      if (!accessToken) {
+        return NextResponse.json(
+          { ok: false, message: "ログインが必要です。" },
+          { status: 401 },
+        );
+      }
+
+      bridgePath = "/internal/line/configure";
+      bridgeHeaders = {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
-      },
+      };
+    }
+
+    const response = await fetch(new URL(bridgePath, BRIDGE_URL), {
+      method: "POST",
+      headers: bridgeHeaders,
       body: JSON.stringify({ channelId, channelSecret }),
       cache: "no-store",
     });
@@ -82,7 +96,13 @@ export async function POST(request: Request) {
       const message =
         code === "line_credentials_rejected"
           ? "LINEのChannel IDまたはChannel Secretが正しくありません。"
-          : "LINE公式アカウントへ接続できませんでした。設定をご確認ください。";
+          : code === "invalid_line_credentials"
+            ? "LINEのChannel IDまたはChannel Secretの形式を確認してください。"
+            : code === "bridge_not_configured" || code === "unauthorized"
+              ? "OmniBoxのLINE連携サーバー設定に問題があります。"
+              : code === "webhook_setup_failed"
+                ? "LINEへの認証は成功しましたが、Webhookの設定に失敗しました。"
+                : "LINE公式アカウントへ接続できませんでした。設定をご確認ください。";
 
       return NextResponse.json({ ok: false, message }, { status: 400 });
     }
