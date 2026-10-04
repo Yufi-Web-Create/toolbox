@@ -15,18 +15,27 @@ export function SignupForm() {
   return (
     <form action={formAction}>
       <div>
-        <label htmlFor="email">Email</label>
+        <label htmlFor="name">表示名</label>
+        <input id="name" name="name" required type="text" maxLength={100} />
+      </div>
+
+      <div>
+        <label htmlFor="loginId">ログインID</label>
         <input
-          autoComplete="email"
-          id="email"
-          name="email"
+          autoComplete="username"
+          autoCapitalize="none"
+          id="loginId"
+          minLength={3}
+          maxLength={32}
+          name="loginId"
           required
-          type="email"
+          type="text"
+          placeholder="hajimari_admin"
         />
       </div>
 
       <div>
-        <label htmlFor="password">Password</label>
+        <label htmlFor="password">パスワード</label>
         <input
           aria-describedby="password-requirement"
           autoComplete="new-password"
@@ -36,11 +45,11 @@ export function SignupForm() {
           required
           type="password"
         />
-        <p id="password-requirement">Use at least 8 characters.</p>
+        <p id="password-requirement">8文字以上で入力してください。</p>
       </div>
 
       <button disabled={isPending} type="submit">
-        {isPending ? "Creating account…" : "Create account"}
+        {isPending ? "作成中..." : "アカウントを作成"}
       </button>
 
       {state.message ? (
