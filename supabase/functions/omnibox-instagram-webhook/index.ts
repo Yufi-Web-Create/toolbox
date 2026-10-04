@@ -15,7 +15,7 @@ function hex(buffer: ArrayBuffer) {
 }
 
 async function verifySignature(raw: Uint8Array, signature: string, secret: string) {
-  if (!signature.startsWith("sha256=")) return false;
+  if (!signature.startsWith("sha256=") || !secret) return false;
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -34,6 +34,14 @@ async function verifySignature(raw: Uint8Array, signature: string, secret: strin
   return mismatch === 0;
 }
 
+async function deriveVerifyToken(secret: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode("omnibox-instagram-webhook:" + secret),
+  );
+  return hex(digest).slice(0, 40);
+}
+
 function parseTokenBundle(value: unknown) {
   if (typeof value !== "string" || !value) return null;
   try {
@@ -46,10 +54,7 @@ function parseTokenBundle(value: unknown) {
   }
 }
 
-async function fetchInstagramProfile(
-  accessToken: string,
-  userId: string,
-) {
+async function fetchInstagramProfile(accessToken: string, userId: string) {
   try {
     const url = new URL(
       `https://graph.instagram.com/${encodeURIComponent(userId)}`,
@@ -82,27 +87,50 @@ async function fetchInstagramProfile(
 }
 
 Deno.serve(async (req) => {
-  const verifyToken = Deno.env.get("OMNIBOX_INSTAGRAM_VERIFY_TOKEN") ?? "";
-  const appSecret = Deno.env.get("OMNIBOX_INSTAGRAM_CLIENT_SECRET") ?? "";
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceKey) {
+    return json(500, { ok: false, error: "server_not_configured" });
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
   if (req.method === "GET") {
     const url = new URL(req.url);
     const mode = url.searchParams.get("hub.mode");
-    const token = url.searchParams.get("hub.verify_token");
+    const token = url.searchParams.get("hub.verify_token") ?? "";
     const challenge = url.searchParams.get("hub.challenge") ?? "";
 
-    if (
-      mode === "subscribe" &&
-      verifyToken &&
-      token &&
-      token === verifyToken
-    ) {
-      return new Response(challenge, {
-        status: 200,
-        headers: { "content-type": "text/plain; charset=utf-8" },
-      });
+    if (mode !== "subscribe" || !token) {
+      return json(403, { ok: false, error: "verification_failed" });
+    }
+
+    const { data: connections } = await admin
+      .from("provider_connections")
+      .select("id")
+      .eq("provider", "instagram")
+      .eq("status", "active")
+      .not("vault_secret_id", "is", null);
+
+    for (const connection of connections ?? []) {
+      const { data: secretValue } = await admin.rpc(
+        "omnibox_get_provider_secret",
+        { p_connection_id: connection.id },
+      );
+      const bundle = parseTokenBundle(secretValue);
+      const clientSecret =
+        bundle && typeof bundle.omnibox_client_secret === "string"
+          ? bundle.omnibox_client_secret
+          : "";
+
+      if (clientSecret && token === await deriveVerifyToken(clientSecret)) {
+        return new Response(challenge, {
+          status: 200,
+          headers: { "content-type": "text/plain; charset=utf-8" },
+        });
+      }
     }
 
     return json(403, { ok: false, error: "verification_failed" });
@@ -112,16 +140,8 @@ Deno.serve(async (req) => {
     return json(405, { ok: false, error: "method_not_allowed" });
   }
 
-  if (!appSecret || !supabaseUrl || !serviceKey) {
-    return json(503, { ok: false, error: "webhook_not_configured" });
-  }
-
   const raw = new Uint8Array(await req.arrayBuffer());
   const signature = req.headers.get("x-hub-signature-256") ?? "";
-
-  if (!(await verifySignature(raw, signature, appSecret))) {
-    return json(401, { ok: false, error: "invalid_signature" });
-  }
 
   let payload: Record<string, unknown>;
   try {
@@ -134,9 +154,68 @@ Deno.serve(async (req) => {
     return json(200, { ok: true, ignored: true });
   }
 
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const accountIds = [
+    ...new Set(
+      payload.entry
+        .map((rawEntry) =>
+          rawEntry && typeof rawEntry === "object"
+            ? String((rawEntry as Record<string, unknown>).id ?? "").trim()
+            : "",
+        )
+        .filter(Boolean),
+    ),
+  ];
+
+  if (accountIds.length === 0) {
+    return json(200, { ok: true, accepted: 0 });
+  }
+
+  const { data: matchingConnections } = await admin
+    .from("provider_connections")
+    .select("id, organization_id, external_account_id")
+    .eq("provider", "instagram")
+    .eq("status", "active")
+    .in("external_account_id", accountIds);
+
+  const connectionSecrets = new Map<
+    string,
+    { connectionId: string; organizationId: string; accessToken: string; clientSecret: string }
+  >();
+
+  let signatureValid = false;
+
+  for (const connection of matchingConnections ?? []) {
+    const { data: secretValue } = await admin.rpc(
+      "omnibox_get_provider_secret",
+      { p_connection_id: connection.id },
+    );
+    const bundle = parseTokenBundle(secretValue);
+    const accessToken =
+      bundle && typeof bundle.access_token === "string"
+        ? bundle.access_token
+        : "";
+    const clientSecret =
+      bundle && typeof bundle.omnibox_client_secret === "string"
+        ? bundle.omnibox_client_secret
+        : "";
+
+    if (!clientSecret) continue;
+
+    connectionSecrets.set(String(connection.external_account_id), {
+      connectionId: connection.id,
+      organizationId: connection.organization_id,
+      accessToken,
+      clientSecret,
+    });
+
+    if (!signatureValid) {
+      signatureValid = await verifySignature(raw, signature, clientSecret);
+    }
+  }
+
+  if (!signatureValid) {
+    return json(401, { ok: false, error: "invalid_signature" });
+  }
 
   let accepted = 0;
 
@@ -148,27 +227,8 @@ Deno.serve(async (req) => {
     if (!entry) continue;
 
     const accountId = String(entry.id ?? "").trim();
-    if (!accountId) continue;
-
-    const { data: connection } = await admin
-      .from("provider_connections")
-      .select("id, organization_id")
-      .eq("provider", "instagram")
-      .eq("external_account_id", accountId)
-      .eq("status", "active")
-      .maybeSingle();
-
-    if (!connection?.id) continue;
-
-    const { data: secretValue } = await admin.rpc(
-      "omnibox_get_provider_secret",
-      { p_connection_id: connection.id },
-    );
-    const bundle = parseTokenBundle(secretValue);
-    const accessToken =
-      bundle && typeof bundle.access_token === "string"
-        ? bundle.access_token
-        : "";
+    const connection = connectionSecrets.get(accountId);
+    if (!connection) continue;
 
     const messaging = Array.isArray(entry.messaging) ? entry.messaging : [];
 
@@ -197,8 +257,8 @@ Deno.serve(async (req) => {
 
       if (!senderId || !messageId || !body) continue;
 
-      const profile = accessToken
-        ? await fetchInstagramProfile(accessToken, senderId)
+      const profile = connection.accessToken
+        ? await fetchInstagramProfile(connection.accessToken, senderId)
         : { displayName: senderId, avatarUrl: null };
 
       const occurredAt =
@@ -209,13 +269,14 @@ Deno.serve(async (req) => {
       const { error: ingestError } = await admin.rpc(
         "omnibox_ingest_external_message",
         {
-          p_provider_connection_id: connection.id,
+          p_provider_connection_id: connection.connectionId,
           p_provider: "instagram",
           p_provider_thread_id: senderId,
           p_customer_external_id: senderId,
           p_customer_display_name: profile.displayName,
           p_customer_avatar_url: profile.avatarUrl,
-          p_provider_message_id: `instagram:${connection.id}:${messageId}`,
+          p_provider_message_id:
+            `instagram:${connection.connectionId}:${messageId}`,
           p_body: body,
           p_occurred_at: occurredAt,
           p_metadata: { account_id: accountId },
