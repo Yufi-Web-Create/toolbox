@@ -136,12 +136,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = process.env.OPENAI_API_KEY?.trim();
+    const gatewayToken =
+      process.env.AI_GATEWAY_API_KEY?.trim() ||
+      process.env.VERCEL_OIDC_TOKEN?.trim() ||
+      "";
+    const openAiKey = process.env.OPENAI_API_KEY?.trim() || "";
+    const useGateway = Boolean(gatewayToken);
+    const apiKey = useGateway ? gatewayToken : openAiKey;
+
     if (!apiKey) {
       return NextResponse.json(
         {
           ok: false,
-          message: "AI機能は運営設定でAPIキーを設定すると利用できます。",
+          message: "AI実行環境が設定されていません。運営設定をご確認ください。",
         },
         { status: 503 },
       );
@@ -165,8 +172,13 @@ export async function POST(request: Request) {
     }
 
     const conversation = conversations[0];
-    const model = process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const model =
+      process.env.OPENAI_MODEL?.trim() ||
+      (useGateway ? "openai/gpt-6-luna" : "gpt-6-luna");
+    const endpoint = useGateway
+      ? "https://ai-gateway.vercel.sh/v1/responses"
+      : "https://api.openai.com/v1/responses";
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         Authorization: "Bearer " + apiKey,
