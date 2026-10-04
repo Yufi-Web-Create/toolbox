@@ -353,13 +353,13 @@
               <div class="bg-white border-t border-slate-200 p-3 md:p-4 shrink-0">
                 <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div class="flex items-center gap-1.5 flex-wrap">
-                    <button onclick="triggerGeminiDraft('polite')" class="text-xs bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
+                    <button onclick="showAiComingSoon()" class="text-xs bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
                       <i data-lucide="sparkles" class="w-3 h-3 text-teal-600"></i>
-                      <span>AI丁寧返信</span>
+                      <span>AI丁寧返信（準備中）</span>
                     </button>
-                    <button onclick="triggerGeminiDraft('friendly')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
+                    <button onclick="showAiComingSoon()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
                       <i data-lucide="smile" class="w-3 h-3 text-slate-500"></i>
-                      <span>親しみやすい返信</span>
+                      <span>親しみやすい返信（準備中）</span>
                     </button>
                     <button onclick="openTemplateSelectorModal()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
                       <i data-lucide="file-text" class="w-3 h-3 text-slate-500"></i>
@@ -981,9 +981,9 @@
       <div>
         <div class="flex items-center justify-between mb-1">
           <label class="text-xs font-bold text-slate-600">投稿本文</label>
-          <button onclick="generateAiPostDraftWithGemini()" class="text-xs text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1">
+          <button onclick="showAiComingSoon()" class="text-xs text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1">
             <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-            <span>Gemini AIで告知文を自動作成</span>
+            <span>AI投稿アシスタント（準備中）</span>
           </button>
         </div>
         <textarea id="new-post-content" rows="4" placeholder="フォロワーに届けたい情報を入力してください... #ハッシュタグ など" class="w-full text-xs md:text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 resize-none"></textarea>
@@ -1224,6 +1224,10 @@
     let liveInboxRefreshInFlight = false;
     let assignableStaff = [];
     let customerNameEditingThreadId = null;
+    const composerDrafts = {
+      reply: new Map(),
+      note: new Map()
+    };
 
     let threads = [];
     let connectedAccounts = [];
@@ -1918,81 +1922,8 @@
       }
     }
 
-    window.triggerGeminiDraft = async function(tone) {
-      const thread = threads.find(t => t.id === currentThreadId);
-      if (!thread) {
-        showToast('スレッドを選択してください');
-        return;
-      }
-
-      const loadingBox = document.getElementById('ai-loading-box');
-      const loadingText = document.getElementById('ai-loading-text');
-      loadingBox.classList.remove('hidden');
-      loadingText.textContent = `Gemini AIが【${tone === 'polite' ? '丁寧な敬語' : '親しみやすい接客トーン'}】で最適な返信案を作成中...`;
-
-      const lastCustomerMessage = thread.lastMessage;
-      const channelMeta = getChannelMeta(thread.channel);
-      const acc = getAccountById(thread.accountId);
-
-      const systemPrompt = `あなたは店舗・企業のプロフェッショナルなSNSカスタマーサポートです。
-お客さまからの問い合わせに対して、自然で好印象な日本語返信文を作成してください。
-文面には [日時] や [担当者名] などのプレースホルダーを必要に応じて配置し、人間が確認して微調整しやすい形で出力してください。
-挨拶・結びを含めてそのまま使える完成度の文章にしてください。`;
-
-      const userPrompt = `【問い合わせ窓口】: ${channelMeta.name} (${acc.accountName})
-【顧客名】: ${thread.customerName}
-【希望トーン】: ${tone === 'polite' ? '礼儀正しい敬語・ビジネス丁寧語' : '柔らかく親しみやすい接客トーン'}
-【問い合わせ本文】:
-"${lastCustomerMessage}"
-
-上記の内容に対する返信案を作成してください。返信メッセージ本文のみを出力してください。`;
-
-      try {
-        const generated = await callGeminiApi(systemPrompt, userPrompt);
-        const input = document.getElementById('message-input');
-        input.value = generated.trim();
-        setInputMode('reply');
-        input.focus();
-        showToast('Gemini AIが返信文案を作成しました！');
-      } catch (err) {
-        console.error("Gemini call failed:", err);
-        generateFallbackDraft(tone, thread);
-      } finally {
-        loadingBox.classList.add('hidden');
-      }
-    };
-
-    function generateFallbackDraft(tone, thread) {
-      const input = document.getElementById('message-input');
-      if (tone === 'polite') {
-        input.value = `${thread.customerName}様\n\nお問い合わせいただき誠にありがとうございます。OmniBox担当の${thread.assignee}でございます。\nご質問いただきました内容について確認が取れましたのでご案内いたします。\n\n詳細についてご確認いただけますと幸いです。よろしくお願い申し上げます。`;
-      } else {
-        input.value = `${thread.customerName}さん、メッセージありがとうございます！✨\nご質問いただいた件、しっかり確認できました！\n気になる点があればいつでもお気軽にDMしてくださいね😊`;
-      }
-      showToast('AIアシスタントの返信案を挿入しました');
-    }
-
-    window.generateAiPostDraftWithGemini = async function() {
-      const textarea = document.getElementById('new-post-content');
-      textarea.value = 'Gemini AIがSNS告知文を生成中...';
-      const promptTopics = [
-        '秋の新作メニューの告知。季節感、限定感、ハッシュタグを含めて魅力をアピール。',
-        '週末限定のフォロワー様限定10%OFFキャンペーンの告知。来店を促す明るい文面。',
-        '店舗の営業時間変更と、スタッフおすすめアイテムの紹介。'
-      ];
-      const selectedTopic = promptTopics[Math.floor(Math.random() * promptTopics.length)];
-
-      const systemPrompt = `あなたはSNSマーケティングの専門家です。InstagramやXでエンゲージメントを高める魅力的な告知投稿文を作成してください。絵文字を効果的に使い、関連するハッシュタグを末尾に3〜5個付与してください。`;
-      const userPrompt = `テーマ: 「${selectedTopic}」についての投稿文を作成してください。`;
-
-      try {
-        const result = await callGeminiApi(systemPrompt, userPrompt);
-        textarea.value = result.trim();
-        showToast('AIがSNS投稿文を自動生成しました！');
-      } catch (e) {
-        textarea.value = `【週末限定フェア開催🎉】日頃の感謝を込めて、今週末限定で全メニュー20%OFFの特別キャンペーンを実施いたします！ご予約はプロフィールのリンクまたはDMからお気軽にどうぞ！✨ #セール #週末イベント #お知らせ`;
-        showToast('SNS投稿案をセットしました');
-      }
+    window.showAiComingSoon = function() {
+      showToast('AI機能は現在準備中です。定型文をご利用ください');
     };
 
     function getChannelMeta(channel) {
@@ -2340,6 +2271,8 @@
 
       document.getElementById('chat-status-select').value = thread.status;
       renderAssigneeOptions(thread.assigneeUserId || null);
+      const composer = document.getElementById('message-input');
+      if (composer) composer.value = composerDrafts[inputMode]?.get(thread.id) || '';
 
       updateStatusPill(thread.status);
 
@@ -2557,6 +2490,7 @@
           }
 
           input.value = '';
+          composerDrafts.note.delete(thread.id);
           const refreshed = await loadConversationDetail(thread.id);
           if (refreshed) {
             updateActiveChatPane(refreshed);
@@ -2709,13 +2643,28 @@
     };
 
     window.setInputMode = function(mode) {
-      inputMode = mode;
+      const nextMode = mode === 'note' ? 'note' : 'reply';
+      const input = document.getElementById('message-input');
+      if (input && currentThreadId) {
+        composerDrafts[inputMode]?.set(currentThreadId, input.value);
+      }
+
+      inputMode = nextMode;
       const btnReply = document.getElementById('tab-mode-reply');
       const btnNote = document.getElementById('tab-mode-note');
       const noteIndicator = document.getElementById('note-indicator');
       const sendBtnLabel = document.getElementById('send-button-label');
 
-      if (mode === 'note') {
+      if (input) {
+        input.value = currentThreadId
+          ? (composerDrafts[inputMode]?.get(currentThreadId) || '')
+          : '';
+        input.placeholder = inputMode === 'note'
+          ? '社内共有メモを入力...（お客様には送信されません）'
+          : '返信メッセージを入力... (Enterで改行 / ⌘+Enter・Ctrl+Enterで送信)';
+      }
+
+      if (inputMode === 'note') {
         btnNote.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
         btnNote.classList.remove('text-slate-600');
         btnReply.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
@@ -2761,27 +2710,40 @@
       const thread = threads.find(t => t.id === currentThreadId);
       if (!thread) return;
 
-      const author = loggedInUser?.name || 'スタッフ';
-      const now = new Date();
-      const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-      thread.notes = thread.notes || [];
-      thread.notes.push({ author: author, time: timeStr, text: text });
-      thread.messages = thread.messages || [];
-      thread.messages.push({ sender: 'internal_note', author: author, time: timeStr, text: text });
-      thread.updatedAt = Date.now();
-
-      if (isCloudReady && db) {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'threads', thread.id), {
-          notes: thread.notes,
-          messages: thread.messages,
-          updatedAt: thread.updatedAt
-        });
+      if (isDemoSession || !thread.liveConversationId) {
+        const author = loggedInUser?.name || 'スタッフ';
+        const now = new Date();
+        const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+        thread.notes = thread.notes || [];
+        thread.notes.push({ author, time: timeStr, text });
+        input.value = '';
+        renderInternalNotes(thread);
+        showToast('デモ用の社内メモを追加しました');
+        return;
       }
 
-      input.value = '';
-      renderInternalNotes(thread);
-      renderMessages(thread);
-      showToast('社内メモを追加しました');
+      try {
+        const response = await fetch('/api/omnibox/notes', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId: thread.liveConversationId,
+            body: text
+          })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || '社内メモを保存できませんでした');
+        }
+
+        input.value = '';
+        const refreshed = await loadConversationDetail(thread.id);
+        if (refreshed) updateActiveChatPane(refreshed);
+        showToast('社内共有メモを保存しました');
+      } catch (error) {
+        showToast(error.message || '社内メモを保存できませんでした');
+      }
     };
 
     function renderConnectedAccounts() {
@@ -3552,11 +3514,27 @@
 
     window.applyTemplateToCurrentChat = function(bodyText) {
       window.switchView('inbox');
-      const input = document.getElementById('message-input');
-      input.value = bodyText;
       window.setInputMode('reply');
+      const input = document.getElementById('message-input');
+      const start = Number.isInteger(input.selectionStart) ? input.selectionStart : input.value.length;
+      const end = Number.isInteger(input.selectionEnd) ? input.selectionEnd : start;
+      const prefix = input.value.slice(0, start);
+      const suffix = input.value.slice(end);
+      const separator = prefix && !prefix.endsWith('\n') ? '\n' : '';
+      input.value = prefix + separator + bodyText + suffix;
+      composerDrafts.reply.set(currentThreadId, input.value);
+      const nextPos = (prefix + separator + bodyText).length;
+      input.setSelectionRange(nextPos, nextPos);
       input.focus();
-      showToast('定型文を入力欄に反映しました');
+
+      const placeholderMatch = input.value.match(/\[[^\]]+\]/);
+      if (placeholderMatch) {
+        const index = input.value.indexOf(placeholderMatch[0]);
+        input.setSelectionRange(index, index + placeholderMatch[0].length);
+        showToast('定型文を挿入しました。[]の箇所を確認してください');
+      } else {
+        showToast('定型文をカーソル位置に挿入しました');
+      }
     };
 
     window.openTemplateSelectorModal = function() {
@@ -3683,8 +3661,21 @@
       document.getElementById('add-account-modal').classList.add('hidden');
     };
 
+    function toLocalDateTimeInputValue(date) {
+      const pad = value => String(value).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
     window.openNewPostModal = function() {
-      document.getElementById('new-post-modal').classList.remove('hidden');
+      const modal = document.getElementById('new-post-modal');
+      modal.classList.remove('hidden');
+      const input = document.getElementById('new-post-datetime');
+      if (input) {
+        const future = new Date(Date.now() + 60 * 60 * 1000);
+        future.setMinutes(Math.ceil(future.getMinutes() / 5) * 5, 0, 0);
+        input.min = toLocalDateTimeInputValue(new Date(Date.now() + 60 * 1000));
+        input.value = toLocalDateTimeInputValue(future);
+      }
     };
 
     window.closeNewPostModal = function() {
