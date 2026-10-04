@@ -99,7 +99,6 @@ Deno.serve(async (req) => {
         .select("id")
         .eq("organization_id", ALLOWED_ORGANIZATION_ID)
         .eq("provider", "line")
-        .is("external_account_id", null)
         .maybeSingle();
 
     if (connectionLookupError) {
@@ -142,6 +141,54 @@ Deno.serve(async (req) => {
     return json(200, { ok: true, config: data });
   }
 
+
+  if (payload.action === "store-operator-config") {
+    const provider = String(payload.provider ?? "");
+    const encryptedKey = String(payload.encryptedKey ?? "");
+    const encryptedPayload = String(payload.encryptedPayload ?? "");
+    const iv = String(payload.iv ?? "");
+    const authTag = String(payload.authTag ?? "");
+
+    if (
+      !["instagram", "x", "google"].includes(provider) ||
+      !encryptedKey ||
+      !encryptedPayload ||
+      !iv ||
+      !authTag
+    ) {
+      return json(400, { ok: false, error: "invalid_operator_config_payload" });
+    }
+
+    const { error } = await supabase.from("operator_provider_configs").upsert({
+      provider,
+      encrypted_key: encryptedKey,
+      encrypted_payload: encryptedPayload,
+      iv,
+      auth_tag: authTag,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "provider" });
+
+    if (error) return json(500, { ok: false, error: "operator_config_store_failed" });
+    return json(200, { ok: true });
+  }
+
+  if (payload.action === "get-operator-config") {
+    const provider = String(payload.provider ?? "");
+    if (!["instagram", "x", "google"].includes(provider)) {
+      return json(400, { ok: false, error: "invalid_provider" });
+    }
+
+    const { data, error } = await supabase
+      .from("operator_provider_configs")
+      .select("encrypted_key, encrypted_payload, iv, auth_tag, updated_at")
+      .eq("provider", provider)
+      .maybeSingle();
+
+    if (error) return json(500, { ok: false, error: "operator_config_lookup_failed" });
+    if (!data) return json(404, { ok: false, error: "operator_config_not_found" });
+    return json(200, { ok: true, config: data });
+  }
+
   if (payload.action === "inbound") {
     const { data: lineConnection, error: connectionError } = await supabase
       .from("provider_connections")
@@ -149,7 +196,6 @@ Deno.serve(async (req) => {
       .eq("organization_id", ALLOWED_ORGANIZATION_ID)
       .eq("provider", "line")
       .eq("status", "active")
-      .is("external_account_id", null)
       .maybeSingle();
 
     if (connectionError || !lineConnection?.id) {
