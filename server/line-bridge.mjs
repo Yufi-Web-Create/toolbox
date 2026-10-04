@@ -405,42 +405,159 @@ async function fetchLineProfile(fetchImpl, accessToken, userId) {
   }
 }
 
+async function getLineWebhookStatus(fetchImpl, lineAccessToken) {
+  const response = await fetchImpl(
+    "https://api.line.me/v2/bot/channel/webhook/endpoint",
+    {
+      headers: {
+        Authorization: "Bearer " + lineAccessToken,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    return {
+      lineApiReachable: false,
+      webhookUrl: null,
+      webhookActive: false,
+      webhookMatches: false,
+    };
+  }
+
+  let info = {};
+  try {
+    info = await response.json();
+  } catch {}
+
+  const endpoint =
+    typeof info?.endpoint === "string" && info.endpoint.trim()
+      ? info.endpoint.trim()
+      : null;
+
+  return {
+    lineApiReachable: true,
+    webhookUrl: endpoint,
+    webhookActive: info?.active === true,
+    webhookMatches: endpoint === WEBHOOK_URL,
+  };
+}
+
+async function applyLineWebhook(fetchImpl, lineAccessToken) {
+  const setWebhookResponse = await fetchImpl(
+    "https://api.line.me/v2/bot/channel/webhook/endpoint",
+    {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer " + lineAccessToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ endpoint: WEBHOOK_URL }),
+    },
+  );
+
+  if (!setWebhookResponse.ok) {
+    return { ok: false, error: "webhook_setup_failed" };
+  }
+
+  const testWebhookResponse = await fetchImpl(
+    "https://api.line.me/v2/bot/channel/webhook/test",
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + lineAccessToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ endpoint: WEBHOOK_URL }),
+    },
+  );
+
+  let webhookVerified = testWebhookResponse.ok;
+  try {
+    const testResult = await testWebhookResponse.json();
+    if (typeof testResult?.success === "boolean") {
+      webhookVerified = testResult.success;
+    }
+  } catch {}
+
+  const status = await getLineWebhookStatus(fetchImpl, lineAccessToken);
+
+  return {
+    ok: true,
+    webhookUrl: WEBHOOK_URL,
+    webhookVerified,
+    ...status,
+  };
+}
+
 async function handleHealth({ response, config, fetchImpl }) {
   if (!config.configured) {
     sendJson(response, 200, {
       ok: true,
       configured: false,
       lineConnected: false,
+      lineApiReachable: false,
+      webhookActive: false,
+      webhookMatches: false,
+      webhookUrl: null,
       missing: config.missing,
     });
     return;
   }
 
-  let lineConnected = false;
+  let providerConfig = null;
   try {
-    lineConnected = Boolean(await loadProviderConfig(fetchImpl, config));
-  } catch {
-    lineConnected = false;
-  }
+    providerConfig = await loadProviderConfig(fetchImpl, config, true);
+  } catch {}
 
-  sendJson(response, 200, {
-    ok: true,
-    configured: true,
-    lineConnected,
-    missing: [],
-  });
-}
-
-async function handleLineConfigure({ request, response, config, fetchImpl }) {
-  if (!config.configured) {
-    sendJson(response, 503, { ok: false, error: "bridge_not_configured" });
+  if (!providerConfig) {
+    sendJson(response, 200, {
+      ok: true,
+      configured: true,
+      lineConnected: false,
+      lineApiReachable: false,
+      webhookActive: false,
+      webhookMatches: false,
+      webhookUrl: null,
+      missing: [],
+    });
     return;
   }
 
+  try {
+    const token = await issueStatelessLineToken(fetchImpl, providerConfig);
+    const webhook = await getLineWebhookStatus(fetchImpl, token);
+    sendJson(response, 200, {
+      ok: true,
+      configured: true,
+      lineConnected: true,
+      ...webhook,
+      missing: [],
+    });
+  } catch {
+    sendJson(response, 200, {
+      ok: true,
+      configured: true,
+      lineConnected: true,
+      lineApiReachable: false,
+      webhookActive: false,
+      webhookMatches: false,
+      webhookUrl: null,
+      missing: [],
+    });
+  }
+}
+
+async function authenticateVisibleOrganization({
+  request,
+  response,
+  config,
+  fetchImpl,
+}) {
   const userAccessToken = getBearerToken(request);
   if (!userAccessToken) {
     sendJson(response, 401, { ok: false, error: "unauthorized" });
-    return;
+    return null;
   }
 
   const user = await fetchAuthenticatedUser(fetchImpl, config, userAccessToken);
@@ -450,8 +567,25 @@ async function handleLineConfigure({ request, response, config, fetchImpl }) {
 
   if (!user || !organization) {
     sendJson(response, 403, { ok: false, error: "forbidden" });
+    return null;
+  }
+
+  return { user, userAccessToken };
+}
+
+async function handleLineConfigure({ request, response, config, fetchImpl }) {
+  if (!config.configured) {
+    sendJson(response, 503, { ok: false, error: "bridge_not_configured" });
     return;
   }
+
+  const auth = await authenticateVisibleOrganization({
+    request,
+    response,
+    config,
+    fetchImpl,
+  });
+  if (!auth) return;
 
   let payload;
   try {
@@ -482,66 +616,47 @@ async function handleLineConfigure({ request, response, config, fetchImpl }) {
   }
 
   await storeProviderConfig(fetchImpl, config, providerConfig);
+  const result = await applyLineWebhook(fetchImpl, lineAccessToken);
+  sendJson(response, result.ok ? 200 : 502, result);
+}
 
-  const setWebhookResponse = await fetchImpl(
-    "https://api.line.me/v2/bot/channel/webhook/endpoint",
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${lineAccessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ endpoint: WEBHOOK_URL }),
-    },
-  );
-
-  if (!setWebhookResponse.ok) {
-    sendJson(response, 502, { ok: false, error: "webhook_setup_failed" });
+async function handleLineRepair({ request, response, config, fetchImpl }) {
+  if (!config.configured) {
+    sendJson(response, 503, { ok: false, error: "bridge_not_configured" });
     return;
   }
 
-  const testWebhookResponse = await fetchImpl(
-    "https://api.line.me/v2/bot/channel/webhook/test",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lineAccessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ endpoint: WEBHOOK_URL }),
-    },
-  );
+  const auth = await authenticateVisibleOrganization({
+    request,
+    response,
+    config,
+    fetchImpl,
+  });
+  if (!auth) return;
 
-  let testSuccess = testWebhookResponse.ok;
+  let providerConfig;
   try {
-    const testResult = await testWebhookResponse.json();
-    if (typeof testResult?.success === "boolean") testSuccess = testResult.success;
-  } catch {}
-
-  const infoResponse = await fetchImpl(
-    "https://api.line.me/v2/bot/channel/webhook/endpoint",
-    {
-      headers: {
-        Authorization: `Bearer ${lineAccessToken}`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
-
-  let active = false;
-  if (infoResponse.ok) {
-    try {
-      const info = await infoResponse.json();
-      active = info?.active === true;
-    } catch {}
+    providerConfig = await loadProviderConfig(fetchImpl, config, true);
+  } catch {
+    sendJson(response, 502, { ok: false, error: "config_lookup_failed" });
+    return;
   }
 
-  sendJson(response, 200, {
-    ok: true,
-    webhookUrl: WEBHOOK_URL,
-    webhookVerified: testSuccess,
-    webhookActive: active,
-  });
+  if (!providerConfig) {
+    sendJson(response, 404, { ok: false, error: "line_not_connected" });
+    return;
+  }
+
+  let lineAccessToken;
+  try {
+    lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig);
+  } catch {
+    sendJson(response, 502, { ok: false, error: "line_credentials_rejected" });
+    return;
+  }
+
+  const result = await applyLineWebhook(fetchImpl, lineAccessToken);
+  sendJson(response, result.ok ? 200 : 502, result);
 }
 
 async function handleLineWebhook({ request, response, config, fetchImpl }) {
@@ -817,6 +932,11 @@ export function createLineBridgeServer({
 
       if (request.method === "POST" && url.pathname === "/internal/line/configure") {
         await handleLineConfigure({ request, response, config, fetchImpl });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/line/repair") {
+        await handleLineRepair({ request, response, config, fetchImpl });
         return;
       }
 
