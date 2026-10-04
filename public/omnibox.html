@@ -711,7 +711,7 @@
       <div class="max-w-4xl mx-auto space-y-6">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <h2 class="text-xl font-bold text-slate-900">接続アカウント & 実Webhook連携設定</h2>
+            <h2 class="text-xl font-bold text-slate-900">接続アカウント</h2>
             <p class="text-sm text-slate-500 mt-1">
               各SNSで複数保有しているブランド・店舗・用途別のアカウントを無制限に連携・管理できます。
             </p>
@@ -725,39 +725,8 @@
         <div class="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-md">
           <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
             <div>
-              <div class="flex items-center gap-2 mb-2 font-bold text-sm text-teal-400">
-                <i data-lucide="terminal" class="w-4 h-4"></i>
-                <span>LINE公式アカウントの実接続</span>
-              </div>
-              <p class="text-xs text-slate-300 leading-relaxed">
-                LINE DevelopersのMessaging APIチャネルにあるChannel ID / Channel Secretを登録すると、OmniBoxがアクセストークン発行、Webhook URL設定、疎通確認まで自動で行います。
-              </p>
-            </div>
-            <button id="line-webhook-repair-button" onclick="repairLineWebhook()" class="hidden shrink-0 text-[11px] px-3 py-2 rounded-lg border border-teal-700 bg-teal-900/40 text-teal-200 hover:bg-teal-900">
-              Webhookを診断・再設定
-            </button>
-          </div>
-          <div class="mt-3 bg-slate-950 p-3 rounded-xl font-mono text-[11px] text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span class="break-all">Webhookエンドポイント: https://omnibox-line-bridge.onrender.com/webhooks/line</span>
-            <button onclick="copyToClipboard('https://omnibox-line-bridge.onrender.com/webhooks/line')" class="text-teal-400 hover:text-teal-300 shrink-0 whitespace-nowrap">コピー</button>
-          </div>
-          <div id="line-webhook-health" class="mt-3 text-[11px] text-slate-400">
-            LINE接続状態を確認しています...
-          </div>
-        </div>
-
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
-          <div class="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <h3 class="text-sm font-bold text-slate-800">OAuth Developer App 設定</h3>
-              <p class="text-[11px] text-slate-500 mt-1">Instagram / X / Google のDeveloper Consoleで、以下のCallback URLとClient ID / Secret設定が必要です。</p>
-            </div>
-            <span class="text-[10px] px-2 py-1 rounded bg-amber-50 text-amber-700 border border-amber-100">運営側設定</span>
-          </div>
-          <div id="oauth-setup-checklist" class="space-y-2 text-[11px]"></div>
-        </div>
-
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
+              <div class="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 md:p-5">
           <h3 class="text-sm font-bold text-slate-800">SNS連携に必要な操作</h3>
           <p class="text-[11px] text-slate-500 mt-1 mb-3">運営側でDeveloper Appを一度準備した後、店舗・顧客側はOmniBoxから対象アカウントへログインして許可するだけの流れにします。</p>
           <div class="space-y-2">
