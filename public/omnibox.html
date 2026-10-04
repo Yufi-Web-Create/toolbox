@@ -490,6 +490,16 @@
 
               <!-- 返信入力ドック -->
               <div class="bg-white border-t border-slate-200 p-3 md:p-4 shrink-0">
+                <div id="instagram-request-banner" class="hidden mb-2 p-2.5 rounded-xl border border-pink-200 bg-pink-50 text-xs text-pink-900 flex items-center justify-between gap-3">
+                  <div class="flex items-start gap-2">
+                    <i data-lucide="message-circle-question" class="w-4 h-4 text-pink-600 mt-0.5 shrink-0"></i>
+                    <div>
+                      <div class="font-bold">Instagram メッセージリクエスト</div>
+                      <div class="text-[10px] text-pink-700 mt-0.5">初回の返信を送るとInstagram側でリクエストが承認され、会話がGeneralへ移動します。</div>
+                    </div>
+                  </div>
+                  <button type="button" onclick="focusInstagramRequestReply()" class="shrink-0 px-2.5 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-bold text-[11px]">返信して承認</button>
+                </div>
                 <div class="composer-actions flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div class="flex items-center gap-1.5 flex-wrap">
                     <button onclick="openTemplateSelectorModal()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1 transition">
@@ -2771,6 +2781,7 @@
 
       renderInternalNotes(thread);
       renderMessages(thread);
+      renderInstagramRequestState(thread);
       lucide.createIcons();
     }
 
@@ -3167,6 +3178,22 @@
       } catch (error) {
         showToast(error.message || '担当者を更新できませんでした');
       }
+    };
+
+    function renderInstagramRequestState(thread) {
+      const banner = document.getElementById('instagram-request-banner');
+      if (!banner) return;
+      const hasAgentReply = Array.isArray(thread?.messages) &&
+        thread.messages.some(message => message.sender === 'agent');
+      const isInitialInstagramConversation =
+        thread?.channel === 'instagram' && !hasAgentReply;
+      banner.classList.toggle('hidden', !isInitialInstagramConversation);
+    }
+
+    window.focusInstagramRequestReply = function() {
+      setInputMode('reply');
+      const input = document.getElementById('message-input');
+      input?.focus();
     };
 
     window.saveComposerDraft = function() {
@@ -4479,7 +4506,21 @@
     }
 
     window.handleSearch = function() {
-      searchQuery = document.getElementById('search-input').value;
+      const input = document.getElementById('search-input');
+      const value = input?.value || '';
+      const looksLikeCredentialAutofill =
+        loggedInUser?.email &&
+        value.trim().toLowerCase() === loggedInUser.email.trim().toLowerCase();
+
+      if (looksLikeCredentialAutofill) {
+        input.value = '';
+        searchQuery = '';
+        serverSearchConversationIds = null;
+        renderThreadList();
+        return;
+      }
+
+      searchQuery = value;
       serverSearchConversationIds = null;
       renderThreadList();
       window.clearTimeout(searchDebounceTimer);
@@ -4487,9 +4528,15 @@
     };
 
     window.syncMobileSearch = function(value) {
+      const looksLikeCredentialAutofill =
+        loggedInUser?.email &&
+        String(value || '').trim().toLowerCase() === loggedInUser.email.trim().toLowerCase();
+      const safeValue = looksLikeCredentialAutofill ? '' : (value || '');
       const desktop = document.getElementById('search-input');
-      if (desktop) desktop.value = value;
-      searchQuery = value || '';
+      if (desktop) desktop.value = safeValue;
+      const mobile = document.getElementById('mobile-search-input');
+      if (looksLikeCredentialAutofill && mobile) mobile.value = '';
+      searchQuery = safeValue;
       serverSearchConversationIds = null;
       renderThreadList();
       window.clearTimeout(searchDebounceTimer);
