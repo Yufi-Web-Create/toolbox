@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --exclude server/line-bridge.test.mjs",
-    "test:bridge": "node --test server/line-bridge.test.mjs"
+    "test:bridge": "node --test server/line-bridge.test.mjs",
+    "check:inline-js": "node scripts/check-omnibox-inline-js.mjs",
+    "prebuild": "npm run check:inline-js"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
