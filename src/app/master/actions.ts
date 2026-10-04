@@ -50,6 +50,35 @@ async function operatorBridgeRequest(path: string, payload: Record<string, unkno
   }
 }
 
+export async function configureAiFromMaster(formData: FormData) {
+  await requireMaster();
+
+  const apiKey = String(formData.get("apiKey") ?? "").trim();
+  const model = String(formData.get("model") ?? "").trim() || "gpt-6-luna";
+
+  if (apiKey.length > 512 || model.length > 128 || !/^[a-z0-9][a-z0-9._:/-]*$/i.test(model)) {
+    redirect(masterUrl("ai-invalid"));
+  }
+
+  const result = await operatorBridgeRequest("/internal/operator/ai/configure", {
+    apiKey,
+    model,
+  });
+
+  revalidatePath("/master");
+  redirect(
+    masterUrl(
+      result.ok
+        ? "ai-saved"
+        : result.error === "invalid_ai_key" ||
+            result.error === "ai_key_rejected" ||
+            result.error === "invalid_ai_model"
+          ? "ai-invalid"
+          : "ai-error",
+    ),
+  );
+}
+
 export async function configureLineFromMaster(formData: FormData) {
   await requireMaster();
 
