@@ -2,132 +2,108 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { signup, type SignupState } from "./actions";
 
-const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  signUp: vi.fn(),
-}));
-
-vi.mock("../../lib/supabase/server", () => ({
-  createClient: mocks.createClient,
-}));
-
 const initialState: SignupState = {
   status: "idle",
   message: "",
 };
 
-function createSignupData(email?: string, password?: string) {
+function createSignupData(
+  name?: string,
+  loginId?: string,
+  password?: string,
+) {
   const formData = new FormData();
-
-  if (email !== undefined) {
-    formData.set("email", email);
-  }
-
-  if (password !== undefined) {
-    formData.set("password", password);
-  }
-
+  if (name !== undefined) formData.set("name", name);
+  if (loginId !== undefined) formData.set("loginId", loginId);
+  if (password !== undefined) formData.set("password", password);
   return formData;
 }
 
 describe("signup", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.stubEnv("APP_URL", "https://toolbox.example");
-    mocks.createClient.mockResolvedValue({
-      auth: { signUp: mocks.signUp },
-    });
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
-  it.each(["", "invalid", "person@localhost"])(
-    "rejects an invalid email: %s",
-    async (email) => {
+  it("rejects a missing display name", async () => {
+    const result = await signup(
+      initialState,
+      createSignupData("", "owner01", "password123"),
+    );
+    expect(result).toEqual({
+      status: "error",
+      message: "表示名を入力してください。",
+    });
+  });
+
+  it.each(["", "a", "ab", "@invalid"])(
+    "rejects an invalid login ID: %s",
+    async (loginId) => {
       const result = await signup(
         initialState,
-        createSignupData(email, "password123"),
+        createSignupData("Owner", loginId, "password123"),
       );
-
-      expect(result).toEqual({
-        status: "error",
-        message: "Enter a valid email address.",
-      });
-      expect(mocks.createClient).not.toHaveBeenCalled();
+      expect(result.status).toBe("error");
+      expect(fetch).not.toHaveBeenCalled();
     },
   );
 
-  it("rejects a password shorter than eight characters", async () => {
+  it("rejects a short password", async () => {
     const result = await signup(
       initialState,
-      createSignupData("person@example.com", "short"),
+      createSignupData("Owner", "owner01", "short"),
     );
-
     expect(result).toEqual({
       status: "error",
-      message: "Password must be at least 8 characters.",
+      message: "パスワードは8文字以上で入力してください。",
     });
-    expect(mocks.createClient).not.toHaveBeenCalled();
   });
 
-  it("submits valid credentials and returns the verification instruction", async () => {
-    mocks.signUp.mockResolvedValue({ data: { user: {} }, error: null });
-
+  it("creates an account through the ID signup edge function", async () => {
     const result = await signup(
       initialState,
-      createSignupData(" person@example.com ", "password123"),
+      createSignupData("Owner", " Owner01 ", "password123"),
     );
 
-    expect(mocks.signUp).toHaveBeenCalledWith({
-      email: "person@example.com",
-      password: "password123",
-      options: {
-        emailRedirectTo:
-          "https://toolbox.example/auth/callback?next=/login",
-      },
-    });
+    expect(fetch).toHaveBeenCalled();
     expect(result).toEqual({
       status: "success",
-      message: "Check your email to verify your account before signing in.",
+      message: "アカウントを作成しました。IDとパスワードでログインできます。",
     });
   });
 
-  it("returns a safe message for provider errors", async () => {
-    mocks.signUp.mockResolvedValue({
-      data: { user: null },
-      error: { message: "raw provider detail with token" },
-    });
+  it("reports a duplicate login ID", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: false, error: "login_id_taken" }), {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
 
     const result = await signup(
       initialState,
-      createSignupData("person@example.com", "password123"),
+      createSignupData("Owner", "owner01", "password123"),
     );
 
     expect(result).toEqual({
       status: "error",
-      message: "We could not create your account. Please try again.",
+      message: "そのIDはすでに使用されています。別のIDを入力してください。",
     });
-    expect(result.message).not.toContain("raw provider detail");
   });
-
-  it.each(["", "https://toolbox.example/path"])(
-    "fails closed with a safe message for invalid APP_URL: %s",
-    async (appUrl) => {
-      vi.stubEnv("APP_URL", appUrl);
-
-      const result = await signup(
-        initialState,
-        createSignupData("person@example.com", "password123"),
-      );
-
-      expect(result).toEqual({
-        status: "error",
-        message: "We could not create your account. Please try again.",
-      });
-      expect(mocks.createClient).not.toHaveBeenCalled();
-      expect(mocks.signUp).not.toHaveBeenCalled();
-    },
-  );
 });
