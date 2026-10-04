@@ -198,6 +198,19 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).not.toContain('<option value="佐藤 美咲">');
   });
 
+  it("preserves customer name edits during live inbox refresh", () => {
+    expect(html).toContain("markCustomerNameEditing");
+    expect(html).toContain("customerNameEditingThreadId");
+    expect(html).toContain("document.activeElement !== customerNameInput");
+  });
+
+  it("renders received LINE stickers as typed messages", () => {
+    expect(html).toContain("message.message_type || 'text'");
+    expect(html).toContain("message.metadata || {}");
+    expect(html).toContain("LINEスタンプ");
+    expect(html).toContain('data-lucide="sticker"');
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
