@@ -45,7 +45,7 @@ export function LoginForm({ callbackErrorMessage, nextPath }: LoginFormProps) {
             minLength={3}
             maxLength={32}
             type="text"
-            placeholder="hajimari_admin"
+            placeholder="sample_admin"
           />
         </label>
 
