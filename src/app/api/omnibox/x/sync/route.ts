@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isPlanKey, PLAN_DEFINITIONS } from "../../../../../lib/plans";
 import { createClient } from "../../../../../lib/supabase/server";
 
 function syncUrl() {
@@ -24,6 +25,33 @@ export async function POST() {
       return NextResponse.json(
         { ok: false, message: "ログインが必要です。" },
         { status: 401 },
+      );
+    }
+
+    const { data: memberships } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", claims.claims.sub)
+      .limit(1);
+    const organizationId =
+      Array.isArray(memberships) && memberships.length === 1
+        ? memberships[0].organization_id
+        : null;
+    const { data: organization } = organizationId
+      ? await supabase
+          .from("organizations")
+          .select("plan_key")
+          .eq("id", organizationId)
+          .maybeSingle()
+      : { data: null };
+    const plan = isPlanKey(organization?.plan_key)
+      ? organization.plan_key
+      : "standard";
+
+    if (!PLAN_DEFINITIONS[plan].xDm) {
+      return NextResponse.json(
+        { ok: false, message: "X DMはスタンダード以上のプランで利用できます。" },
+        { status: 403 },
       );
     }
 
