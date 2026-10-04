@@ -1412,6 +1412,8 @@
     let providerInboxSyncStarted = false;
     let liveInboxTimer = null;
     let liveInboxRefreshInFlight = false;
+    let liveInboxInitialized = false;
+    let liveInboxLastSeen = new Map();
     let assignableStaff = [];
     let customerNameEditingThreadId = null;
     const composerDrafts = {
@@ -1934,15 +1936,32 @@
     function startLiveInboxRefresh() {
       stopLiveInboxRefresh();
       if (isDemoSession || !loggedInUser) return;
-      liveInboxTimer = window.setInterval(async () => {
-        if (document.hidden || liveInboxRefreshInFlight || !loggedInUser) return;
+
+      const refresh = async () => {
+        if (liveInboxRefreshInFlight || !loggedInUser) return;
         liveInboxRefreshInFlight = true;
         try {
           await loadLiveInbox(currentThreadId, { silent: true });
         } finally {
           liveInboxRefreshInFlight = false;
         }
-      }, 1500);
+      };
+
+      liveInboxTimer = window.setInterval(refresh, 1500);
+
+      document.removeEventListener('visibilitychange', handleInboxVisibilityRefresh);
+      document.addEventListener('visibilitychange', handleInboxVisibilityRefresh);
+    }
+
+    async function handleInboxVisibilityRefresh() {
+      if (document.hidden || isDemoSession || !loggedInUser) return;
+      if (liveInboxRefreshInFlight) return;
+      liveInboxRefreshInFlight = true;
+      try {
+        await loadLiveInbox(currentThreadId, { silent: true });
+      } finally {
+        liveInboxRefreshInFlight = false;
+      }
     }
 
     function stopLiveInboxRefresh() {
@@ -1950,6 +1969,7 @@
         window.clearInterval(liveInboxTimer);
         liveInboxTimer = null;
       }
+      document.removeEventListener('visibilitychange', handleInboxVisibilityRefresh);
     }
 
     async function loadLiveInbox(conversationId = null, { silent = false } = {}) {
@@ -1975,10 +1995,27 @@
         }
 
         const payload = await response.json();
+        const conversations = Array.isArray(payload.conversations) ? payload.conversations : [];
         const selectedId = payload.selectedConversation?.id || conversationId || null;
         const selectedMessages = Array.isArray(payload.messages) ? payload.messages : [];
 
-        threads = (payload.conversations || []).map((conversation) => {
+        const previousIds = new Set(threads.map(thread => thread.liveConversationId || thread.id));
+        const previousLastSeen = new Map(liveInboxLastSeen);
+        const newConversationIds = conversations
+          .filter(conversation => !previousIds.has(conversation.id))
+          .map(conversation => conversation.id);
+        const newlyUpdatedConversationIds = conversations
+          .filter(conversation => {
+            const previous = previousLastSeen.get(conversation.id);
+            return previous && previous !== conversation.last_message_at;
+          })
+          .map(conversation => conversation.id);
+
+        liveInboxLastSeen = new Map(
+          conversations.map(conversation => [conversation.id, conversation.last_message_at])
+        );
+
+        threads = conversations.map((conversation) => {
           const isSelected = conversation.id === selectedId;
           const messages = isSelected
             ? selectedMessages.map((message) => ({
@@ -2028,11 +2065,41 @@
           };
         });
 
-        if (selectedId) {
+        const hasNewInquiry = liveInboxInitialized && newConversationIds.length > 0;
+        const hasNewMessageElsewhere =
+          liveInboxInitialized &&
+          newlyUpdatedConversationIds.some(id => id !== currentThreadId);
+
+        if (hasNewInquiry) {
+          currentStatusFilter = 'all';
+          currentAccountFilter = 'all';
+          searchQuery = '';
+          serverSearchConversationIds = null;
+
+          const searchInput = document.getElementById('inbox-search-input');
+          if (searchInput) searchInput.value = '';
+
+          const newestNewConversation = conversations.find(conversation =>
+            newConversationIds.includes(conversation.id)
+          );
+          if (newestNewConversation?.id) {
+            currentThreadId = newestNewConversation.id;
+          }
+
+          showToast('新しい問い合わせを受信しました');
+        } else if (selectedId) {
           currentThreadId = selectedId;
         }
 
         onDataUpdated();
+
+        if (hasNewInquiry && currentThreadId) {
+          await loadConversationDetail(currentThreadId);
+        } else if (hasNewMessageElsewhere) {
+          showToast('新しいメッセージを受信しました');
+        }
+
+        liveInboxInitialized = true;
 
         if (!conversationId && !isDemoSession) {
           setTimeout(() => {
