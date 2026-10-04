@@ -152,6 +152,18 @@ export async function POST(request: Request) {
     const { apiKey, model } = aiRuntime;
     const useGateway = aiRuntime.provider === "gateway";
 
+    const latestMessage = (messageData as MessageRow[])[0] ?? null;
+    if (latestMessage?.direction === "outbound") {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "最後のメッセージはスタッフから送信済みです。お客様から新しい返信が届いた後にAI返信案を作成してください。",
+        },
+        { status: 409 },
+      );
+    }
+
     const messages = (messageData as MessageRow[]).reverse();
     const conversationText = messages
       .map((message) => {
