@@ -44,6 +44,79 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url);
     const conversationId = url.searchParams.get("conversation");
+    const detailOnly = url.searchParams.get("detail") === "1";
+
+    if (conversationId && detailOnly) {
+      const { data: conversation, error: conversationError } = await supabase
+        .from("conversations")
+        .select(
+          "id, organization_id, provider, provider_connection_id, provider_thread_id, customer_external_id, customer_display_name, customer_avatar_url, customer_name_source, assignee_user_id, status, last_message_preview, last_message_at, created_at, updated_at",
+        )
+        .eq("id", conversationId)
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+
+      if (conversationError || !conversation) {
+        return NextResponse.json(
+          { ok: false, error: "conversation_unavailable" },
+          { status: 404 },
+        );
+      }
+
+      if (
+        !planAllowsProvider(
+          plan,
+          conversation.provider === "email" ? "google" : conversation.provider,
+        )
+      ) {
+        return NextResponse.json(
+          { ok: false, error: "conversation_unavailable" },
+          { status: 403 },
+        );
+      }
+
+      const [messageResult, noteResult] = await Promise.all([
+        supabase
+          .from("messages")
+          .select(
+            "id, organization_id, conversation_id, provider_connection_id, provider_message_id, direction, body, message_type, metadata, sent_by_user_id, created_at",
+          )
+          .eq("organization_id", organizationId)
+          .eq("conversation_id", conversationId)
+          .order("created_at", { ascending: true })
+          .limit(200),
+        supabase
+          .from("internal_notes")
+          .select(
+            "id, organization_id, conversation_id, created_by, author_name, body, created_at",
+          )
+          .eq("organization_id", organizationId)
+          .eq("conversation_id", conversationId)
+          .order("created_at", { ascending: true })
+          .limit(200),
+      ]);
+
+      if (
+        messageResult.error ||
+        noteResult.error ||
+        !Array.isArray(messageResult.data) ||
+        !Array.isArray(noteResult.data)
+      ) {
+        return NextResponse.json(
+          { ok: false, error: "conversation_unavailable" },
+          { status: 503 },
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        conversations: [],
+        messages: messageResult.data,
+        notes: noteResult.data,
+        selectedConversation: conversation,
+      });
+    }
+
     const inbox = await getInboxSnapshot(organizationId, conversationId);
 
     if (!inbox.success) {
