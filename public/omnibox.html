@@ -2206,7 +2206,6 @@
       }
 
       try {
-        const mediaUrls = await uploadSelectedPostImages();
         const response = await fetch('/api/omnibox/posts', {
           credentials: 'same-origin',
           cache: 'no-store'
@@ -2234,6 +2233,7 @@
             id: post.id,
             content: post.content,
             mediaUrl: post.media_url || '',
+            mediaUrls: Array.isArray(post.media_urls) ? post.media_urls : (post.media_url ? [post.media_url] : []),
             channels,
             scheduledAt: post.scheduled_at
               ? new Date(post.scheduled_at).toLocaleString('ja-JP')
@@ -4082,7 +4082,11 @@
             </div>
           </div>
           <p class="text-xs text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100 whitespace-pre-wrap">${escapeHtml(post.content)}</p>
-          ${post.mediaUrl ? `<div class="mt-2 text-[10px] text-slate-400 truncate">画像: ${escapeHtml(post.mediaUrl)}</div>` : ''}
+          ${Array.isArray(post.mediaUrls) && post.mediaUrls.length > 0
+            ? `<div class="mt-2 text-[10px] text-slate-400">画像: ${post.mediaUrls.length}枚</div>`
+            : post.mediaUrl
+              ? `<div class="mt-2 text-[10px] text-slate-400">画像: 1枚</div>`
+              : ''}
           ${post.lastError ? `<div class="mt-2 text-[10px] text-red-600">エラー: ${escapeHtml(post.lastError)}</div>` : ''}
         `;
         container.appendChild(card);
