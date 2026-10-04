@@ -181,3 +181,54 @@ export async function DELETE(request: Request) {
     );
   }
 }
+
+
+export async function PATCH(request: Request) {
+  try {
+    const ctx = await context();
+    if (!ctx) {
+      return NextResponse.json(
+        { ok: false, message: "ログインが必要です。" },
+        { status: 401 },
+      );
+    }
+
+    const payload = await request.json();
+    const id = typeof payload?.id === "string" ? payload.id.trim() : "";
+    const title = typeof payload?.title === "string" ? payload.title.trim() : "";
+    const category =
+      typeof payload?.category === "string" && payload.category.trim()
+        ? payload.category.trim()
+        : "general";
+    const body = typeof payload?.body === "string" ? payload.body.trim() : "";
+
+    if (!id || !title || title.length > 100 || !body || body.length > 5000) {
+      return NextResponse.json(
+        { ok: false, message: "定型文の内容を確認してください。" },
+        { status: 400 },
+      );
+    }
+
+    const { data, error } = await ctx.supabase
+      .from("reply_templates")
+      .update({ title, category, body })
+      .eq("id", id)
+      .eq("organization_id", ctx.organizationId)
+      .select("id, title, category, body, created_at")
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json(
+        { ok: false, message: "定型文を更新できませんでした。" },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json({ ok: true, template: data });
+  } catch {
+    return NextResponse.json(
+      { ok: false, message: "定型文を更新できませんでした。" },
+      { status: 500 },
+    );
+  }
+}
