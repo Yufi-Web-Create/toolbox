@@ -111,6 +111,13 @@ describe("uploaded OmniBox application shell", () => {
     expect(selectThreadSource).toContain("loadConversationDetail");
   });
 
+  it("shows a blocking loading modal while creating an employee", () => {
+    expect(html).toContain('id="employee-create-loading-modal"');
+    expect(html).toContain("従業員アカウントを登録中");
+    expect(html).toContain("loadingModal?.classList.remove('hidden')");
+    expect(html).toContain("loadingModal?.classList.add('hidden')");
+  });
+
   it("provides employee rename, password reset, and deletion controls", () => {
     expect(html).toContain("renameEmployee");
     expect(html).toContain("resetEmployeePassword");
