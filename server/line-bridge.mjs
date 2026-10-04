@@ -14,18 +14,19 @@ import { pathToFileURL } from "node:url";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_TEXT_LENGTH = 5000;
-const WEBHOOK_URL = "https://omnibox-line-bridge.onrender.com/webhooks/line";
+const WEBHOOK_BASE_URL = "https://omnibox-line-bridge.onrender.com/webhooks/line";
+
+function lineWebhookUrl(organizationId) {
+  return `${WEBHOOK_BASE_URL}/${organizationId}`;
+}
 const REQUIRED_ENV_KEYS = [
   "SUPABASE_URL",
   "SUPABASE_PUBLISHABLE_KEY",
-  "OMNIBOX_ORGANIZATION_ID",
   "BRIDGE_SIGNING_PRIVATE_KEY_PEM",
 ];
 
-let cachedProviderConfig = null;
-let cachedProviderConfigUntil = 0;
-let cachedLineToken = null;
-let cachedLineTokenUntil = 0;
+const cachedProviderConfigs = new Map();
+const cachedLineTokens = new Map();
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
@@ -143,7 +144,6 @@ export function getBridgeConfiguration(env = process.env) {
     missing,
     supabaseUrl: env.SUPABASE_URL?.trim() ?? "",
     supabasePublishableKey: env.SUPABASE_PUBLISHABLE_KEY?.trim() ?? "",
-    organizationId: env.OMNIBOX_ORGANIZATION_ID?.trim() ?? "",
     signingPrivateKey: env.BRIDGE_SIGNING_PRIVATE_KEY_PEM ?? "",
     providerBridgeKey: env.OMNIBOX_PROVIDER_BRIDGE_KEY?.trim() ?? "",
     port: Number.parseInt(env.PORT ?? "8787", 10) || 8787,
@@ -273,7 +273,6 @@ async function storeOperatorProviderConfig(fetchImpl, config, provider, provider
   const encrypted = encryptProviderConfig(config, providerConfig);
   const { response } = await signedEdgeRequest(fetchImpl, config, {
     action: "store-operator-config",
-    organizationId: config.organizationId,
     provider,
     ...encrypted,
   });
@@ -283,7 +282,7 @@ async function storeOperatorProviderConfig(fetchImpl, config, provider, provider
 async function loadOperatorProviderConfig(fetchImpl, config, provider) {
   const { response, data } = await signedEdgeRequest(fetchImpl, config, {
     action: "get-operator-config",
-    organizationId: config.organizationId,
+    organizationId,
     provider,
   });
   if (response.status === 404) return null;
@@ -291,44 +290,49 @@ async function loadOperatorProviderConfig(fetchImpl, config, provider) {
   return decryptProviderConfig(config, data.config);
 }
 
-async function storeProviderConfig(fetchImpl, config, providerConfig) {
+async function storeProviderConfig(fetchImpl, config, organizationId, providerConfig) {
   const encrypted = encryptProviderConfig(config, providerConfig);
   const { response } = await signedEdgeRequest(fetchImpl, config, {
     action: "store-config",
-    organizationId: config.organizationId,
+    organizationId,
     ...encrypted,
   });
 
   if (!response.ok) throw new Error("config store failed");
 
-  cachedProviderConfig = providerConfig;
-  cachedProviderConfigUntil = Date.now() + 5 * 60 * 1000;
-  cachedLineToken = null;
-  cachedLineTokenUntil = 0;
+  cachedProviderConfigs.set(organizationId, {
+    value: providerConfig,
+    until: Date.now() + 5 * 60 * 1000,
+  });
+  cachedLineTokens.delete(organizationId);
 }
 
-async function loadProviderConfig(fetchImpl, config, force = false) {
-  if (!force && cachedProviderConfig && Date.now() < cachedProviderConfigUntil) {
-    return cachedProviderConfig;
+async function loadProviderConfig(fetchImpl, config, organizationId, force = false) {
+  const cached = cachedProviderConfigs.get(organizationId);
+  if (!force && cached?.value && Date.now() < cached.until) {
+    return cached.value;
   }
 
   const { response, data } = await signedEdgeRequest(fetchImpl, config, {
     action: "get-config",
-    organizationId: config.organizationId,
+    organizationId,
   });
 
   if (response.status === 404) return null;
   if (!response.ok || !data?.config) throw new Error("config lookup failed");
 
   const providerConfig = decryptProviderConfig(config, data.config);
-  cachedProviderConfig = providerConfig;
-  cachedProviderConfigUntil = Date.now() + 5 * 60 * 1000;
+  cachedProviderConfigs.set(organizationId, {
+    value: providerConfig,
+    until: Date.now() + 5 * 60 * 1000,
+  });
   return providerConfig;
 }
 
-async function issueStatelessLineToken(fetchImpl, providerConfig) {
-  if (cachedLineToken && Date.now() < cachedLineTokenUntil) {
-    return cachedLineToken;
+async function issueStatelessLineToken(fetchImpl, providerConfig, organizationId = "") {
+  const cached = organizationId ? cachedLineTokens.get(organizationId) : null;
+  if (cached?.token && Date.now() < cached.until) {
+    return cached.token;
   }
 
   const params = new URLSearchParams({
@@ -352,9 +356,13 @@ async function issueStatelessLineToken(fetchImpl, providerConfig) {
 
   const expiresIn =
     typeof result.expires_in === "number" ? result.expires_in : 900;
-  cachedLineToken = result.access_token;
-  cachedLineTokenUntil = Date.now() + Math.max(60, expiresIn - 60) * 1000;
-  return cachedLineToken;
+  if (organizationId) {
+    cachedLineTokens.set(organizationId, {
+      token: result.access_token,
+      until: Date.now() + Math.max(60, expiresIn - 60) * 1000,
+    });
+  }
+  return result.access_token;
 }
 
 async function fetchAuthenticatedUser(fetchImpl, config, accessToken) {
@@ -370,10 +378,10 @@ async function fetchAuthenticatedUser(fetchImpl, config, accessToken) {
   return isUuid(user?.id) ? user : null;
 }
 
-async function fetchVisibleOrganization(fetchImpl, config, accessToken) {
-  const url = new URL("/rest/v1/organizations", config.supabaseUrl);
-  url.searchParams.set("select", "id");
-  url.searchParams.set("id", `eq.${config.organizationId}`);
+async function fetchVisibleOrganization(fetchImpl, config, accessToken, userId) {
+  const url = new URL("/rest/v1/organization_members", config.supabaseUrl);
+  url.searchParams.set("select", "organization_id,role");
+  url.searchParams.set("user_id", `eq.${userId}`);
   url.searchParams.set("limit", "1");
 
   const response = await fetchImpl(url, {
@@ -392,7 +400,6 @@ async function fetchVisibleConversation(fetchImpl, config, accessToken, conversa
   const url = new URL("/rest/v1/conversations", config.supabaseUrl);
   url.searchParams.set("select", "id,organization_id,customer_external_id");
   url.searchParams.set("id", `eq.${conversationId}`);
-  url.searchParams.set("organization_id", `eq.${config.organizationId}`);
   url.searchParams.set("limit", "1");
 
   const response = await fetchImpl(url, {
@@ -434,7 +441,7 @@ async function fetchLineProfile(fetchImpl, accessToken, userId) {
   }
 }
 
-export async function getLineWebhookStatus(fetchImpl, lineAccessToken) {
+export async function getLineWebhookStatus(fetchImpl, lineAccessToken, expectedWebhookUrl = null) {
   const response = await fetchImpl(
     "https://api.line.me/v2/bot/channel/webhook/endpoint",
     {
@@ -468,11 +475,12 @@ export async function getLineWebhookStatus(fetchImpl, lineAccessToken) {
     lineApiReachable: true,
     webhookUrl: endpoint,
     webhookActive: info?.active === true,
-    webhookMatches: endpoint === WEBHOOK_URL,
+    webhookMatches: expectedWebhookUrl ? endpoint === expectedWebhookUrl : false,
   };
 }
 
-async function applyLineWebhook(fetchImpl, lineAccessToken) {
+async function applyLineWebhook(fetchImpl, lineAccessToken, organizationId) {
+  const webhookUrl = lineWebhookUrl(organizationId);
   const setWebhookResponse = await fetchImpl(
     "https://api.line.me/v2/bot/channel/webhook/endpoint",
     {
@@ -481,7 +489,7 @@ async function applyLineWebhook(fetchImpl, lineAccessToken) {
         Authorization: "Bearer " + lineAccessToken,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ endpoint: WEBHOOK_URL }),
+      body: JSON.stringify({ endpoint: webhookUrl }),
     },
   );
 
@@ -497,7 +505,7 @@ async function applyLineWebhook(fetchImpl, lineAccessToken) {
         Authorization: "Bearer " + lineAccessToken,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ endpoint: WEBHOOK_URL }),
+      body: JSON.stringify({ endpoint: webhookUrl }),
     },
   );
 
@@ -509,11 +517,11 @@ async function applyLineWebhook(fetchImpl, lineAccessToken) {
     }
   } catch {}
 
-  const status = await getLineWebhookStatus(fetchImpl, lineAccessToken);
+  const status = await getLineWebhookStatus(fetchImpl, lineAccessToken, webhookUrl);
 
   return {
     ok: true,
-    webhookUrl: WEBHOOK_URL,
+    webhookUrl,
     webhookVerified,
     ...status,
   };
@@ -536,7 +544,12 @@ async function handleHealth({ response, config, fetchImpl }) {
 
   let providerConfig = null;
   try {
-    providerConfig = await loadProviderConfig(fetchImpl, config, true);
+    providerConfig = await loadProviderConfig(
+      fetchImpl,
+      config,
+      auth.organization.organization_id,
+      true,
+    );
   } catch {}
 
   if (!providerConfig) {
@@ -591,7 +604,7 @@ async function authenticateVisibleOrganization({
 
   const user = await fetchAuthenticatedUser(fetchImpl, config, userAccessToken);
   const organization = user
-    ? await fetchVisibleOrganization(fetchImpl, config, userAccessToken)
+    ? await fetchVisibleOrganization(fetchImpl, config, userAccessToken, user.id)
     : null;
 
   if (!user || !organization) {
@@ -599,7 +612,7 @@ async function authenticateVisibleOrganization({
     return null;
   }
 
-  return { user, userAccessToken };
+  return { user, userAccessToken, organization };
 }
 
 async function handleLineConfigure({ request, response, config, fetchImpl }) {
@@ -638,14 +651,19 @@ async function handleLineConfigure({ request, response, config, fetchImpl }) {
   let lineAccessToken;
 
   try {
-    lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig);
+    lineAccessToken = await issueStatelessLineToken(
+      fetchImpl,
+      providerConfig,
+      auth.organization.organization_id,
+    );
   } catch {
     sendJson(response, 400, { ok: false, error: "line_credentials_rejected" });
     return;
   }
 
-  await storeProviderConfig(fetchImpl, config, providerConfig);
-  const result = await applyLineWebhook(fetchImpl, lineAccessToken);
+  const organizationId = auth.organization.organization_id;
+  await storeProviderConfig(fetchImpl, config, organizationId, providerConfig);
+  const result = await applyLineWebhook(fetchImpl, lineAccessToken, organizationId);
   sendJson(response, result.ok ? 200 : 502, result);
 }
 
@@ -684,7 +702,11 @@ async function handleLineRepair({ request, response, config, fetchImpl }) {
     return;
   }
 
-  const result = await applyLineWebhook(fetchImpl, lineAccessToken);
+  const result = await applyLineWebhook(
+    fetchImpl,
+    lineAccessToken,
+    auth.organization.organization_id,
+  );
   sendJson(response, result.ok ? 200 : 502, result);
 }
 
@@ -700,21 +722,23 @@ async function handleOperatorLineConfigure({ request, response, config, fetchImp
     sendJson(response, 400, { ok: false, error: "invalid_json" });
     return;
   }
+  const organizationId =
+    typeof payload?.organizationId === "string" ? payload.organizationId.trim() : "";
   const channelId = typeof payload?.channelId === "string" ? payload.channelId.trim() : "";
   const channelSecret = typeof payload?.channelSecret === "string" ? payload.channelSecret.trim() : "";
-  if (!/^\d+$/.test(channelId) || channelSecret.length < 16 || channelSecret.length > 256) {
+  if (!isUuid(organizationId) || !/^\d+$/.test(channelId) || channelSecret.length < 16 || channelSecret.length > 256) {
     sendJson(response, 400, { ok: false, error: "invalid_line_credentials" });
     return;
   }
   const providerConfig = { channelId, channelSecret };
   let token;
-  try { token = await issueStatelessLineToken(fetchImpl, providerConfig); }
+  try { token = await issueStatelessLineToken(fetchImpl, providerConfig, organizationId); }
   catch {
     sendJson(response, 400, { ok: false, error: "line_credentials_rejected" });
     return;
   }
-  await storeProviderConfig(fetchImpl, config, providerConfig);
-  const result = await applyLineWebhook(fetchImpl, token);
+  await storeProviderConfig(fetchImpl, config, organizationId, providerConfig);
+  const result = await applyLineWebhook(fetchImpl, token, organizationId);
   sendJson(response, result.ok ? 200 : 502, result);
 }
 
@@ -723,8 +747,20 @@ async function handleOperatorLineRepair({ request, response, config, fetchImpl }
     sendJson(response, 401, { ok: false, error: "unauthorized" });
     return;
   }
+  let payload;
+  try { payload = await readJsonBody(request); }
+  catch {
+    sendJson(response, 400, { ok: false, error: "invalid_json" });
+    return;
+  }
+  const organizationId =
+    typeof payload?.organizationId === "string" ? payload.organizationId.trim() : "";
+  if (!isUuid(organizationId)) {
+    sendJson(response, 400, { ok: false, error: "invalid_organization_id" });
+    return;
+  }
   let providerConfig;
-  try { providerConfig = await loadProviderConfig(fetchImpl, config, true); }
+  try { providerConfig = await loadProviderConfig(fetchImpl, config, organizationId, true); }
   catch {
     sendJson(response, 502, { ok: false, error: "config_lookup_failed" });
     return;
@@ -739,7 +775,7 @@ async function handleOperatorLineRepair({ request, response, config, fetchImpl }
     sendJson(response, 502, { ok: false, error: "line_credentials_rejected" });
     return;
   }
-  const result = await applyLineWebhook(fetchImpl, token);
+  const result = await applyLineWebhook(fetchImpl, token, organizationId);
   sendJson(response, result.ok ? 200 : 502, result);
 }
 
@@ -908,13 +944,13 @@ async function handleOperatorAiGet({ request, response, config, fetchImpl }) {
   });
 }
 
-async function handleLineWebhook({ request, response, config, fetchImpl }) {
+async function handleLineWebhook({ request, response, config, fetchImpl, organizationId }) {
   if (!config.configured) {
     sendJson(response, 503, { ok: false, error: "bridge_not_configured" });
     return;
   }
 
-  const providerConfig = await loadProviderConfig(fetchImpl, config);
+  const providerConfig = await loadProviderConfig(fetchImpl, config, organizationId);
   if (!providerConfig) {
     sendJson(response, 503, { ok: false, error: "line_not_connected" });
     return;
@@ -943,7 +979,7 @@ async function handleLineWebhook({ request, response, config, fetchImpl }) {
   }
 
   const events = Array.isArray(payload?.events) ? payload.events : [];
-  const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig);
+  const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig, organizationId);
 
   const messageTypes = events
     .filter((event) => event?.type === "message")
@@ -971,7 +1007,7 @@ async function handleLineWebhook({ request, response, config, fetchImpl }) {
 
     const { response: persistResponse } = await signedEdgeRequest(fetchImpl, config, {
       action: "inbound",
-      organizationId: config.organizationId,
+      organizationId,
       ...normalized,
       customerDisplayName: profile.displayName,
       customerAvatarUrl: profile.pictureUrl,
@@ -1033,13 +1069,14 @@ async function handleLineProfile({ request, response, config, fetchImpl }) {
     return;
   }
 
-  const providerConfig = await loadProviderConfig(fetchImpl, config);
+  const organizationId = conversation.organization_id;
+  const providerConfig = await loadProviderConfig(fetchImpl, config, organizationId);
   if (!providerConfig) {
     sendJson(response, 503, { ok: false, error: "line_not_connected" });
     return;
   }
 
-  const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig);
+  const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig, organizationId);
   const profile = await fetchLineProfile(
     fetchImpl,
     lineAccessToken,
@@ -1048,7 +1085,7 @@ async function handleLineProfile({ request, response, config, fetchImpl }) {
 
   const { response: persistResponse } = await signedEdgeRequest(fetchImpl, config, {
     action: "profile",
-    organizationId: config.organizationId,
+    organizationId,
     conversationId,
     customerDisplayName: profile.displayName,
     customerAvatarUrl: profile.pictureUrl,
@@ -1148,7 +1185,7 @@ async function handleLineReply({ request, response, config, fetchImpl }) {
 
   const { response: persistResponse } = await signedEdgeRequest(fetchImpl, config, {
     action: "outbound",
-    organizationId: config.organizationId,
+    organizationId,
     conversationId,
     body: message,
     providerMessageId,
@@ -1220,8 +1257,22 @@ export function createLineBridgeServer({
         return;
       }
 
-      if (request.method === "POST" && url.pathname === "/webhooks/line") {
-        await handleLineWebhook({ request, response, config, fetchImpl });
+      const lineWebhookMatch = url.pathname.match(
+        /^\/webhooks\/line\/([0-9a-f-]{36})$/i,
+      );
+      if (request.method === "POST" && lineWebhookMatch) {
+        const organizationId = lineWebhookMatch[1];
+        if (!isUuid(organizationId)) {
+          sendJson(response, 404, { ok: false, error: "not_found" });
+          return;
+        }
+        await handleLineWebhook({
+          request,
+          response,
+          config,
+          fetchImpl,
+          organizationId,
+        });
         return;
       }
 
