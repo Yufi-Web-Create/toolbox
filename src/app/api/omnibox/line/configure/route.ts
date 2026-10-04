@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const userId = claimsData.claims.sub;
     const { data: memberships, error: membershipError } = await supabase
       .from("organization_members")
-      .select("role")
+      .select("organization_id, role")
       .eq("user_id", userId)
       .limit(1);
 
@@ -82,7 +82,11 @@ export async function POST(request: Request) {
     const response = await fetch(new URL(bridgePath, BRIDGE_URL), {
       method: "POST",
       headers: bridgeHeaders,
-      body: JSON.stringify({ channelId, channelSecret }),
+      body: JSON.stringify({
+        organizationId: memberships[0].organization_id,
+        channelId,
+        channelSecret,
+      }),
       cache: "no-store",
     });
 
