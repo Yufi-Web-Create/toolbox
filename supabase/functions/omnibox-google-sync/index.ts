@@ -135,10 +135,6 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const googleClientId = Deno.env.get("OMNIBOX_GOOGLE_CLIENT_ID") ?? "";
-  const googleClientSecret =
-    Deno.env.get("OMNIBOX_GOOGLE_CLIENT_SECRET") ?? "";
-
   if (!supabaseUrl || !serviceKey) {
     return json(500, { ok: false, error: "server_not_configured" });
   }
@@ -201,8 +197,12 @@ Deno.serve(async (req) => {
     if (!gmailToken || (expiresAt && expiresAt < Date.now() + 60_000)) {
       const refreshed = await refreshGoogleToken(
         bundle,
-        googleClientId,
-        googleClientSecret,
+        typeof bundle.omnibox_client_id === "string"
+          ? bundle.omnibox_client_id
+          : Deno.env.get("OMNIBOX_GOOGLE_CLIENT_ID") ?? "",
+        typeof bundle.omnibox_client_secret === "string"
+          ? bundle.omnibox_client_secret
+          : Deno.env.get("OMNIBOX_GOOGLE_CLIENT_SECRET") ?? "",
       );
       if (!refreshed) continue;
 
