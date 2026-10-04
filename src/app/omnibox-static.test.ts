@@ -169,6 +169,30 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("投稿未対応");
   });
 
+  it("uses live inbox refresh without production pseudo receive controls", () => {
+    expect(html).toContain("startLiveInboxRefresh");
+    expect(html).toContain("1500");
+    expect(html).toContain("自動更新");
+    expect(html).not.toContain("疑似受信");
+    expect(html).not.toContain("simulateIncomingMessage");
+  });
+
+  it("supports collapsible left status and right customer panels", () => {
+    expect(html).toContain('id="status-sidebar"');
+    expect(html).toContain("toggleStatusSidebar");
+    expect(html).toContain('id="customer-info-panel"');
+    expect(html).toContain("toggleCustomerPanel");
+    expect(html).toContain("is-collapsed");
+  });
+
+  it("loads real managed staff for conversation assignment", () => {
+    expect(html).toContain("loadAssignableStaff");
+    expect(html).toContain("assignableStaff");
+    expect(html).toContain("assigneeUserId");
+    expect(html).not.toContain('<option value="山田 太郎">');
+    expect(html).not.toContain('<option value="佐藤 美咲">');
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
