@@ -217,6 +217,42 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("payload.notes");
   });
 
+  it("keeps reply and internal-note drafts separated", () => {
+    expect(html).toContain("composerDrafts");
+    expect(html).toContain("composerDrafts[inputMode]?.set");
+    expect(html).toContain("社内共有メモを入力");
+  });
+
+  it("does not generate fake AI replies before AI is connected", () => {
+    expect(html).toContain("AI機能は現在準備中です");
+    expect(html).toContain("AI丁寧返信（準備中）");
+    expect(html).not.toContain("確認が取れましたのでご案内いたします");
+    expect(html).not.toContain("しっかり確認できました");
+  });
+
+  it("supports tablet and mobile inbox layouts", () => {
+    expect(html).toContain("@media (max-width: 1199px)");
+    expect(html).toContain("@media (max-width: 767px)");
+    expect(html).toContain('id="thread-list-pane"');
+    expect(html).toContain("mobile-chat-open");
+    expect(html).toContain("closeMobileChat");
+    expect(html).toContain("applyResponsiveDefaults");
+  });
+
+  it("uses full inbox search and clearer operational labels", () => {
+    expect(html).toContain("/api/omnibox/search?q=");
+    expect(html).toContain("未読 ");
+    expect(html).toContain("受信会話数");
+    expect(html).toContain("OmniBox運営側のOAuth設定未完了");
+  });
+
+  it("supports editing reply templates and a general filter", () => {
+    expect(html).toContain("editReplyTemplate");
+    expect(html).toContain("templateEditingId");
+    expect(html).toContain('data-cat="general"');
+    expect(html).toContain("カーソル位置に挿入しました");
+  });
+
   it("contains syntactically valid connected module JavaScript", () => {
     const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
     expect(match).not.toBeNull();
