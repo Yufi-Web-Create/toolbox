@@ -69,19 +69,20 @@ async function runSubscriptionAction(
 
   const { url, publishableKey } = getSupabaseConfig();
 
-  const { data: connections, error: connectionError } = await auth.supabase
-    .from("provider_connections")
-    .select("id")
-    .eq("id", connectionId)
-    .eq("organization_id", auth.organizationId)
-    .eq("provider", "instagram")
-    .limit(1);
+  const { data: connections, error: connectionError } = await auth.supabase.rpc(
+    "omnibox_list_provider_connections",
+  );
 
-  if (
-    connectionError ||
-    !Array.isArray(connections) ||
-    connections.length !== 1
-  ) {
+  const matchingConnection =
+    !connectionError && Array.isArray(connections)
+      ? connections.find(
+          (connection) =>
+            connection?.id === connectionId &&
+            connection?.provider === "instagram",
+        )
+      : null;
+
+  if (!matchingConnection) {
     return NextResponse.json(
       { ok: false, message: "Instagram接続が見つかりません。" },
       { status: 404 },
