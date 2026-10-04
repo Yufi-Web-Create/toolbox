@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { getAiRuntimeConfig } from "../../lib/ai-config";
 import { getProviderConfig } from "../../lib/integrations/oauth/providers";
 import {
   hasMasterSession,
   isMasterConfigured,
 } from "../../lib/master-auth";
 import {
+  configureAiFromMaster,
   configureLineFromMaster,
   configureOAuthProviderFromMaster,
   masterLogout,
@@ -171,6 +173,9 @@ const STATUS_MESSAGES: Record<string, string> = {
   "google-saved": "Google / Gmail のDeveloper App設定を保存しました。",
   "google-error": "Google / Gmail の設定を保存できませんでした。",
   "provider-invalid": "Client ID / Client Secretを確認してください。",
+  "ai-saved": "AI接続設定を保存し、OpenAI APIへの接続確認が完了しました。",
+  "ai-invalid": "OpenAI APIキーまたはモデル名を確認してください。",
+  "ai-error": "AI接続設定を保存できませんでした。Bridgeの稼働状況をご確認ください。",
 };
 
 export default async function MasterPage({
@@ -182,24 +187,15 @@ export default async function MasterPage({
     redirect("/master-login");
   }
 
-  const [line, instagram, x, google] = await Promise.all([
+  const [line, instagram, x, google, aiRuntime] = await Promise.all([
     getLineHealth(),
     getProviderConfig("instagram", APP_ORIGIN),
     getProviderConfig("x", APP_ORIGIN),
     getProviderConfig("google", APP_ORIGIN),
+    getAiRuntimeConfig(),
   ]);
   const params = await searchParams;
   const statusMessage = params.status ? STATUS_MESSAGES[params.status] : null;
-
-  const gatewayConfigured = Boolean(
-    process.env.AI_GATEWAY_API_KEY?.trim() ||
-      process.env.VERCEL_OIDC_TOKEN?.trim(),
-  );
-  const openAiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
-  const aiConfigured = gatewayConfigured || openAiConfigured;
-  const aiModel =
-    process.env.OPENAI_MODEL?.trim() ||
-    (gatewayConfigured ? "openai/gpt-6-luna" : "gpt-6-luna");
 
   return (
     <main className={styles.page}>
@@ -243,27 +239,98 @@ export default async function MasterPage({
             </div>
           </article>
 
-          <article className={styles.card}>
-            <h2>AI返信アシスタント</h2>
-            <div className={styles.rows}>
-              <div className={styles.row}>
-                <span>AI実行環境</span>
-                <State ready={aiConfigured} />
+          <article className={styles.card + " " + styles.cardWide}>
+            <div className={styles.cardTitleRow}>
+              <h2>AI返信アシスタント</h2>
+              <State
+                ready={Boolean(aiRuntime)}
+                readyText="接続済み"
+                pendingText="要設定"
+              />
+            </div>
+            <div className={styles.lineLayout}>
+              <div>
+                <div className={styles.rows}>
+                  <div className={styles.row}>
+                    <span>AI実行環境</span>
+                    <State
+                      ready={Boolean(aiRuntime)}
+                      readyText="利用可能"
+                      pendingText="未接続"
+                    />
+                  </div>
+                  <div className={styles.row}>
+                    <span>接続方式</span>
+                    <span className={styles.value}>
+                      {aiRuntime?.provider === "gateway"
+                        ? "Vercel AI Gateway"
+                        : aiRuntime
+                          ? "OpenAI API"
+                          : "未設定"}
+                    </span>
+                  </div>
+                  <div className={styles.row}>
+                    <span>モデル</span>
+                    <span className={styles.value}>
+                      {aiRuntime?.model ?? "gpt-6-luna"}
+                    </span>
+                  </div>
+                  {aiRuntime ? (
+                    <div className={styles.row}>
+                      <span>設定元</span>
+                      <span className={styles.value}>
+                        {aiRuntime.source === "stored"
+                          ? "運営設定（暗号化保存）"
+                          : "サーバー環境変数"}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+                <p className={styles.note}>
+                  OpenAI APIキーはRender Bridgeで暗号化して保存します。画面や通常ユーザーには公開されません。
+                </p>
               </div>
-              <div className={styles.row}>
-                <span>接続方式</span>
-                <span className={styles.value}>
-                  {gatewayConfigured
-                    ? "Vercel AI Gateway / OIDC"
-                    : openAiConfigured
-                      ? "OpenAI API"
-                      : "未設定"}
-                </span>
-              </div>
-              <div className={styles.row}>
-                <span>モデル</span>
-                <span className={styles.value}>{aiModel}</span>
-              </div>
+
+              <form action={configureAiFromMaster} className={styles.form} autoComplete="off">
+                <label className={styles.field}>
+                  <span>OpenAI API Key</span>
+                  <input
+                    name="apiKey"
+                    type="password"
+                    placeholder={
+                      aiRuntime?.source === "stored"
+                        ? "変更するときだけ新しいAPIキーを入力"
+                        : "sk-..."
+                    }
+                    autoComplete="new-password"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    data-1p-ignore="true"
+                    data-lpignore="true"
+                    required={!aiRuntime}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>モデル</span>
+                  <input
+                    name="model"
+                    defaultValue={aiRuntime?.model ?? "gpt-6-luna"}
+                    placeholder="gpt-6-luna"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    required
+                  />
+                </label>
+                <p className={styles.note}>
+                  保存時にOpenAI APIへの接続確認を行います。日常的な返信案生成には、速度とコストのバランスから gpt-6-luna を初期値にしています。
+                </p>
+                <button className={styles.primaryButton} type="submit">
+                  {aiRuntime?.source === "stored"
+                    ? "AI設定を更新・接続確認"
+                    : "AI設定を保存・接続確認"}
+                </button>
+              </form>
             </div>
           </article>
 
