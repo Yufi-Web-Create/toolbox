@@ -61,11 +61,14 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("ログアウト");
   });
 
-  it("supports employee login with organization auto-detection", () => {
-    expect(html).toContain('id="auth-input-organization"');
+  it("supports ID-and-password login for administrators and employees", () => {
+    expect(html).toContain('id="auth-input-login-id"');
     expect(html).toContain("switchLoginType('employee')");
-    expect(html).toContain("所属組織はログイン後に自動判定されます");
     expect(html).toContain("従業員としてログイン");
+    expect(html).toContain("IDとパスワードを入力してください");
+    expect(html).toContain('id="employee-create-login-id"');
+    expect(html).not.toContain('id="auth-input-email"');
+    expect(html).not.toContain('id="employee-create-email"');
   });
 
   it("keeps the full account area clickable and closes the menu safely", () => {
@@ -268,7 +271,7 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain('name="omnibox_inbox_search"');
     expect(html).toContain('autocomplete="off"');
     expect(html).toContain("readonly onpointerdown=\"activateInboxSearch(this)\"");
-    expect(html).toContain('id="auth-input-email" name="omnibox_login_email" autocomplete="username" disabled');
+    expect(html).toContain('id="auth-input-login-id" name="omnibox_login_id" autocomplete="username"');
     expect(html).toContain("looksLikeCredentialAutofill");
     expect(html).toContain("Instagram 初回メッセージ");
     expect(html).toContain("返信する（Requestsなら承認）");
