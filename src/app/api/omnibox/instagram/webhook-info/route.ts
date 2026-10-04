@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     }
 
     const origin = new URL(request.url).origin;
-    const config = getProviderConfig("instagram", origin);
+    const config = await getProviderConfig("instagram", origin);
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
 
     if (!config || !supabaseUrl) {
