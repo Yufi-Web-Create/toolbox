@@ -171,18 +171,23 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("X DMを同期");
   });
 
-  it("uses real social publishing and scheduled post APIs", () => {
+  it("uses direct multi-image social publishing and scheduled post APIs", () => {
     expect(html).toContain("/api/omnibox/posts");
-    expect(html).toContain("new-post-media-url");
-    expect(html).toContain("Instagram投稿には公開画像URL");
+    expect(html).toContain("/api/omnibox/media");
+    expect(html).toContain('id="new-post-media-files"');
+    expect(html).toContain("Instagramは最大10枚");
+    expect(html).toContain("Xを含む投稿は最大4枚");
+    expect(html).toContain("movePostImage");
+    expect(html).not.toContain("new-post-media-url");
     expect(html).toContain("指定時刻に自動投稿します");
-    expect(html).toContain("投稿未対応");
   });
 
-  it("uses live inbox refresh without production pseudo receive controls", () => {
+  it("uses event-driven inbox refresh without production pseudo receive controls", () => {
     expect(html).toContain("startLiveInboxRefresh");
-    expect(html).toContain("1500");
-    expect(html).toContain("自動更新");
+    expect(html).toContain("/api/omnibox/inbox/events");
+    expect(html).toContain("window.EventSource");
+    expect(html).toContain("リアルタイム受信");
+    expect(html).not.toContain("setInterval(refresh, 1500)");
     expect(html).not.toContain("疑似受信");
     expect(html).not.toContain("simulateIncomingMessage");
   });
@@ -222,10 +227,19 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("payload.notes");
   });
 
-  it("keeps reply and internal-note drafts separated", () => {
+  it("keeps reply and internal-note drafts separated and preserves typing", () => {
     expect(html).toContain("composerDrafts");
     expect(html).toContain("composerDrafts[inputMode]?.set");
+    expect(html).toContain("saveComposerDraft()");
     expect(html).toContain("社内共有メモを入力");
+  });
+
+  it("guards inbox search from credential autofill and explains Instagram requests", () => {
+    expect(html).toContain('name="omnibox_inbox_search"');
+    expect(html).toContain('autocomplete="off"');
+    expect(html).toContain("looksLikeCredentialAutofill");
+    expect(html).toContain("Instagram メッセージリクエスト");
+    expect(html).toContain("返信して承認");
   });
 
   it("does not expose fake AI generation before AI is connected", () => {
