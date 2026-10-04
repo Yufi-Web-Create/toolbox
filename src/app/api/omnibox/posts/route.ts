@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isPlanKey, PLAN_DEFINITIONS } from "../../../../lib/plans";
 import { createClient } from "../../../../lib/supabase/server";
 
 function publisherUrl() {
@@ -32,12 +33,22 @@ async function authContext() {
 
   if (!organizationId) return null;
 
+  const { data: organization } = await supabase
+    .from("organizations")
+    .select("plan_key")
+    .eq("id", organizationId)
+    .maybeSingle();
+  const plan = isPlanKey(organization?.plan_key)
+    ? organization.plan_key
+    : "standard";
+
   const { data: sessionData } = await supabase.auth.getSession();
 
   return {
     supabase,
     userId,
     organizationId,
+    plan,
     accessToken: sessionData.session?.access_token ?? "",
   };
 }
@@ -49,6 +60,13 @@ export async function GET() {
       return NextResponse.json(
         { ok: false, message: "ログインが必要です。" },
         { status: 401 },
+      );
+    }
+
+    if (!PLAN_DEFINITIONS[ctx.plan].socialPublishing) {
+      return NextResponse.json(
+        { ok: false, message: "SNS投稿はスタンダード以上のプランで利用できます。" },
+        { status: 403 },
       );
     }
 
@@ -84,6 +102,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { ok: false, message: "ログインが必要です。" },
         { status: 401 },
+      );
+    }
+
+    if (!PLAN_DEFINITIONS[ctx.plan].socialPublishing) {
+      return NextResponse.json(
+        { ok: false, message: "SNS投稿はスタンダード以上のプランで利用できます。" },
+        { status: 403 },
       );
     }
 
@@ -263,6 +288,13 @@ export async function DELETE(request: Request) {
       return NextResponse.json(
         { ok: false, message: "ログインが必要です。" },
         { status: 401 },
+      );
+    }
+
+    if (!PLAN_DEFINITIONS[ctx.plan].socialPublishing) {
+      return NextResponse.json(
+        { ok: false, message: "SNS投稿はスタンダード以上のプランで利用できます。" },
+        { status: 403 },
       );
     }
 
