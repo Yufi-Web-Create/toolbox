@@ -1,7 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const ALLOWED_ORGANIZATION_ID = "919201e2-7c75-4c96-bc74-cb3b08da5a04";
 const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6p8c5sdMjuLveJ9fDYji
 B6nYv9dzBKYj6SQiiIUidlM2arMNB2+1XOO+G2OuM8STxaSUo1W/HiOX1xM6J6k3
@@ -71,8 +70,14 @@ Deno.serve(async (req) => {
     return json(400, { ok: false, error: "invalid_json" });
   }
 
-  if (payload.organizationId !== ALLOWED_ORGANIZATION_ID) {
-    return json(403, { ok: false, error: "organization_not_allowed" });
+  const organizationId =
+    typeof payload.organizationId === "string" ? payload.organizationId.trim() : "";
+  const operatorAction =
+    payload.action === "store-operator-config" ||
+    payload.action === "get-operator-config";
+
+  if (!operatorAction && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(organizationId)) {
+    return json(400, { ok: false, error: "invalid_organization_id" });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -82,6 +87,21 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  if (!operatorAction) {
+    const { data: organization, error: organizationError } = await supabase
+      .from("organizations")
+      .select("id")
+      .eq("id", organizationId)
+      .maybeSingle();
+
+    if (organizationError) {
+      return json(500, { ok: false, error: "organization_lookup_failed" });
+    }
+    if (!organization) {
+      return json(404, { ok: false, error: "organization_not_found" });
+    }
+  }
 
   if (payload.action === "store-config") {
     const encryptedKey = String(payload.encryptedKey ?? "");
@@ -97,7 +117,7 @@ Deno.serve(async (req) => {
       await supabase
         .from("provider_connections")
         .select("id")
-        .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+        .eq("organization_id", organizationId)
         .eq("provider", "line")
         .maybeSingle();
 
@@ -106,7 +126,7 @@ Deno.serve(async (req) => {
     }
 
     const configPayload = {
-      organization_id: ALLOWED_ORGANIZATION_ID,
+      organization_id: organizationId,
       provider: "line",
       encrypted_key: encryptedKey,
       encrypted_payload: encryptedPayload,
@@ -131,7 +151,7 @@ Deno.serve(async (req) => {
     const { data, error } = await supabase
       .from("provider_connections")
       .select("encrypted_key, encrypted_payload, iv, auth_tag, updated_at")
-      .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+      .eq("organization_id", organizationId)
       .eq("provider", "line")
       .maybeSingle();
 
@@ -193,7 +213,7 @@ Deno.serve(async (req) => {
     const { data: lineConnection, error: connectionError } = await supabase
       .from("provider_connections")
       .select("id")
-      .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+      .eq("organization_id", organizationId)
       .eq("provider", "line")
       .eq("status", "active")
       .maybeSingle();
@@ -205,7 +225,7 @@ Deno.serve(async (req) => {
     const { data: existingConversation, error: existingError } = await supabase
       .from("conversations")
       .select("id, customer_name_source")
-      .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+      .eq("organization_id", organizationId)
       .eq("provider", "line")
       .eq("provider_thread_id", payload.providerThreadId)
       .maybeSingle();
@@ -215,7 +235,7 @@ Deno.serve(async (req) => {
     }
 
     const conversationPayload: Record<string, unknown> = {
-      organization_id: ALLOWED_ORGANIZATION_ID,
+      organization_id: organizationId,
       provider: "line",
       provider_connection_id: lineConnection.id,
       provider_thread_id: payload.providerThreadId,
@@ -243,7 +263,7 @@ Deno.serve(async (req) => {
         .from("conversations")
         .update(conversationPayload)
         .eq("id", conversationId)
-        .eq("organization_id", ALLOWED_ORGANIZATION_ID);
+        .eq("organization_id", organizationId);
 
       if (updateError) {
         return json(500, { ok: false, error: "conversation_persist_failed" });
@@ -262,7 +282,7 @@ Deno.serve(async (req) => {
     }
 
     const { error: messageError } = await supabase.from("messages").upsert({
-      organization_id: ALLOWED_ORGANIZATION_ID,
+      organization_id: organizationId,
       conversation_id: conversationId,
       provider_connection_id: lineConnection.id,
       provider_message_id: payload.providerMessageId,
@@ -294,7 +314,7 @@ Deno.serve(async (req) => {
       .from("conversations")
       .select("id, customer_name_source")
       .eq("id", conversationId)
-      .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+      .eq("organization_id", organizationId)
       .maybeSingle();
 
     if (conversationError || !conversation) {
@@ -315,7 +335,7 @@ Deno.serve(async (req) => {
       .from("conversations")
       .update(updates)
       .eq("id", conversationId)
-      .eq("organization_id", ALLOWED_ORGANIZATION_ID);
+      .eq("organization_id", organizationId);
 
     if (updateError) {
       return json(500, { ok: false, error: "profile_update_failed" });
@@ -338,7 +358,7 @@ Deno.serve(async (req) => {
       .from("conversations")
       .select("id")
       .eq("id", conversationId)
-      .eq("organization_id", ALLOWED_ORGANIZATION_ID)
+      .eq("organization_id", organizationId)
       .maybeSingle();
 
     if (conversationError || !conversation) {
@@ -346,7 +366,7 @@ Deno.serve(async (req) => {
     }
 
     const { error: messageError } = await supabase.from("messages").insert({
-      organization_id: ALLOWED_ORGANIZATION_ID,
+      organization_id: organizationId,
       conversation_id: conversationId,
       provider_message_id: payload.providerMessageId || null,
       direction: "outbound",
@@ -366,7 +386,7 @@ Deno.serve(async (req) => {
         updated_at: createdAt,
       })
       .eq("id", conversationId)
-      .eq("organization_id", ALLOWED_ORGANIZATION_ID);
+      .eq("organization_id", organizationId);
 
     if (updateError) return json(500, { ok: false, error: "conversation_update_failed" });
     return json(200, { ok: true });
