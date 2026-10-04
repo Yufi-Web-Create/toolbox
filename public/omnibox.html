@@ -494,11 +494,11 @@
                   <div class="flex items-start gap-2">
                     <i data-lucide="message-circle-question" class="w-4 h-4 text-pink-600 mt-0.5 shrink-0"></i>
                     <div>
-                      <div class="font-bold">Instagram メッセージリクエスト</div>
-                      <div class="text-[10px] text-pink-700 mt-0.5">初回の返信を送るとInstagram側でリクエストが承認され、会話がGeneralへ移動します。</div>
+                      <div class="font-bold">Instagram 初回メッセージ</div>
+                      <div class="text-[10px] text-pink-700 mt-0.5">フォロワー外からの会話はRequestsに入ります。初回返信を送るとInstagram側で承認され、Generalへ移動します。</div>
                     </div>
                   </div>
-                  <button type="button" onclick="focusInstagramRequestReply()" class="shrink-0 px-2.5 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-bold text-[11px]">返信して承認</button>
+                  <button type="button" onclick="focusInstagramRequestReply()" class="shrink-0 px-2.5 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-bold text-[11px]">返信する（Requestsなら承認）</button>
                 </div>
                 <div class="composer-actions flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div class="flex items-center gap-1.5 flex-wrap">
@@ -611,7 +611,7 @@
           <div>
             <h2 class="text-xl font-bold text-slate-900">SNS一括・予約投稿マネージャー</h2>
             <p class="text-xs md:text-sm text-slate-500 mt-1">
-              Instagram、X、Googleビジネスプロフィール等へ同時に内容を最適化して予約配信できます。
+              InstagramとXへ、画像付き投稿をまとめて作成・予約配信できます。
             </p>
           </div>
           <button onclick="openNewPostModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 shadow-xs transition">
