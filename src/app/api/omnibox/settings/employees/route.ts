@@ -48,8 +48,8 @@ async function forward(method: "GET" | "POST" | "PATCH" | "DELETE", payload?: un
   if (!response.ok || result.ok !== true) {
     const code = typeof result.error === "string" ? result.error : "";
     const message =
-      code === "email_already_exists"
-        ? "そのメールアドレスはすでに使用されています。"
+      code === "login_id_taken"
+        ? "そのIDはすでに使用されています。別のIDを入力してください。"
         : code === "owner_required"
           ? "従業員アカウントの管理は管理者のみ行えます。"
           : code === "plan_user_limit_reached"
