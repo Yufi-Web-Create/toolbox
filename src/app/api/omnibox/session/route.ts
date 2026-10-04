@@ -82,10 +82,14 @@ export async function GET() {
     }
 
     const email = typeof claims.email === "string" ? claims.email : "";
+    const loginId =
+      typeof metadata.login_id === "string" && metadata.login_id.trim()
+        ? metadata.login_id.trim()
+        : "";
     const name =
       typeof metadata.full_name === "string" && metadata.full_name.trim()
         ? metadata.full_name.trim()
-        : email.split("@")[0] || "スタッフ";
+        : loginId || "スタッフ";
 
     const roleKey = membership?.role ?? accountType;
     const requiresOrganizationSetup =
@@ -96,6 +100,7 @@ export async function GET() {
       user: {
         id: claims.sub,
         email,
+        loginId,
         name,
         role: roleKey === "owner" ? "管理者" : "従業員",
         roleKey,
