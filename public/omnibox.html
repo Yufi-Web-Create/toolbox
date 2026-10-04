@@ -1308,17 +1308,17 @@
           </div>
 
           <div>
-            <label class="text-xs font-bold text-slate-600 block mb-1">メールアドレス</label>
+            <label class="text-xs font-bold text-slate-600 block mb-1">ログインID</label>
             <div class="relative">
-              <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
-              <input type="email" id="auth-input-email" name="omnibox_login_email" autocomplete="username" disabled required placeholder="yamada@company.com" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
+              <i data-lucide="key-round" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+              <input type="text" id="auth-input-login-id" name="omnibox_login_id" autocomplete="username" autocapitalize="none" spellcheck="false" disabled required minlength="3" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9._-]{2,31}" placeholder="例: hajimari_admin" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition">
             </div>
           </div>
 
           <div>
             <div class="flex items-center justify-between mb-1">
               <label class="text-xs font-bold text-slate-600">パスワード</label>
-              <button type="button" onclick="showForgotPasswordInfo()" class="text-[11px] text-teal-600 hover:underline">パスワードをお忘れですか？</button>
+              <span class="text-[10px] text-slate-400">8文字以上</span>
             </div>
             <div class="relative">
               <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
@@ -4294,7 +4294,7 @@
         const holidayName = holidays.get(key) || '';
 
         cells.push(`
-          <button type="button" onclick="openNewPostModalForDate('${key}')" class="min-h-[92px] sm:min-h-[108px] border-r border-b border-slate-100 p-1.5 sm:p-2 text-left align-top hover:bg-teal-50/50 transition ${inMonth ? 'bg-white' : 'bg-slate-50/70'}">
+          <button type="button" onclick="openNewPostModalForDate('${key}')" class="min-h-[92px] sm:min-h-[108px] border-r border-b border-slate-100 p-1.5 sm:p-2 text-left flex flex-col justify-start items-stretch hover:bg-teal-50/50 transition ${inMonth ? 'bg-white' : 'bg-slate-50/70'}">
             <div class="flex items-start justify-between gap-1">
               <div class="min-w-0">
                 <span class="inline-flex px-1.5 py-0.5 rounded text-[11px] font-semibold ${isToday ? 'bg-teal-600 text-white' : inMonth ? 'text-slate-700' : 'text-slate-300'}">${date.getDate()}</span>
