@@ -1162,6 +1162,16 @@
     </div>
   </div>
 
+  <div id="employee-create-loading-modal" class="fixed inset-0 bg-slate-900/45 backdrop-blur-xs z-[140] hidden items-center justify-center p-4" aria-live="polite" aria-busy="true">
+    <div class="bg-white rounded-2xl max-w-xs w-full p-6 shadow-2xl border border-slate-100 text-center">
+      <div class="w-11 h-11 mx-auto rounded-full bg-teal-50 text-teal-700 flex items-center justify-center">
+        <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
+      </div>
+      <h3 class="font-bold text-slate-900 mt-3">従業員アカウントを登録中</h3>
+      <p class="text-xs text-slate-500 mt-1.5">アカウントとログインIDを作成しています。画面を閉じずにそのままお待ちください。</p>
+    </div>
+  </div>
+
   <div id="post-success-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-[130] hidden items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center">
       <div class="w-12 h-12 mx-auto rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
@@ -4606,6 +4616,10 @@
       }
 
       button.disabled = true;
+      const loadingModal = document.getElementById('employee-create-loading-modal');
+      loadingModal?.classList.remove('hidden');
+      loadingModal?.classList.add('flex');
+      lucide.createIcons();
 
       try {
         if (isDemoSession) {
@@ -4654,6 +4668,8 @@
         showToast(error.message || '定型文を保存できませんでした');
       } finally {
         button.disabled = false;
+        loadingModal?.classList.add('hidden');
+        loadingModal?.classList.remove('flex');
       }
     };
 
