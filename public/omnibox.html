@@ -1206,7 +1206,7 @@
               <i data-lucide="building-2" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
               <input type="text" id="auth-input-organization" maxlength="32" autocomplete="organization" placeholder="例: HAJIMARI_BEPPU" class="w-full text-xs pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 bg-slate-50/50 focus:bg-white transition uppercase">
             </div>
-            <p class="text-[10px] text-slate-400 mt-1">入力した場合は所属組織と照合します。従業員権限は登録情報から自動判定されます。</p>
+            <p class="text-[10px] text-slate-400 mt-1">所属組織はログイン後に自動判定されます。</p>
           </div>
 
           <div id="auth-name-group" class="hidden">
@@ -3773,7 +3773,7 @@
         tabRegister.className = 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition';
         nameGroup.classList.add('hidden');
         loginTypeGroup.classList.remove('hidden');
-        organizationGroup.classList.toggle('hidden', currentLoginType !== 'employee');
+        organizationGroup.classList.add('hidden');
         submitLabel.textContent = currentLoginType === 'employee' ? '従業員としてログイン' : '管理者としてログイン';
       } else {
         tabRegister.className = 'flex-1 py-2 rounded-lg bg-white text-slate-800 shadow-xs flex items-center justify-center gap-1.5 transition';
