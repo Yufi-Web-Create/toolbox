@@ -26,6 +26,8 @@ export type InboxMessage = {
   provider_message_id: string | null;
   direction: "inbound" | "outbound";
   body: string;
+  message_type: "text" | "sticker" | "image" | "video" | "audio" | "file" | "location" | "unknown";
+  metadata: Record<string, unknown>;
   sent_by_user_id: string | null;
   created_at: string;
 };
@@ -81,7 +83,7 @@ export async function getInboxSnapshot(
     const { data: messageData, error: messageError } = await supabase
       .from("messages")
       .select(
-        "id, organization_id, conversation_id, provider_connection_id, provider_message_id, direction, body, sent_by_user_id, created_at",
+        "id, organization_id, conversation_id, provider_connection_id, provider_message_id, direction, body, message_type, metadata, sent_by_user_id, created_at",
       )
       .eq("organization_id", organizationId)
       .eq("conversation_id", selectedConversation.id)
