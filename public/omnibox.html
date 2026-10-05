@@ -289,10 +289,6 @@
             <i data-lucide="user-cog" class="w-3.5 h-3.5 text-slate-400"></i>
             <span>アカウント設定</span>
           </button>
-          <button onclick="switchView('channels'); document.getElementById('user-menu-dropdown').classList.add('hidden')" class="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2">
-            <i data-lucide="link-2" class="w-3.5 h-3.5 text-slate-400"></i>
-            <span>SNS連携設定</span>
-          </button>
           <button onclick="handleLogout()" class="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2 mt-1 border-t border-slate-100 pt-2">
             <i data-lucide="log-out" class="w-3.5 h-3.5 text-red-500"></i>
             <span>ログアウト</span>
@@ -373,7 +369,7 @@
             
             <div class="space-y-1" id="account-filter-container">
               <button onclick="filterByAccount('all')" class="account-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100 font-medium text-slate-800" data-account="all">
-                <span class="flex items-center gap-2"><i data-lucide="grid" class="w-3.5 h-3.5"></i>すべての全アカウント</span>
+                <span class="flex items-center gap-2"><i data-lucide="grid" class="w-3.5 h-3.5"></i>すべてのアカウント</span>
                 <span id="badge-all-accounts" class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded-full">0</span>
               </button>
               <div id="account-tree-list" class="space-y-2 mt-2">
@@ -618,7 +614,7 @@
           <div>
             <h2 class="text-xl font-bold text-slate-900">SNS一括・予約投稿マネージャー</h2>
             <p class="text-xs md:text-sm text-slate-500 mt-1">
-              InstagramとXへ、画像付き投稿をまとめて作成・予約配信できます。
+              InstagramとXへ、画像付き投稿をまとめて作成・予約配信できます。LINEはメッセージ対応専用です。
             </p>
           </div>
           <button onclick="openNewPostModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 shadow-xs transition">
@@ -796,8 +792,8 @@
               </div>
               <div>
                 <label class="text-xs font-bold text-slate-600 block mb-1.5">組織ID</label>
-                <input id="settings-organization-id" type="text" maxlength="32" required class="w-full max-w-xl text-sm font-mono uppercase px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="例: SAMPLE_SHOP">
-                <p class="text-[10px] text-slate-400 mt-1">3〜32文字の半角英数字・ハイフン・アンダースコア。組織を識別する管理用IDです。</p>
+                <input id="settings-organization-id" type="text" maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false" required class="w-full max-w-xl text-sm font-mono uppercase px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="例: SAMPLE_SHOP">
+                <p id="settings-organization-id-help" class="text-[10px] text-slate-400 mt-1">3〜32文字の半角英数字・ハイフン・アンダースコア。初期設定後はログイン事故防止のため変更できません。</p>
               </div>
               <button type="submit" class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition">
                 組織設定を保存
@@ -848,11 +844,15 @@
               </div>
               <div>
                 <label class="text-[11px] font-bold text-slate-600 block mb-1">ログインID</label>
-                <input id="employee-create-login-id" type="text" minlength="3" maxlength="32" autocomplete="off" required class="w-full text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="staff01">
+                <input id="employee-create-login-id" name="omnibox_employee_login_id" type="text" minlength="3" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore required class="w-full text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="staff01">
               </div>
               <div>
                 <label class="text-[11px] font-bold text-slate-600 block mb-1">初期パスワード</label>
-                <input id="employee-create-password" type="password" minlength="8" required class="w-full text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="8文字以上">
+                <div class="flex gap-2">
+                  <input id="employee-create-password" name="omnibox_new_employee_password" type="password" minlength="8" autocomplete="new-password" data-lpignore="true" data-1p-ignore required class="flex-1 min-w-0 text-xs px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="8文字以上">
+                  <button type="button" onclick="generateEmployeePassword()" class="px-2.5 rounded-xl border border-slate-200 bg-white text-[10px] font-semibold text-slate-600 hover:border-teal-300" aria-label="安全な初期パスワードを自動生成">自動生成</button>
+                  <button type="button" onclick="toggleEmployeePasswordVisibility()" class="px-2.5 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-800" aria-label="初期パスワードの表示を切り替える"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
+                </div>
               </div>
               <div class="md:col-span-3">
                 <button type="submit" id="employee-create-button" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-2">
@@ -957,8 +957,7 @@
       <!-- 方式1: ワンクリックOAuthソーシャルログイン -->
       <div id="connect-oauth-section" class="space-y-3">
         <p class="text-xs text-slate-600 leading-relaxed">
-          連携したいプラットフォームのボタンを押し、公式ログイン画面でOmniBoxへのアクセスを許可してください。
-          「OmniBox運営側のOAuth設定未完了」と表示される場合は、利用者側ではなくOmniBox側のDeveloper App設定が必要です。
+          連携したいサービスを選び、公式ログイン画面の案内に沿って接続してください。専門的な設定はOmniBox側で管理します。
         </p>
         <div id="oauth-provider-setup-status" class="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
           OAuth接続状態を確認しています...
@@ -1010,27 +1009,10 @@
                   <span>𝕏 (Twitter) でログインして連携</span>
                   <span class="text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-medium">DM & ポスト予約</span>
                 </div>
-                <div class="text-[11px] text-slate-400">OAuth 2.0 PKCE で安全にアカウントを紐付け</div>
+                <div class="text-[11px] text-slate-400">公式ログイン画面から安全にアカウントを接続</div>
               </div>
             </div>
             <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 group-hover:text-slate-900 group-hover:translate-x-0.5 transition"></i>
-          </button>
-
-          <!-- Google / Gmail -->
-          <button onclick="startOAuthFlow('email')" data-oauth-provider="google" class="w-full flex items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/40 transition group">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
-                Mail
-              </div>
-              <div class="text-left">
-                <div class="text-xs font-bold text-slate-800 group-hover:text-blue-700 flex items-center gap-1.5">
-                  <span>Google / メールアカウントでログイン</span>
-                  <span class="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-medium">問い合わせメール</span>
-                </div>
-                <div class="text-[11px] text-slate-400">サポート窓口メールをスレッド受信箱へ統合</div>
-              </div>
-            </div>
-            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition"></i>
           </button>
         </div>
 
@@ -1091,7 +1073,7 @@
           <i data-lucide="send" class="w-5 h-5 text-teal-600"></i>
           <span>SNS一括・予約投稿を作成</span>
         </h3>
-        <button onclick="closeNewPostModal()" class="text-slate-400 hover:text-slate-600">
+        <button onclick="closeNewPostModal()" class="text-slate-400 hover:text-slate-600" aria-label="投稿作成画面を閉じる">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -1123,7 +1105,11 @@
         <div class="flex items-center justify-between mb-1">
           <label class="text-xs font-bold text-slate-600">投稿本文</label>
         </div>
-        <textarea id="new-post-content" rows="4" placeholder="フォロワーに届けたい情報を入力してください... #ハッシュタグ など" class="w-full text-xs md:text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 resize-none"></textarea>
+        <textarea id="new-post-content" rows="4" oninput="updatePostCharacterCounter()" placeholder="フォロワーに届けたい情報を入力してください... #ハッシュタグ など" class="w-full text-xs md:text-sm p-3 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500 resize-none"></textarea>
+        <div class="mt-1 flex items-center justify-between gap-2 text-[10px]">
+          <span class="text-slate-400">Xは全角文字を約2文字分として計算します</span>
+          <span id="new-post-character-count" class="font-mono text-slate-500">0文字 / X残り280</span>
+        </div>
       </div>
 
       <div>
@@ -1196,61 +1182,30 @@
     </div>
   </div>
 
-  <!-- Instagram Webhook設定 -->
+  <!-- Instagram DM受信状態 -->
   <div id="instagram-webhook-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] hidden items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-slate-100 p-5 space-y-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 p-5 space-y-4">
       <div class="flex items-start justify-between gap-4">
         <div>
           <h3 class="font-bold text-sm text-slate-800 flex items-center gap-2">
             <i data-lucide="instagram" class="w-4 h-4 text-pink-600"></i>
-            Instagram DM受信設定
+            Instagram DM受信状態
           </h3>
-          <p class="text-[11px] text-slate-500 mt-1">Meta Developers のWebhook設定に以下を登録してください。</p>
+          <p class="text-[11px] text-slate-500 mt-1">DMをOmniBoxで受信できる状態か確認します。</p>
         </div>
-        <button type="button" onclick="closeInstagramWebhookInfo()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+        <button type="button" onclick="closeInstagramWebhookInfo()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" aria-label="Instagram受信状態を閉じる">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
-
-      <div class="space-y-3">
-        <div>
-          <label class="text-[11px] font-bold text-slate-500 block mb-1">Callback URL</label>
-          <div class="flex gap-2">
-            <input id="instagram-webhook-url" readonly class="flex-1 min-w-0 text-[11px] font-mono px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700">
-            <button type="button" onclick="copyInstagramWebhookField('instagram-webhook-url')" class="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-100 rounded-xl hover:bg-teal-100">コピー</button>
-          </div>
-        </div>
-
-        <div>
-          <label class="text-[11px] font-bold text-slate-500 block mb-1">Verify Token</label>
-          <div class="flex gap-2">
-            <input id="instagram-webhook-token" readonly class="flex-1 min-w-0 text-[11px] font-mono px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700">
-            <button type="button" onclick="copyInstagramWebhookField('instagram-webhook-token')" class="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-100 rounded-xl hover:bg-teal-100">コピー</button>
-          </div>
-        </div>
-
-        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-1">
-          <div><strong>Webhookフィールド:</strong> <span id="instagram-webhook-fields" class="font-mono">messages</span></div>
-          <div>Metaアプリ側のWebhook設定に加えて、接続したInstagramアカウントごとのWebhook購読が必要です。</div>
-        </div>
-
-        <div class="p-3 rounded-xl border border-slate-200 bg-white space-y-2">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <div class="text-[11px] font-bold text-slate-700">アカウントWebhook購読</div>
-              <div id="instagram-subscription-status" class="text-[11px] text-slate-500 mt-0.5">確認中...</div>
-            </div>
-            <button id="instagram-subscription-register-button" type="button" onclick="registerInstagramWebhookSubscription()" class="px-3 py-2 text-xs font-semibold text-white bg-pink-600 hover:bg-pink-700 rounded-xl disabled:opacity-50">
-              Webhook購読を再登録
-            </button>
-          </div>
-          <div class="text-[10px] text-slate-400">
-            登録後に Meta の subscribed_apps を再確認し、messages が含まれているか表示します。
-          </div>
-        </div>
+      <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+        <div class="text-[11px] font-bold text-slate-700">受信状態</div>
+        <div id="instagram-subscription-status" class="text-xs text-slate-500 mt-1">確認中...</div>
       </div>
-
-      <div class="flex justify-end">
+      <div class="p-3 rounded-xl bg-teal-50 border border-teal-100 text-[11px] text-teal-800">
+        通常は追加設定不要です。DMが届かない場合だけ「受信設定を再確認」をお試しください。
+      </div>
+      <div class="flex items-center justify-end gap-2">
+        <button id="instagram-subscription-register-button" type="button" onclick="registerInstagramWebhookSubscription()" class="px-3 py-2 text-xs font-semibold text-pink-700 bg-pink-50 border border-pink-100 hover:bg-pink-100 rounded-xl disabled:opacity-50">受信設定を再確認</button>
         <button type="button" onclick="closeInstagramWebhookInfo()" class="px-4 py-2 text-xs font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-xl">閉じる</button>
       </div>
     </div>
@@ -1416,13 +1371,13 @@
         name: 'ライト',
         price: '¥9,800/月',
         description: '問い合わせ管理を小さく開始',
-        features: ['LINE・メール問い合わせ', '利用3名まで', 'SNS投稿なし']
+        features: ['LINE問い合わせ', '利用3名まで', 'SNS投稿なし']
       },
       standard: {
         name: 'スタンダード',
         price: '¥29,800/月',
         description: '問い合わせとSNS投稿を一元化',
-        features: ['Instagram DM', 'SNS予約投稿', '利用人数無制限']
+        features: ['Instagram・X・LINE問い合わせ', 'Instagram・X予約投稿', '利用人数無制限']
       },
       pro: {
         name: 'プロ',
@@ -1646,6 +1601,7 @@
           ? 'text-[9px] bg-emerald-100 text-emerald-700 font-mono px-1.5 py-0.2 rounded'
           : 'text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded';
       }
+      updateAiQuotaLabels();
 
       document.querySelectorAll('[data-oauth-provider]').forEach(button => {
         const provider = button.dataset.oauthProvider;
@@ -1853,8 +1809,7 @@
 
       const labels = {
         instagram: 'Instagram',
-        x: 'X',
-        google: 'Google / Gmail'
+        x: 'X'
       };
 
       const rows = Object.entries(labels).map(([provider, label]) => {
@@ -1862,13 +1817,12 @@
         return `<div class="flex items-center justify-between gap-3 py-0.5">
           <span>${label}</span>
           <span class="${configured ? 'text-emerald-700' : 'text-amber-700'} font-semibold">
-            ${configured ? '接続可能' : 'OmniBox運営側のOAuth設定未完了'}
+            ${configured ? '接続できます' : '現在準備中'}
           </span>
         </div>`;
       });
 
       container.innerHTML = rows.join('');
-      renderOAuthSetupChecklist();
     }
 
     async function loadProviderConnections() {
@@ -2453,18 +2407,27 @@
       const postLabel = document.getElementById('ai-post-quota-label');
       if (replyLabel) replyLabel.textContent = text;
       if (postLabel) postLabel.textContent = text;
+      const canUseAi = currentPlanFeatures.ai === true;
+      const exhausted = aiTrialQuotaRemaining <= 0;
+      ['ai-draft-button', 'ai-post-draft-button'].forEach(id => {
+        const button = document.getElementById(id);
+        if (!button) return;
+        button.disabled = !canUseAi || exhausted;
+        button.classList.toggle('opacity-50', !canUseAi || exhausted);
+        button.classList.toggle('cursor-not-allowed', !canUseAi || exhausted);
+        button.title = !canUseAi
+          ? 'プロ以上のプランで利用できます'
+          : exhausted
+            ? 'AI利用回数の上限に達しました'
+            : '';
+      });
     }
 
     function checkTemporaryAiQuota() {
       if (aiTrialQuotaRemaining > 0) return true;
-
-      window.alert('AI生成回数の上限に達しました。決済システム実装後はここで生成を停止します。現在はテスト期間のため回数を回復します。');
-      aiTrialQuotaRemaining = AI_TRIAL_QUOTA_MAX;
-      try {
-        localStorage.setItem('omnibox_ai_trial_quota', String(aiTrialQuotaRemaining));
-      } catch {}
+      showToast('AI利用回数の上限に達しました');
       updateAiQuotaLabels();
-      return true;
+      return false;
     }
 
     function consumeTemporaryAiQuota() {
@@ -2495,7 +2458,7 @@
           return {
             name: 'Instagram',
             color: 'bg-pink-500',
-            icon: '<i data-lucide="instagram" class="w-2.5 h-2.5 text-white stroke-[2.2]"></i>'
+            icon: '<i data-lucide="instagram" class="w-4 h-4 text-white stroke-[2.2]"></i>'
           };
         case 'x':
           return {
@@ -2596,10 +2559,14 @@
           btn.classList.add('text-slate-600', 'hover:bg-slate-100');
         }
       });
+      const mobileAccount = document.getElementById('mobile-account-filter');
+      if (mobileAccount) mobileAccount.value = accId;
+      updateInboxFilterLabel();
       renderThreadList();
     };
 
     function renderThreadList() {
+      updateInboxFilterLabel();
       const container = document.getElementById('thread-list-container');
       if (!container) return;
       container.innerHTML = '';
@@ -3694,12 +3661,12 @@
 
       if (hasMessages) {
         status.innerHTML = `
-          <span class="text-emerald-700 font-semibold">messages 購読済み</span>
+          <span class="text-emerald-700 font-semibold">受信OK</span>
           <span class="block text-[10px] text-slate-400 mt-0.5">${escapeHtml(fields.join(', ') || 'messages')}</span>
         `;
       } else {
         status.innerHTML = `
-          <span class="text-amber-700 font-semibold">messages が未購読です</span>
+          <span class="text-amber-700 font-semibold">要再接続・再確認</span>
           <span class="block text-[10px] text-slate-400 mt-0.5">${fields.length ? escapeHtml(fields.join(', ')) : 'subscribed_apps に有効な購読がありません'}</span>
         `;
       }
@@ -3707,7 +3674,7 @@
 
     window.showInstagramWebhookInfo = async function(connectionId) {
       if (loggedInUser?.roleKey !== 'owner') {
-        showToast('Instagram受信設定は管理者のみ確認できます');
+        showToast('Instagram受信状態は管理者のみ確認できます');
         return;
       }
       if (!connectionId) {
@@ -3716,46 +3683,25 @@
       }
 
       instagramWebhookConnectionId = connectionId;
+      const modal = document.getElementById('instagram-webhook-modal');
+      modal?.classList.remove('hidden');
+      modal?.classList.add('flex');
+      renderInstagramSubscriptionStatus({ subscribedFields: [], messagesSubscribed: false });
+      lucide.createIcons();
 
       try {
-        const [infoResponse, subscriptionResponse] = await Promise.all([
-          fetch('/api/omnibox/instagram/webhook-info', {
-            credentials: 'same-origin',
-            cache: 'no-store'
-          }),
-          fetch('/api/omnibox/instagram/subscription?connectionId=' + encodeURIComponent(connectionId), {
-            credentials: 'same-origin',
-            cache: 'no-store'
-          })
-        ]);
-
-        const result = await infoResponse.json();
-        const subscription = await subscriptionResponse.json();
-
-        if (!infoResponse.ok || !result.ok) {
-          throw new Error(result.message || 'Instagram受信設定を確認できませんでした');
+        const response = await fetch('/api/omnibox/instagram/subscription?connectionId=' + encodeURIComponent(connectionId), {
+          credentials: 'same-origin',
+          cache: 'no-store'
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) {
+          throw new Error(result.message || 'Instagram受信状態を確認できませんでした');
         }
-
-        document.getElementById('instagram-webhook-url').value = result.webhookUrl || '';
-        document.getElementById('instagram-webhook-token').value = result.verifyToken || '';
-        document.getElementById('instagram-webhook-fields').textContent =
-          Array.isArray(result.subscribedFields) ? result.subscribedFields.join(', ') : 'messages';
-
-        if (subscriptionResponse.ok && subscription.ok) {
-          renderInstagramSubscriptionStatus(subscription);
-        } else {
-          renderInstagramSubscriptionStatus({
-            subscribedFields: [],
-            messagesSubscribed: false
-          });
-        }
-
-        const modal = document.getElementById('instagram-webhook-modal');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        lucide.createIcons();
+        renderInstagramSubscriptionStatus(result);
       } catch (error) {
-        showToast(error.message || 'Instagram受信設定を確認できませんでした');
+        const status = document.getElementById('instagram-subscription-status');
+        if (status) status.innerHTML = '<span class="text-amber-700 font-semibold">要再接続・再確認</span>';
       }
     };
 
@@ -3766,7 +3712,7 @@
       }
 
       const button = document.getElementById('instagram-subscription-register-button');
-      const original = button?.textContent || 'Webhook購読を再登録';
+      const original = button?.textContent || '受信設定を再確認';
       if (button) {
         button.disabled = true;
         button.textContent = '登録中...';
@@ -3782,17 +3728,17 @@
         const result = await response.json();
 
         if (!response.ok || !result.ok) {
-          throw new Error(result.message || 'Webhook購読を再登録できませんでした');
+          throw new Error(result.message || '受信設定を再確認できませんでした');
         }
 
         renderInstagramSubscriptionStatus(result);
         showToast(
           result.messagesSubscribed
-            ? 'InstagramのWebhook購読を再登録しました'
-            : '購読登録は完了しましたが、messages を確認できませんでした'
+            ? 'Instagramの受信設定を再確認しました'
+            : '受信設定を確認しましたが、DM受信状態を確認できませんでした'
         );
       } catch (error) {
-        showToast(error.message || 'Webhook購読を再登録できませんでした');
+        showToast(error.message || '受信設定を再確認できませんでした');
       } finally {
         if (button) {
           button.disabled = false;
@@ -4066,6 +4012,22 @@
       });
     }
 
+    function getXWeightedLength(text) {
+      return Array.from(String(text || '')).reduce((sum, char) => sum + (char.codePointAt(0) > 127 ? 2 : 1), 0);
+    }
+
+    window.updatePostCharacterCounter = function() {
+      const content = document.getElementById('new-post-content')?.value || '';
+      const counter = document.getElementById('new-post-character-count');
+      if (!counter) return;
+      const weighted = getXWeightedLength(content);
+      const remaining = 280 - weighted;
+      counter.textContent = `${Array.from(content).length}文字 / X残り${remaining}`;
+      counter.classList.toggle('text-red-600', remaining < 0);
+      counter.classList.toggle('font-bold', remaining < 0);
+      counter.classList.toggle('text-slate-500', remaining >= 0);
+    };
+
     window.submitNewPost = async function() {
       const content = document.getElementById('new-post-content').value.trim();
       const timing =
@@ -4104,6 +4066,11 @@
       const includesX = selectedAccounts.some(
         acc => acc.provider === 'x' || acc.platform === 'x'
       );
+      if (includesX && getXWeightedLength(content) > 280) {
+        showToast('Xの文字数上限を超えています。本文を短くしてください');
+        document.getElementById('new-post-content')?.focus();
+        return;
+      }
       if (includesX && selectedPostImages.length > 4) {
         showToast('X投稿の画像は4枚までです');
         return;
@@ -4135,7 +4102,7 @@
           createdAt: Date.now()
         });
         renderScheduledPosts();
-        window.closeNewPostModal();
+        window.closeNewPostModal(true);
         document.getElementById('new-post-content').value = '';
         selectedPostTargetIds.clear();
         clearSelectedPostImages();
@@ -4173,7 +4140,7 @@
           );
         }
 
-        window.closeNewPostModal();
+        window.closeNewPostModal(true);
         document.getElementById('new-post-content').value = '';
         const briefInput = document.getElementById('new-post-ai-brief');
         if (briefInput) briefInput.value = '';
@@ -4550,15 +4517,15 @@
         card.innerHTML = `
           <div>
             <div class="flex items-center justify-between gap-2 mb-2">
-              <span class="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md uppercase">${escapeHtml(tmpl.category)}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md">${escapeHtml({general:'一般',salon:'美容・サロン',restaurant:'飲食店',ec:'EC・物販'}[tmpl.category] || tmpl.category)}</span>
               <div class="flex items-center gap-1">
-                <button onclick="window.copyToClipboard(decodeURIComponent('${encodedBody}'))" class="p-1.5 text-slate-400 hover:text-teal-600 rounded-lg hover:bg-teal-50" title="コピー">
+                <button onclick="window.copyToClipboard(decodeURIComponent('${encodedBody}'))" class="p-1.5 text-slate-400 hover:text-teal-600 rounded-lg hover:bg-teal-50" title="コピー" aria-label="定型文をコピー">
                   <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                 </button>
-                <button onclick="editReplyTemplate('${tmpl.id}')" class="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50" title="編集">
+                <button onclick="editReplyTemplate('${tmpl.id}')" class="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50" title="編集" aria-label="定型文を編集">
                   <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                 </button>
-                <button onclick="deleteReplyTemplate('${tmpl.id}')" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50" title="削除">
+                <button onclick="deleteReplyTemplate('${tmpl.id}')" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50" title="削除" aria-label="定型文を削除">
                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
               </div>
@@ -4712,6 +4679,11 @@
     };
 
     window.applyTemplateToCurrentChat = function(bodyText) {
+      if (!currentThreadId || !threads.some(thread => thread.id === currentThreadId)) {
+        window.switchView('inbox');
+        showToast('返信したいスレッドを選んでください');
+        return;
+      }
       window.switchView('inbox');
       window.setInputMode('reply');
       const input = document.getElementById('message-input');
@@ -4797,6 +4769,13 @@
         activeNav.classList.remove('text-slate-600');
       }
 
+      const userMenuTrigger = document.getElementById('user-menu-trigger');
+      if (userMenuTrigger) {
+        userMenuTrigger.classList.toggle('bg-teal-50', viewName === 'settings');
+        userMenuTrigger.classList.toggle('ring-1', viewName === 'settings');
+        userMenuTrigger.classList.toggle('ring-teal-200', viewName === 'settings');
+      }
+
       document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
         const active = btn.dataset.view === viewName;
         btn.classList.toggle('bg-teal-50', active);
@@ -4831,6 +4810,22 @@
       window.switchView(target);
     }
 
+    function updateInboxFilterLabel() {
+      const label = document.getElementById('inbox-filter-label');
+      if (!label) return;
+      const statusLabels = {
+        all: 'すべてのステータス',
+        unread: '未対応・未読',
+        in_progress: '対応中',
+        resolved: '対応完了'
+      };
+      const account = currentAccountFilter === 'all'
+        ? null
+        : connectedAccounts.find(item => item.id === currentAccountFilter);
+      const accountLabel = account?.accountName || 'すべてのアカウント';
+      label.textContent = accountLabel + '・' + (statusLabels[currentStatusFilter] || 'すべてのステータス');
+    }
+
     window.filterByStatus = function(status) {
       currentStatusFilter = status;
       document.querySelectorAll('.status-filter-btn').forEach(btn => {
@@ -4844,6 +4839,7 @@
       });
       const mobileStatus = document.getElementById('mobile-status-filter');
       if (mobileStatus) mobileStatus.value = status;
+      updateInboxFilterLabel();
       renderThreadList();
     };
 
@@ -4924,7 +4920,7 @@
 
       if (width >= 768 && width < 1200) {
         customer?.classList.add('is-collapsed');
-        status?.classList.add('is-collapsed');
+        status?.classList.remove('is-collapsed');
       } else if (width >= 1200) {
         status?.classList.remove('is-collapsed');
       }
@@ -5007,11 +5003,17 @@
         target.setMinutes(Math.ceil(target.getMinutes() / 5) * 5, 0, 0);
         input.value = toLocalDateTimeInputValue(target);
       }
+      window.updatePostCharacterCounter();
       lucide.createIcons();
     };
 
-    window.closeNewPostModal = function() {
-      document.getElementById('new-post-modal').classList.add('hidden');
+    window.closeNewPostModal = function(force = false) {
+      const modal = document.getElementById('new-post-modal');
+      const content = document.getElementById('new-post-content')?.value.trim() || '';
+      const brief = document.getElementById('new-post-ai-brief')?.value.trim() || '';
+      const hasDraft = Boolean(content || brief || selectedPostImages.length);
+      if (!force && hasDraft && !window.confirm('入力中の投稿内容を破棄して閉じますか？')) return;
+      modal?.classList.add('hidden');
     };
 
     window.openNewPostModalWithAiPrompt = function() {
@@ -5313,7 +5315,12 @@
           requiresOrganizationSetup && currentOrganization.name === 'OmniBox Workspace'
             ? ''
             : (currentOrganization.name || '');
-        document.getElementById('settings-organization-id').value = currentOrganization.loginId || '';
+        const organizationIdInput = document.getElementById('settings-organization-id');
+        organizationIdInput.value = currentOrganization.loginId || '';
+        organizationIdInput.readOnly = !requiresOrganizationSetup;
+        organizationIdInput.classList.toggle('bg-slate-100', !requiresOrganizationSetup);
+        organizationIdInput.classList.toggle('text-slate-500', !requiresOrganizationSetup);
+        organizationIdInput.title = requiresOrganizationSetup ? '組織IDを設定してください' : '初期設定後の組織IDは変更できません';
         const employeeOrgId = document.getElementById('employee-login-org-id');
         if (employeeOrgId) employeeOrgId.textContent = currentOrganization.loginId || '未設定';
       }
@@ -5388,7 +5395,8 @@
       }
 
       const name = document.getElementById('settings-organization-name').value.trim();
-      const loginId = document.getElementById('settings-organization-id').value.trim().toUpperCase();
+      const requestedLoginId = document.getElementById('settings-organization-id').value.trim().toUpperCase();
+      const loginId = requiresOrganizationSetup ? requestedLoginId : (currentOrganization?.loginId || requestedLoginId);
       const wasInitialSetup = requiresOrganizationSetup;
 
       try {
@@ -5482,6 +5490,24 @@
       } catch (error) {
         list.innerHTML = `<div class="text-xs text-red-500 py-3">${error.message || '従業員一覧を読み込めませんでした'}</div>`;
       }
+    };
+
+    window.generateEmployeePassword = function() {
+      const input = document.getElementById('employee-create-password');
+      if (!input) return;
+      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+      const random = new Uint32Array(16);
+      crypto.getRandomValues(random);
+      input.value = Array.from(random, value => alphabet[value % alphabet.length]).join('');
+      input.type = 'text';
+      input.focus();
+      showToast('安全な初期パスワードを生成しました。作成後に従業員へ安全な方法で共有してください');
+    };
+
+    window.toggleEmployeePasswordVisibility = function() {
+      const input = document.getElementById('employee-create-password');
+      if (!input) return;
+      input.type = input.type === 'password' ? 'text' : 'password';
     };
 
     window.createEmployeeAccount = async function(e) {
