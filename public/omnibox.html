@@ -623,7 +623,7 @@
                 <div id="internal-notes-list" class="space-y-2 max-h-60 overflow-y-auto mb-3"></div>
                 <div class="flex gap-1.5">
                   <input type="text" id="quick-note-input" placeholder="メモを残す..." class="flex-1 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:border-teal-500">
-                  <button onclick="addQuickNote()" class="text-xs px-2.5 py-1.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition">追加</button>
+                  <button onclick="addQuickNote()" class="text-xs px-2.5 py-1.5 bg-amber-100 text-amber-900 border border-amber-200 rounded-lg hover:bg-amber-200 transition">メモ追加</button>
                 </div>
               </div>
               </div>
@@ -1227,6 +1227,17 @@
         <button onclick="closeTemplateSelectorModal()" class="text-slate-400 hover:text-slate-600">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
+      </div>
+      <div class="grid grid-cols-[minmax(0,1fr)_150px] gap-2">
+        <input id="modal-template-search" type="search" oninput="renderTemplateSelectorList()" placeholder="定型文を検索..." class="min-w-0 text-xs px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500">
+        <select id="modal-template-category" onchange="renderTemplateSelectorList()" class="text-xs px-2.5 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none focus:border-teal-500">
+          <option value="all">すべて</option>
+          <option value="general">一般</option>
+          <option value="salon">美容・サロン</option>
+          <option value="restaurant">飲食・レストラン</option>
+          <option value="ec">EC・物販</option>
+          <option value="business">士業・企業問い合わせ</option>
+        </select>
       </div>
       <div id="modal-template-list" class="max-h-72 overflow-y-auto space-y-2"></div>
     </div>
@@ -2950,7 +2961,16 @@
         customerNameInput.value = thread.customerName || '';
       }
       document.getElementById('info-customer-channel').textContent = `${meta.name} (${acc.accountName})`;
-      document.getElementById('info-customer-contact').textContent = thread.customerHandle;
+      const contact = document.getElementById('info-customer-contact');
+      if (contact) {
+        const handle = thread.customerHandle || '';
+        if (thread.channel === 'instagram' && handle.startsWith('@')) {
+          const username = handle.slice(1);
+          contact.innerHTML = `<a href="https://www.instagram.com/${encodeURIComponent(username)}/" target="_blank" rel="noopener noreferrer" class="text-pink-600 hover:underline">@${escapeHtml(username)} ↗</a>`;
+        } else {
+          contact.textContent = handle || '-';
+        }
+      }
       
       const tagContainer = document.getElementById('info-customer-tags');
       tagContainer.innerHTML = (thread.tags || []).map(tag => `
@@ -3437,19 +3457,32 @@
           : '返信メッセージを入力... (Enterで改行 / ⌘+Enter・Ctrl+Enterで送信)';
       }
 
+      const sendButton = document.getElementById('send-main-button');
+      const targetLabel = document.getElementById('target-channel-label');
+
       if (inputMode === 'note') {
-        btnNote.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
+        btnNote.classList.add('bg-amber-100', 'text-amber-900', 'shadow-xs');
         btnNote.classList.remove('text-slate-600');
         btnReply.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
         btnReply.classList.add('text-slate-600');
         noteIndicator.classList.remove('hidden');
+        targetLabel?.classList.add('hidden');
+        if (sendButton) {
+          sendButton.classList.remove('bg-teal-600', 'hover:bg-teal-700');
+          sendButton.classList.add('bg-amber-500', 'hover:bg-amber-600');
+        }
         sendBtnLabel.textContent = 'メモを記録';
       } else {
         btnReply.classList.add('bg-white', 'text-slate-800', 'shadow-xs');
         btnReply.classList.remove('text-slate-600');
-        btnNote.classList.remove('bg-white', 'text-slate-800', 'shadow-xs');
+        btnNote.classList.remove('bg-white', 'bg-amber-100', 'text-amber-900', 'text-slate-800', 'shadow-xs');
         btnNote.classList.add('text-slate-600');
         noteIndicator.classList.add('hidden');
+        targetLabel?.classList.remove('hidden');
+        if (sendButton) {
+          sendButton.classList.remove('bg-amber-500', 'hover:bg-amber-600');
+          sendButton.classList.add('bg-teal-600', 'hover:bg-teal-700');
+        }
         sendBtnLabel.textContent = '送信する';
       }
     };
@@ -4892,12 +4925,25 @@
       }
     };
 
-    window.openTemplateSelectorModal = function() {
-      const modal = document.getElementById('template-modal');
+    window.renderTemplateSelectorList = function() {
       const list = document.getElementById('modal-template-list');
+      if (!list) return;
+      const query = (document.getElementById('modal-template-search')?.value || '').trim().toLowerCase();
+      const category = document.getElementById('modal-template-category')?.value || 'all';
       list.innerHTML = '';
 
-      templates.forEach(t => {
+      const filteredTemplates = templates.filter(t => {
+        const matchesCategory = category === 'all' || t.category === category;
+        const haystack = `${t.title || ''} ${t.body || ''}`.toLowerCase();
+        return matchesCategory && (!query || haystack.includes(query));
+      });
+
+      if (filteredTemplates.length === 0) {
+        list.innerHTML = '<div class="p-5 text-center text-xs text-slate-400">該当する定型文はありません。</div>';
+        return;
+      }
+
+      filteredTemplates.forEach(t => {
         const item = document.createElement('div');
         item.className = 'p-3 bg-slate-50 hover:bg-teal-50 border border-slate-200 rounded-xl cursor-pointer transition';
         item.onclick = () => {
@@ -4910,8 +4956,17 @@
         `;
         list.appendChild(item);
       });
+    };
 
+    window.openTemplateSelectorModal = function() {
+      const modal = document.getElementById('template-modal');
+      const search = document.getElementById('modal-template-search');
+      const category = document.getElementById('modal-template-category');
+      if (search) search.value = '';
+      if (category) category.value = 'all';
+      window.renderTemplateSelectorList();
       modal.classList.remove('hidden');
+      setTimeout(() => search?.focus(), 0);
     };
 
     window.closeTemplateSelectorModal = function() {
