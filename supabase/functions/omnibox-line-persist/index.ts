@@ -209,6 +209,50 @@ Deno.serve(async (req) => {
     return json(200, { ok: true, config: data });
   }
 
+  if (payload.action === "list-push-subscriptions") {
+    const { data, error } = await supabase
+      .from("push_subscriptions")
+      .select("endpoint")
+      .eq("organization_id", organizationId);
+
+    if (error) {
+      return json(500, { ok: false, error: "push_subscription_lookup_failed" });
+    }
+
+    const endpoints = Array.from(
+      new Set(
+        (data ?? [])
+          .map((row) => String(row.endpoint ?? "").trim())
+          .filter((endpoint) => endpoint.startsWith("https://")),
+      ),
+    );
+
+    return json(200, { ok: true, endpoints });
+  }
+
+  if (payload.action === "remove-push-subscriptions") {
+    const endpoints = Array.isArray(payload.endpoints)
+      ? payload.endpoints
+          .map((value) => String(value ?? "").trim())
+          .filter((endpoint) => endpoint.startsWith("https://"))
+          .slice(0, 100)
+      : [];
+
+    if (endpoints.length > 0) {
+      const { error } = await supabase
+        .from("push_subscriptions")
+        .delete()
+        .eq("organization_id", organizationId)
+        .in("endpoint", endpoints);
+
+      if (error) {
+        return json(500, { ok: false, error: "push_subscription_cleanup_failed" });
+      }
+    }
+
+    return json(200, { ok: true });
+  }
+
   if (payload.action === "inbound") {
     const { data: lineConnection, error: connectionError } = await supabase
       .from("provider_connections")
