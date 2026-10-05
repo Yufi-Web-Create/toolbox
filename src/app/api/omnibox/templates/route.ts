@@ -4,6 +4,16 @@ import { createClient } from "../../../../lib/supabase/server";
 
 const DEFAULT_TEMPLATES = [
   {
+    category: "general",
+    title: "お問い合わせへの一次返信",
+    body: "お問い合わせありがとうございます。内容を確認のうえ、担当者より改めてご案内いたします。恐れ入りますが、今しばらくお待ちください。",
+  },
+  {
+    category: "general",
+    title: "営業時間外のお問い合わせ",
+    body: "お問い合わせありがとうございます。現在は営業時間外のため、確認でき次第あらためてご返信いたします。お待たせして申し訳ございませんが、よろしくお願いいたします。",
+  },
+  {
     category: "salon",
     title: "ご予約の確定案内（日時・アクセス）",
     body: "ご予約誠にありがとうございます！以下の日時でご案内確定いたしました。\n\n■ご予約日時: [日時を入力]\n■施術内容: [メニュー名]\n\n当日はお気をつけてお越しくださいませ。道に迷われた際はお気軽にお電話ください。",
@@ -71,10 +81,15 @@ export async function GET() {
       );
     }
 
-    let data = initialData;
+    let data = initialData ?? [];
 
-    if (!data || data.length === 0) {
-      const rows = DEFAULT_TEMPLATES.map((template) => ({
+    const existingTitles = new Set(data.map((template) => template.title));
+    const missingDefaults = DEFAULT_TEMPLATES.filter(
+      (template) => !existingTitles.has(template.title),
+    );
+
+    if (missingDefaults.length > 0) {
+      const rows = missingDefaults.map((template) => ({
         ...template,
         organization_id: ctx.organizationId,
         created_by: ctx.userId,
@@ -85,11 +100,11 @@ export async function GET() {
         .select("id, title, category, body, created_at");
 
       if (!seeded.error && seeded.data) {
-        data = seeded.data;
+        data = [...data, ...seeded.data];
       }
     }
 
-    return NextResponse.json({ ok: true, templates: data ?? [] });
+    return NextResponse.json({ ok: true, templates: data });
   } catch {
     return NextResponse.json(
       { ok: false, message: "定型文を読み込めませんでした。" },
