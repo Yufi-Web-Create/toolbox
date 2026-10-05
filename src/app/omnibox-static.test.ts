@@ -208,6 +208,17 @@ describe("uploaded MatoMeet application shell", () => {
     expect(html).not.toContain('id="scheduled-nav-badge"');
   });
 
+  it("rehydrates settings after session restore and remembers the settings tab", () => {
+    expect(html).toContain("omnibox_settings_tab");
+    expect(html).toContain("window.openSettings(settingsTab)");
+    expect(html).toContain("localStorage.setItem('omnibox_settings_tab', target)");
+  });
+
+  it("uses clean favicon markup without rendering escaped newlines", () => {
+    expect(html).toContain('href="/favicon.ico"');
+    expect(html).not.toContain('sizes="any">\\\\n');
+  });
+
   it("supports temporary AI quota, Japan holidays, and send safety checks", () => {
     expect(html).toContain("AI_TRIAL_QUOTA_MAX");
     expect(html).toContain("ai-reply-quota-label");
