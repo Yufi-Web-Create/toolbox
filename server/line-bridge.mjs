@@ -146,6 +146,11 @@ export function getBridgeConfiguration(env = process.env) {
     supabasePublishableKey: env.SUPABASE_PUBLISHABLE_KEY?.trim() ?? "",
     signingPrivateKey: env.BRIDGE_SIGNING_PRIVATE_KEY_PEM ?? "",
     providerBridgeKey: env.OMNIBOX_PROVIDER_BRIDGE_KEY?.trim() ?? "",
+    vapidPublicKey: env.MATOMEET_VAPID_PUBLIC_KEY?.trim() ?? "",
+    vapidPrivateKey: env.MATOMEET_VAPID_PRIVATE_KEY_PEM ?? "",
+    vapidSubject:
+      env.MATOMEET_VAPID_SUBJECT?.trim() ||
+      "https://omnibox-line-bridge.onrender.com",
     port: Number.parseInt(env.PORT ?? "8787", 10) || 8787,
   };
 }
@@ -189,6 +194,93 @@ function isUuid(value) {
     typeof value === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
   );
+}
+
+function encodeBase64Url(value) {
+  return Buffer.from(value).toString("base64url");
+}
+
+function createVapidToken(endpoint, config) {
+  const audience = new URL(endpoint).origin;
+  const header = encodeBase64Url(
+    JSON.stringify({ typ: "JWT", alg: "ES256" }),
+  );
+  const payload = encodeBase64Url(
+    JSON.stringify({
+      aud: audience,
+      exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
+      sub: config.vapidSubject,
+    }),
+  );
+  const unsignedToken = `${header}.${payload}`;
+  const signer = createSign("SHA256");
+  signer.update(unsignedToken);
+  signer.end();
+  const signature = signer
+    .sign({
+      key: config.vapidPrivateKey,
+      dsaEncoding: "ieee-p1363",
+    })
+    .toString("base64url");
+  return `${unsignedToken}.${signature}`;
+}
+
+async function sendEmptyWebPush(fetchImpl, config, endpoint) {
+  if (!config.vapidPublicKey || !config.vapidPrivateKey) {
+    return { ok: false, status: 0 };
+  }
+
+  const token = createVapidToken(endpoint, config);
+  const response = await fetchImpl(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `vapid t=${token}, k=${config.vapidPublicKey}`,
+      TTL: "120",
+      Urgency: "high",
+    },
+  });
+  return { ok: response.ok, status: response.status };
+}
+
+async function notifyPushSubscribers(fetchImpl, config, organizationId) {
+  if (!config.vapidPublicKey || !config.vapidPrivateKey) return;
+
+  const { response, data } = await signedEdgeRequest(fetchImpl, config, {
+    action: "list-push-subscriptions",
+    organizationId,
+  });
+
+  if (!response.ok || !Array.isArray(data?.endpoints)) {
+    throw new Error("push subscription lookup failed");
+  }
+
+  const endpoints = Array.from(
+    new Set(
+      data.endpoints
+        .map((value) => String(value ?? "").trim())
+        .filter((endpoint) => endpoint.startsWith("https://")),
+    ),
+  ).slice(0, 100);
+
+  const staleEndpoints = [];
+  for (const endpoint of endpoints) {
+    try {
+      const result = await sendEmptyWebPush(fetchImpl, config, endpoint);
+      if (result.status === 404 || result.status === 410) {
+        staleEndpoints.push(endpoint);
+      }
+    } catch {
+      console.log("Push notification delivery failed");
+    }
+  }
+
+  if (staleEndpoints.length > 0) {
+    await signedEdgeRequest(fetchImpl, config, {
+      action: "remove-push-subscriptions",
+      organizationId,
+      endpoints: staleEndpoints,
+    });
+  }
 }
 
 async function signedEdgeRequest(fetchImpl, config, payload) {
@@ -1002,6 +1094,7 @@ async function handleLineWebhook({ request, response, config, fetchImpl, organiz
 
   const events = Array.isArray(payload?.events) ? payload.events : [];
   const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig, organizationId);
+  let shouldNotifyPush = false;
 
   const messageTypes = events
     .filter((event) => event?.type === "message")
@@ -1040,9 +1133,16 @@ async function handleLineWebhook({ request, response, config, fetchImpl, organiz
       throw new Error("inbound persistence failed");
     }
     console.log(`LINE inbound persisted: type=${normalized.messageType}`);
+    shouldNotifyPush = true;
   }
 
   sendJson(response, 200, { ok: true });
+
+  if (shouldNotifyPush) {
+    void notifyPushSubscribers(fetchImpl, config, organizationId).catch(() => {
+      console.log("Push notification fanout failed");
+    });
+  }
 }
 
 async function handleLineProfile({ request, response, config, fetchImpl }) {
