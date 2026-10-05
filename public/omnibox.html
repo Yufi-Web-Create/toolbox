@@ -1689,12 +1689,6 @@
         aiButton.classList.toggle('cursor-not-allowed', !canUseAi);
         aiButton.title = canUseAi ? '現在の会話からAI返信案を作成' : 'プロ以上のプランで利用できます';
       }
-      if (aiBadge) {
-        aiBadge.textContent = canUseAi ? '利用可能' : 'プロ以上';
-        aiBadge.className = canUseAi
-          ? 'text-[9px] bg-emerald-100 text-emerald-700 font-mono px-1.5 py-0.2 rounded'
-          : 'text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded';
-      }
       updateAiQuotaLabels();
 
       document.querySelectorAll('[data-oauth-provider]').forEach(button => {
@@ -2551,6 +2545,15 @@
       if (postLabel) postLabel.textContent = text;
       const canUseAi = currentPlanFeatures.ai === true;
       const exhausted = aiTrialQuotaRemaining <= 0;
+      const aiBadge = document.getElementById('ai-status-badge');
+      if (aiBadge) {
+        aiBadge.textContent = !canUseAi ? 'プロ以上' : exhausted ? '残り0回' : `残り${aiTrialQuotaRemaining}回`;
+        aiBadge.className = !canUseAi
+          ? 'text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded'
+          : exhausted
+            ? 'text-[9px] bg-amber-100 text-amber-800 font-mono px-1.5 py-0.2 rounded'
+            : 'text-[9px] bg-emerald-100 text-emerald-700 font-mono px-1.5 py-0.2 rounded';
+      }
       ['ai-draft-button', 'ai-post-draft-button'].forEach(id => {
         const button = document.getElementById(id);
         if (!button) return;
@@ -3328,6 +3331,7 @@
         sendButton.innerHTML = '<span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span><span>送信中...</span>';
       }
 
+      let providerSendSucceeded = false;
       try {
         const response = await fetch('/api/omnibox/reply', {
           method: 'POST',
@@ -3355,8 +3359,7 @@
           renderThreadList();
           updateBadges();
         });
-
-        showToast(`${getChannelMeta(thread.channel).name}へ返信を送信しました`, 'success');
+        providerSendSucceeded = true;
       } catch (error) {
         console.error('Provider reply failed:', error);
         const index = thread.messages.findIndex(message => message.id === optimisticId);
@@ -3373,6 +3376,10 @@
           sendButton.innerHTML = originalHtml;
         }
         lucide.createIcons();
+      }
+
+      if (providerSendSucceeded) {
+        showToast(`${getChannelMeta(thread.channel).name}へ返信を送信しました`, 'success');
       }
     };
 
@@ -5284,6 +5291,20 @@
       document.getElementById('conversation-actions-menu')?.classList.add('hidden');
     };
 
+    document.addEventListener('click', event => {
+      const menu = document.getElementById('conversation-actions-menu');
+      if (!menu || menu.classList.contains('hidden')) return;
+      const trigger = event.target.closest('[onclick*="toggleConversationActionsMenu"]');
+      if (trigger || menu.contains(event.target)) return;
+      window.closeConversationActionsMenu();
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        window.closeConversationActionsMenu();
+      }
+    });
+
     window.openDeleteConversationModal = function() {
       if (!threads.some(item => item.id === currentThreadId)) return;
       const modal = document.getElementById('delete-conversation-modal');
@@ -5403,31 +5424,40 @@
 
     let toastTimeout;
     window.showToast = function(msg, type = 'success') {
-      const toast = document.getElementById('toast');
-      const text = document.getElementById('toast-message');
-      const icon = document.getElementById('toast-icon');
-      text.textContent = msg;
+      try {
+        const toast = document.getElementById('toast');
+        const text = document.getElementById('toast-message');
+        if (!toast || !text) return;
+        text.textContent = msg;
 
-      const config = {
-        success: { icon: 'check-circle', className: 'text-emerald-400' },
-        warning: { icon: 'triangle-alert', className: 'text-amber-400' },
-        error: { icon: 'circle-alert', className: 'text-red-400' },
-        info: { icon: 'info', className: 'text-sky-400' }
-      }[type] || { icon: 'check-circle', className: 'text-emerald-400' };
+        const config = {
+          success: { icon: 'check-circle', className: 'text-emerald-400' },
+          warning: { icon: 'triangle-alert', className: 'text-amber-400' },
+          error: { icon: 'circle-alert', className: 'text-red-400' },
+          info: { icon: 'info', className: 'text-sky-400' }
+        }[type] || { icon: 'check-circle', className: 'text-emerald-400' };
 
-      if (icon) {
-        icon.setAttribute('data-lucide', config.icon);
-        icon.className = 'w-4 h-4 ' + config.className;
+        const existingIcon = document.getElementById('toast-icon');
+        if (existingIcon) {
+          const freshIcon = document.createElement('i');
+          freshIcon.id = 'toast-icon';
+          freshIcon.setAttribute('data-lucide', config.icon);
+          freshIcon.setAttribute('class', 'w-4 h-4 ' + config.className);
+          existingIcon.replaceWith(freshIcon);
+        }
+
+        lucide.createIcons();
+        toast.classList.remove('translate-y-16', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+          toast.classList.remove('translate-y-0', 'opacity-100');
+          toast.classList.add('translate-y-16', 'opacity-0');
+        }, 3500);
+      } catch (error) {
+        console.error('Toast render failed:', error);
       }
-      lucide.createIcons();
-      toast.classList.remove('translate-y-16', 'opacity-0');
-      toast.classList.add('translate-y-0', 'opacity-100');
-
-      clearTimeout(toastTimeout);
-      toastTimeout = setTimeout(() => {
-        toast.classList.remove('translate-y-0', 'opacity-100');
-        toast.classList.add('translate-y-16', 'opacity-0');
-      }, 3500);
     };
 
     window.runWithBusy = async function(button, task, {
@@ -5443,7 +5473,9 @@
       try {
         const result = await task();
         if (result === false) return false;
-        if (successMessage) showToast(typeof successMessage === 'function' ? successMessage(result) : successMessage, 'success');
+        if (successMessage) {
+          showToast(typeof successMessage === 'function' ? successMessage(result) : successMessage, 'success');
+        }
         return result;
       } catch (error) {
         showToast(error?.message || errorMessage, 'error');
