@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-describe("uploaded OmniBox application shell", () => {
+describe("uploaded MatoMeet application shell", () => {
   const html = readFileSync(join(process.cwd(), "public", "omnibox.html"), "utf8");
 
-  it("keeps the supplied OmniBox login and staff registration portal", () => {
-    expect(html).toContain("OmniBox ポータル");
+  it("keeps the supplied MatoMeet login and staff registration portal", () => {
+    expect(html).toContain("MatoMeet ポータル");
     expect(html).toContain("ログイン");
     expect(html).toContain("管理者アカウント作成");
     expect(html).toContain("auth-input-name");
@@ -21,7 +21,7 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).not.toContain("signInAnonymously");
   });
 
-  it("keeps the supplied main OmniBox views", () => {
+  it("keeps the supplied main MatoMeet views", () => {
     expect(html).toContain('id="view-inbox"');
     expect(html).toContain('id="view-publish"');
     expect(html).toContain('id="view-templates"');
@@ -305,7 +305,7 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("/api/omnibox/search?q=");
     expect(html).toContain("未読 ");
     expect(html).toContain("受信会話数");
-    expect(html).toContain("OmniBox運営側のOAuth設定未完了");
+    expect(html).toContain("MatoMeet運営側のOAuth設定未完了");
   });
 
   it("supports editing reply templates and a general filter", () => {
