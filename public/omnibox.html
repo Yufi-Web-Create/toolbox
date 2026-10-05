@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#C45A78">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#FFF7F8">
@@ -1002,6 +1006,32 @@
                 アカウント設定を保存
               </button>
             </form>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-[#EDE5E7] p-5 md:p-6 shadow-xs">
+            <div class="flex items-start gap-3 mb-4">
+              <div class="w-9 h-9 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center">
+                <i data-lucide="bell-ring" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">スマホ通知</h3>
+                <p class="text-xs text-slate-500 mt-1">LINEの新着メッセージを、MatoMeetを閉じている時もこの端末へ通知します。</p>
+              </div>
+            </div>
+            <div id="settings-push-status" class="text-xs text-slate-600 bg-slate-50 border border-[#EDE5E7] rounded-xl px-3 py-2.5 mb-3">
+              通知状態を確認しています...
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button id="settings-push-enable-button" type="button" onclick="enablePushNotifications(this)" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-2">
+                <i data-lucide="bell-plus" class="w-4 h-4"></i>
+                この端末で通知を有効にする
+              </button>
+              <button id="settings-push-disable-button" type="button" onclick="disablePushNotifications(this)" class="hidden px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition inline-flex items-center gap-2">
+                <i data-lucide="bell-off" class="w-4 h-4"></i>
+                通知を解除
+              </button>
+            </div>
+            <p class="text-[10px] leading-relaxed text-slate-400 mt-3">iPhoneでは、Safariの共有メニューからMatoMeetを「ホーム画面に追加」して、そのアイコンから開いた状態で通知を有効にしてください。</p>
           </div>
 
           <div class="bg-white rounded-2xl border border-red-100 p-5 md:p-6 shadow-xs">
@@ -5877,6 +5907,140 @@
       }
     }
 
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+    }
+
+    function pushNotificationsSupported() {
+      return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    }
+
+    async function getCurrentPushSubscription() {
+      if (!pushNotificationsSupported()) return null;
+      const registration = await navigator.serviceWorker.register('/matomeet-sw.js');
+      await navigator.serviceWorker.ready;
+      return await registration.pushManager.getSubscription();
+    }
+
+    async function refreshPushNotificationStatus() {
+      const status = document.getElementById('settings-push-status');
+      const enableButton = document.getElementById('settings-push-enable-button');
+      const disableButton = document.getElementById('settings-push-disable-button');
+      if (!status || !enableButton || !disableButton) return;
+
+      if (!pushNotificationsSupported()) {
+        status.textContent = 'このブラウザではプッシュ通知を利用できません。iPhoneではホーム画面に追加したMatoMeetから開いてください。';
+        status.className = 'text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3';
+        enableButton.classList.add('hidden');
+        disableButton.classList.add('hidden');
+        return;
+      }
+
+      try {
+        const subscription = await getCurrentPushSubscription();
+        const permission = Notification.permission;
+        if (subscription && permission === 'granted') {
+          status.textContent = '通知は有効です。LINEの新着をこの端末へお知らせします。';
+          status.className = 'text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 mb-3';
+          enableButton.classList.add('hidden');
+          disableButton.classList.remove('hidden');
+        } else if (permission === 'denied') {
+          status.textContent = '通知がブラウザ側で拒否されています。端末の設定からMatoMeetの通知を許可してください。';
+          status.className = 'text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3';
+          enableButton.classList.remove('hidden');
+          disableButton.classList.add('hidden');
+        } else {
+          status.textContent = '通知はまだ有効になっていません。';
+          status.className = 'text-xs text-slate-600 bg-slate-50 border border-[#EDE5E7] rounded-xl px-3 py-2.5 mb-3';
+          enableButton.classList.remove('hidden');
+          disableButton.classList.add('hidden');
+        }
+      } catch (error) {
+        console.error('Push status check failed:', error);
+        status.textContent = '通知状態を確認できませんでした。';
+        status.className = 'text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-3';
+      }
+      lucide.createIcons();
+    }
+
+    window.enablePushNotifications = async function(button) {
+      if (!pushNotificationsSupported()) {
+        showToast('このブラウザでは通知を利用できません。iPhoneではホーム画面に追加したMatoMeetからお試しください', 'warning');
+        return;
+      }
+
+      await runWithBusy(button, async () => {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          throw new Error('通知が許可されませんでした');
+        }
+
+        const registration = await navigator.serviceWorker.register('/matomeet-sw.js');
+        await navigator.serviceWorker.ready;
+        let subscription = await registration.pushManager.getSubscription();
+
+        if (!subscription) {
+          const configResponse = await fetch('/api/omnibox/push', {
+            credentials: 'same-origin',
+            cache: 'no-store'
+          });
+          const config = await configResponse.json();
+          if (!configResponse.ok || !config.vapidPublicKey) {
+            throw new Error('通知設定を読み込めませんでした');
+          }
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(config.vapidPublicKey)
+          });
+        }
+
+        const saveResponse = await fetch('/api/omnibox/push', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: subscription.endpoint })
+        });
+        const saved = await saveResponse.json();
+        if (!saveResponse.ok || !saved.ok) {
+          throw new Error(saved.message || '通知設定を保存できませんでした');
+        }
+
+        await refreshPushNotificationStatus();
+        return true;
+      }, {
+        busyText: '通知を設定中...',
+        successMessage: 'スマホ通知を有効にしました',
+        errorMessage: 'スマホ通知を有効にできませんでした'
+      }).catch(() => {});
+    };
+
+    window.disablePushNotifications = async function(button) {
+      if (!pushNotificationsSupported()) return;
+
+      await runWithBusy(button, async () => {
+        const subscription = await getCurrentPushSubscription();
+        if (subscription) {
+          const response = await fetch('/api/omnibox/push', {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: subscription.endpoint })
+          });
+          if (!response.ok) throw new Error('通知設定を解除できませんでした');
+          await subscription.unsubscribe();
+        }
+        await refreshPushNotificationStatus();
+        return true;
+      }, {
+        busyText: '解除中...',
+        successMessage: 'この端末の通知を解除しました',
+        errorMessage: '通知設定を解除できませんでした'
+      }).catch(() => {});
+    };
+
     window.openSettings = function(tab = 'account') {
       if (!sessionReady || !loggedInUser) {
         showToast('アカウント情報を確認しています。少ししてからもう一度お試しください', 'info');
@@ -5884,6 +6048,8 @@
       }
       document.getElementById('user-menu-dropdown')?.classList.add('hidden');
       window.switchView('settings');
+
+      if (tab === 'account') void refreshPushNotificationStatus();
 
       const isOwner = loggedInUser?.roleKey === 'owner';
       const orgTab = document.getElementById('settings-tab-organization');
