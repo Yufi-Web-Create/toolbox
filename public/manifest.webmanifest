@@ -1,0 +1,21 @@
+{
+  "name": "MatoMeet",
+  "short_name": "MatoMeet",
+  "start_url": "/omnibox.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fff8fa",
+  "theme_color": "#c55b78",
+  "icons": [
+    {
+      "src": "/matomeet-icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/matomeet-icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
