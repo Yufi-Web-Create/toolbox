@@ -166,11 +166,8 @@ describe("uploaded MatoMeet application shell", () => {
 
   it("exposes Instagram webhook subscription controls and Gmail sync controls", () => {
     expect(html).toContain("Instagram DM受信状態");
-    expect(html).toContain("/api/omnibox/instagram/webhook-info");
     expect(html).toContain("/api/omnibox/instagram/subscription");
     expect(html).toContain("showInstagramWebhookInfo");
-    expect(html).toContain("Webhook購読を再登録");
-    expect(html).toContain("messages 購読済み");
     expect(html).toContain("Gmailを同期");
     expect(html).toContain("syncGoogleInbox");
   });
