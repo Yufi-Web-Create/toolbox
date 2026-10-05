@@ -29,7 +29,7 @@ export function OmniBoxShell({
       <header className={styles.header}>
         <Link href="/app/inbox" className={styles.brand} aria-label="MatoMeet ホーム">
           <span className={styles.logo}>
-            <img src="/matomeet-symbol.svg" alt="" />
+            <img src="/matomeet-icon.png" alt="" />
           </span>
           <span>
             <span className={styles.brandLine}>
