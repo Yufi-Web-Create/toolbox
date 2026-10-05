@@ -334,6 +334,9 @@ describe("uploaded MatoMeet application shell", () => {
   it("keeps inbox and settings safe while session data is loading", () => {
     expect(html).toContain("inboxLoading");
     expect(html).toContain("問い合わせを読み込んでいます");
+    expect(html).toContain('id="badge-count-all" class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700">—</span>');
+    expect(html).toContain('id="nav-account-count">—</span>');
+    expect(html).toContain('id="unread-total-badge" class="ml-1 text-[11px] px-1.5 py-0.2 bg-brand-600 text-white rounded-full font-bold">確認中</span>');
     expect(html).toContain("sessionReady");
     expect(html).toContain("ログイン情報の確認が完了していないため保存できません");
     expect(html).toContain('name="nickname"');

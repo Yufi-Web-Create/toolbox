@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#FFF7F8">
-  <link rel="icon" href="/favicon.ico" sizes="any">\n  <link rel="icon" href="/matomeet-icon.png" type="image/png" sizes="128x128">\n  <link rel="apple-touch-icon" href="/matomeet-icon.png">
+  <link rel="icon" href="/favicon.ico" sizes="any">
   <title>MatoMeet - SNSメッセージ一元管理 & 予約投稿ハブ (Live Cloud Edition)</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -292,7 +292,7 @@
       <button onclick="switchView('inbox')" id="nav-inbox" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 bg-white text-brand-700 shadow-xs">
         <i data-lucide="inbox" class="w-4 h-4"></i>
         <span>受信箱</span>
-        <span id="unread-total-badge" class="ml-1 text-[11px] px-1.5 py-0.2 bg-brand-600 text-white rounded-full font-bold">未読 0</span>
+        <span id="unread-total-badge" class="ml-1 text-[11px] px-1.5 py-0.2 bg-brand-600 text-white rounded-full font-bold">確認中</span>
       </button>
       <button onclick="switchView('publish')" id="nav-publish" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-2">
         <i data-lucide="send" class="w-4 h-4"></i>
@@ -304,7 +304,7 @@
       </button>
       <button onclick="switchView('channels')" id="nav-channels" class="nav-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:text-slate-900 transition-all flex items-center gap-2">
         <i data-lucide="link-2" class="w-4 h-4"></i>
-        <span>連携アカウント (<span id="nav-account-count">0</span>)</span>
+        <span>連携アカウント (<span id="nav-account-count">—</span>)</span>
       </button>
     </nav>
 
@@ -396,19 +396,19 @@
             <div class="space-y-1">
               <button onclick="filterByStatus('all')" class="status-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-brand-50 text-brand-800 font-medium" data-status="all">
                 <span class="flex items-center gap-2"><i data-lucide="archive" class="w-3.5 h-3.5 text-slate-500"></i>すべて</span>
-                <span id="badge-count-all" class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700">0</span>
+                <span id="badge-count-all" class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700">—</span>
               </button>
               <button onclick="filterByStatus('unread')" class="status-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 font-medium" data-status="unread">
                 <span class="flex items-center gap-2"><i data-lucide="bell" class="w-3.5 h-3.5 text-red-500"></i>未対応</span>
-                <span id="badge-count-unread" class="text-[11px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-bold">0</span>
+                <span id="badge-count-unread" class="text-[11px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-bold">—</span>
               </button>
               <button onclick="filterByStatus('in_progress')" class="status-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 font-medium" data-status="in_progress">
                 <span class="flex items-center gap-2"><i data-lucide="clock" class="w-3.5 h-3.5 text-amber-500"></i>対応中</span>
-                <span id="badge-count-progress" class="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">0</span>
+                <span id="badge-count-progress" class="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">—</span>
               </button>
               <button onclick="filterByStatus('resolved')" class="status-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 font-medium" data-status="resolved">
                 <span class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-500"></i>対応完了</span>
-                <span id="badge-count-resolved" class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">0</span>
+                <span id="badge-count-resolved" class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">—</span>
               </button>
             </div>
           </div>
@@ -425,7 +425,7 @@
             <div class="space-y-1" id="account-filter-container">
               <button onclick="filterByAccount('all')" class="account-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-100 font-medium text-slate-800" data-account="all">
                 <span class="flex items-center gap-2"><i data-lucide="grid" class="w-3.5 h-3.5"></i>すべてのアカウント</span>
-                <span id="badge-all-accounts" class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded-full">0</span>
+                <span id="badge-all-accounts" class="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded-full">—</span>
               </button>
               <div id="account-tree-list" class="space-y-2 mt-2">
                 <!-- 動的生成 -->
@@ -485,8 +485,31 @@
         </div>
 
         <!-- スレッドリスト本体 -->
-        <div id="thread-list-container" class="overflow-y-auto flex-1 divide-y divide-slate-100">
-          <!-- JSで動的にレンダリング -->
+        <div id="thread-list-container" class="overflow-y-auto flex-1 divide-y divide-slate-100" aria-live="polite" aria-busy="true">
+          <div class="p-4 space-y-3">
+            <div class="text-[11px] font-semibold text-slate-500 mb-2">問い合わせを読み込んでいます...</div>
+            <div class="flex items-start gap-3 p-2.5 rounded-xl bg-[#FCF8F8]">
+              <div class="w-10 h-10 rounded-full bg-[#EDE3E5] animate-pulse shrink-0"></div>
+              <div class="flex-1 space-y-2 pt-1">
+                <div class="h-3 w-24 rounded bg-[#EDE3E5] animate-pulse"></div>
+                <div class="h-2.5 w-11/12 rounded bg-[#F1E9EA] animate-pulse"></div>
+              </div>
+            </div>
+            <div class="flex items-start gap-3 p-2.5 rounded-xl bg-[#FCF8F8]">
+              <div class="w-10 h-10 rounded-full bg-[#EDE3E5] animate-pulse shrink-0"></div>
+              <div class="flex-1 space-y-2 pt-1">
+                <div class="h-3 w-28 rounded bg-[#EDE3E5] animate-pulse"></div>
+                <div class="h-2.5 w-4/5 rounded bg-[#F1E9EA] animate-pulse"></div>
+              </div>
+            </div>
+            <div class="flex items-start gap-3 p-2.5 rounded-xl bg-[#FCF8F8]">
+              <div class="w-10 h-10 rounded-full bg-[#EDE3E5] animate-pulse shrink-0"></div>
+              <div class="flex-1 space-y-2 pt-1">
+                <div class="h-3 w-20 rounded bg-[#EDE3E5] animate-pulse"></div>
+                <div class="h-2.5 w-10/12 rounded bg-[#F1E9EA] animate-pulse"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
