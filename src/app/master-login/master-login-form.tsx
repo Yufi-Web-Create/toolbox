@@ -53,7 +53,7 @@ export function MasterLoginForm() {
         </label>
 
         <p className={styles.masterHint}>
-          OmniBox運営担当者専用です。通常の店舗・スタッフアカウントとは別の入口です。
+          MatoMeet運営担当者専用です。通常の店舗・スタッフアカウントとは別の入口です。
         </p>
 
         <button className={styles.submit} disabled={isPending} type="submit">
@@ -67,7 +67,7 @@ export function MasterLoginForm() {
         ) : null}
       </form>
 
-      <div className={styles.footer}>© 2026 OmniBox Cloud Services.</div>
+      <div className={styles.footer}>© 2026 MatoMeet.</div>
     </div>
   );
 }
