@@ -93,7 +93,7 @@ export function LoginForm({ callbackErrorMessage, nextPath }: LoginFormProps) {
         ) : null}
       </form>
 
-      <div className={styles.footer}>© 2026 OmniBox Cloud Services.</div>
+      <div className={styles.footer}>© 2026 MatoMeet.</div>
     </div>
   );
 }
