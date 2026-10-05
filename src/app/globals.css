@@ -1,17 +1,43 @@
 :root {
   color-scheme: light;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Noto Sans JP", "Nunito Sans", "Hiragino Sans", "Yu Gothic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --color-primary: #f28b9d;
+  --color-primary-hover: #e9788c;
+  --color-pink-light: #f8bcc6;
+  --color-pink-pale: #fdecef;
+  --color-bg-soft: #fff7f8;
+  --color-rose-deep: #b96774;
+  --color-text-primary: #3f3739;
+  --color-text-secondary: #756b6d;
+  --color-text-muted: #a49a9c;
+  --color-border: #ede5e7;
+  --color-white: #ffffff;
+  --color-success: #6fb58c;
+  --color-warning: #e8b65c;
+  --color-error: #d96b73;
+  --color-info: #7ea6c9;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --shadow-card: 0 2px 8px rgba(80, 50, 60, .06);
+  --shadow-hover: 0 4px 16px rgba(80, 50, 60, .08);
+  --shadow-modal: 0 12px 40px rgba(80, 50, 60, .12);
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
   background: #ffffff;
-  color: #171717;
+  color: var(--color-text-primary);
 }
+
+button,
+input,
+textarea,
+select { font: inherit; }
 
 main {
   display: grid;
@@ -23,6 +49,6 @@ main {
 }
 
 h1,
-p {
-  margin: 0;
-}
+p { margin: 0; }
+
+::selection { background: #f8d8de; color: #3f3739; }
