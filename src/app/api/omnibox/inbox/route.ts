@@ -270,3 +270,65 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.getClaims();
+    const userId =
+      !error && typeof data?.claims?.sub === "string" ? data.claims.sub : null;
+
+    if (!userId) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    const { data: memberships, error: membershipError } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", userId)
+      .limit(1);
+
+    if (
+      membershipError ||
+      !Array.isArray(memberships) ||
+      memberships.length !== 1
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "organization_membership_required" },
+        { status: 403 },
+      );
+    }
+
+    const body = await request.json();
+    const conversationId =
+      typeof body?.conversationId === "string" ? body.conversationId.trim() : "";
+
+    if (!conversationId) {
+      return NextResponse.json(
+        { ok: false, error: "conversation_required" },
+        { status: 400 },
+      );
+    }
+
+    const { error: deleteError } = await supabase
+      .from("conversations")
+      .delete()
+      .eq("id", conversationId)
+      .eq("organization_id", memberships[0].organization_id);
+
+    if (deleteError) {
+      return NextResponse.json(
+        { ok: false, error: "conversation_delete_failed" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "conversation_delete_failed" },
+      { status: 500 },
+    );
+  }
+}
