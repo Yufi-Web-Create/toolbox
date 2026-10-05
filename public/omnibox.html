@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#FFF7F8">
   <link rel="icon" href="/matomeet-symbol.svg" type="image/svg+xml">
   <title>MatoMeet - SNSメッセージ一元管理 & 予約投稿ハブ (Live Cloud Edition)</title>
@@ -39,7 +39,9 @@
     }
     body {
       font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      min-height: 100vh;
       min-height: 100dvh;
+      height: 100vh;
       height: 100dvh;
     }
     ::-webkit-scrollbar {
@@ -233,6 +235,16 @@
       #messages-container {
         padding: 12px !important;
       }
+      .composer-dock {
+        padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+      }
+      @supports (-webkit-touch-callout: none) {
+        input,
+        textarea,
+        select {
+          font-size: 16px !important;
+        }
+      }
       .composer-actions {
         align-items: stretch !important;
       }
@@ -242,7 +254,7 @@
     }
   </style>
 </head>
-<body class="bg-[#FFF7F8] text-[#3F3739] antialiased h-screen flex flex-col overflow-hidden">
+<body class="bg-[#FFF7F8] text-[#3F3739] antialiased flex flex-col overflow-hidden">
 
   <!-- セッション確認中。認証状態が確定するまでログインフォームを見せない -->
   <div id="session-loading-overlay" class="fixed inset-0 bg-slate-50 z-[70] flex items-center justify-center">
@@ -537,7 +549,7 @@
               <div id="messages-container" class="flex-1 p-4 md:p-6 overflow-y-auto space-y-4"></div>
 
               <!-- 返信入力ドック -->
-              <div class="bg-white border-t border-[#EDE5E7] p-3 md:p-4 shrink-0">
+              <div class="composer-dock bg-white border-t border-[#EDE5E7] p-3 md:p-4 shrink-0">
                 <div id="instagram-request-banner" class="hidden mb-2 p-2.5 rounded-xl border border-pink-200 bg-pink-50 text-xs text-pink-900 flex items-center justify-between gap-3">
                   <div class="flex items-start gap-2">
                     <i data-lucide="message-circle-question" class="w-4 h-4 text-pink-600 mt-0.5 shrink-0"></i>
