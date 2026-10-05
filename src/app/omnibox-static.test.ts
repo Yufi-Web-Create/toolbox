@@ -320,6 +320,35 @@ describe("uploaded MatoMeet application shell", () => {
     expect(html).toContain("currentPlanFeatures");
   });
 
+  it("keeps inbox and settings safe while session data is loading", () => {
+    expect(html).toContain("inboxLoading");
+    expect(html).toContain("問い合わせを読み込んでいます");
+    expect(html).toContain("sessionReady");
+    expect(html).toContain("ログイン情報の確認が完了していないため保存できません");
+    expect(html).toContain('name="nickname"');
+    expect(html).toContain('autocomplete="nickname"');
+    expect(html).toContain('name="username"');
+    expect(html).toContain('autocomplete="username"');
+  });
+
+  it("uses accessible MatoMeet rose and warm neutral styling", () => {
+    expect(html).toContain("600: '#B94A61'");
+    expect(html).toContain("700: '#A84459'");
+    expect(html).not.toContain("border-violet-400 bg-violet-50");
+    expect(html).toContain("MatoMeet warm neutrals");
+    expect(html).toContain('id="chat-recipient-account-badge" class="font-medium text-slate-700 bg-slate-100');
+  });
+
+  it("shows actual connection state and plan-aware AI quota", () => {
+    expect(html).toContain("connected ? '接続済み'");
+    expect(html).toContain("getAiMonthlyLimit");
+    expect(html).toContain("aiResponsesPerMonth");
+    expect(html).toContain("matomeet_ai_usage_");
+    expect(html).not.toContain("localStorage.getItem('omnibox_ai_trial_quota')");
+    expect(html).toContain("SNS窓口のログイン連携");
+    expect(html).not.toContain("SNS・メール窓口のログイン連携");
+  });
+
   it("supports renaming connected account display names", () => {
     expect(html).toContain("renameConnectedAccount");
     expect(html).toContain("連携アカウント名を変更しました");
