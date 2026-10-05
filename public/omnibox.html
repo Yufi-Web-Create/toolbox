@@ -22,8 +22,8 @@
               300: '#F8BCC6',
               400: '#F4A4B3',
               500: '#F28B9D',
-              600: '#E9788C',
-              700: '#CC6677',
+              600: '#B94A61',
+              700: '#A84459',
               800: '#B96774',
               900: '#8E4F59',
             }
@@ -49,15 +49,23 @@
       height: 6px;
     }
     ::-webkit-scrollbar-track {
-      background: #f1f5f9;
+      background: #F7F0F1;
     }
     ::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
+      background: #D9CBCD;
       border-radius: 9999px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
+      background: #BCA9AD;
     }
+
+    /* MatoMeet warm neutrals: keep utility semantics while removing blue-gray cast. */
+    .bg-slate-50 { background-color: #FCF8F8 !important; }
+    .bg-slate-100 { background-color: #F6EFEF !important; }
+    .bg-slate-200 { background-color: #EDE3E5 !important; }
+    .border-slate-100 { border-color: #EEE4E6 !important; }
+    .text-slate-400 { color: #7D7074 !important; }
+    .text-slate-500 { color: #685D60 !important; }
     @keyframes pulse-subtle {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
@@ -432,7 +440,7 @@
                 <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-600"></i>
                 <span>AIアシスタント</span>
               </div>
-              <span id="ai-status-badge" class="text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded">プラン確認中</span>
+              <span id="ai-status-badge" class="text-[10px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.5 rounded">プラン確認中</span>
             </div>
             <p class="text-[11px] text-brand-700 leading-relaxed">
               会話履歴をもとに返信案を生成します。内容を確認してから送信する人間確認型のAIです。
@@ -508,7 +516,7 @@
                   <span id="chat-status-pill" class="text-[10px] font-medium px-2 py-0.5 rounded-full"></span>
                 </div>
                 <div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                  <span id="chat-recipient-account-badge" class="font-medium text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-200 text-[10px] flex items-center gap-1"></span>
+                  <span id="chat-recipient-account-badge" class="font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-[#E6DCDE] text-[11px] flex items-center gap-1"></span>
                   <span>•</span>
                   <span id="chat-customer-last-active" class="whitespace-nowrap"></span>
                 </div>
@@ -950,11 +958,11 @@
             <form onsubmit="saveAccountSettings(event)" class="space-y-4">
               <div>
                 <label class="text-xs font-bold text-slate-600 block mb-1.5">表示名</label>
-                <input id="settings-account-name" type="text" maxlength="100" required class="w-full max-w-xl text-sm px-3 py-2.5 border border-[#EDE5E7] rounded-xl focus:outline-none focus:border-brand-500">
+                <input id="settings-account-name" name="nickname" type="text" maxlength="100" autocomplete="nickname" autocapitalize="words" required class="w-full max-w-xl text-sm px-3 py-2.5 border border-[#EDE5E7] rounded-xl focus:outline-none focus:border-brand-500">
               </div>
               <div>
                 <label class="text-xs font-bold text-slate-600 block mb-1.5">ログインID</label>
-                <input id="settings-account-login-id" type="text" readonly class="w-full max-w-xl text-sm px-3 py-2.5 border border-[#EDE5E7] rounded-xl bg-slate-50 text-slate-500">
+                <input id="settings-account-login-id" name="username" type="text" autocomplete="username" readonly class="w-full max-w-xl text-sm px-3 py-2.5 border border-[#EDE5E7] rounded-xl bg-slate-50 text-slate-500">
                 <p class="text-[10px] text-slate-400 mt-1">ログインIDは他アカウントと重複しません。</p>
               </div>
               <div>
@@ -998,7 +1006,7 @@
         <div>
           <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
             <i data-lucide="shield-check" class="w-5 h-5 text-brand-600"></i>
-            <span>SNS・メール窓口のログイン連携</span>
+            <span>SNS窓口のログイン連携</span>
           </h3>
           <p class="text-xs text-slate-500 mt-0.5">SNSアカウントでログインするだけで、DMの受信と予約投稿が即座に開通します。</p>
         </div>
@@ -1516,6 +1524,8 @@
     let liveInboxEventDebounceTimer = null;
     let liveInboxRefreshInFlight = false;
     let liveInboxInitialized = false;
+    let inboxLoading = true;
+    let sessionReady = false;
     let liveInboxLastSeen = new Map();
     let assignableStaff = [];
     const viewedConversationIds = new Set();
@@ -1739,10 +1749,10 @@
       grid.innerHTML = Object.entries(planCatalog).map(([key, plan]) => {
         const active = key === currentPlan;
         return `
-          <button type="button" onclick="changeOrganizationPlan('${key}')" class="text-left p-3 rounded-xl border transition ${active ? 'border-violet-400 bg-violet-50 ring-1 ring-violet-200' : 'border-[#EDE5E7] bg-white hover:border-violet-300'}">
+          <button type="button" onclick="changeOrganizationPlan('${key}')" class="text-left p-3 rounded-xl border transition ${active ? 'border-brand-400 bg-brand-50 ring-1 ring-brand-200' : 'border-[#EDE5E7] bg-white hover:border-brand-300'}">
             <div class="flex items-start justify-between gap-2">
-              <div class="font-bold text-xs ${active ? 'text-violet-800' : 'text-slate-800'}">${plan.name}</div>
-              ${active ? '<span class="text-[9px] px-1.5 py-0.5 rounded bg-violet-600 text-white">現在</span>' : ''}
+              <div class="font-bold text-xs ${active ? 'text-brand-900' : 'text-slate-800'}">${plan.name}</div>
+              ${active ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-brand-600 text-white">現在</span>' : ''}
             </div>
             <div class="text-sm font-bold text-slate-900 mt-1">${plan.price}</div>
             <div class="text-[10px] text-slate-500 mt-1">${plan.description}</div>
@@ -1920,12 +1930,15 @@
       };
 
       const rows = Object.entries(labels).map(([provider, label]) => {
+        const connected = connectedAccounts.some(account =>
+          account.provider === provider && account.active !== false
+        );
         const configured = providerOAuthReadiness?.[provider]?.configured === true;
+        const text = connected ? '接続済み' : configured ? '接続できます' : '現在準備中';
+        const color = connected || configured ? 'text-emerald-700' : 'text-amber-700';
         return `<div class="flex items-center justify-between gap-3 py-0.5">
           <span>${label}</span>
-          <span class="${configured ? 'text-emerald-700' : 'text-amber-700'} font-semibold">
-            ${configured ? '接続できます' : '現在準備中'}
-          </span>
+          <span class="${color} font-semibold">${text}</span>
         </div>`;
       });
 
@@ -2090,6 +2103,11 @@
     }
 
     async function loadLiveInbox(conversationId = null, { silent = false } = {}) {
+      if (!conversationId) {
+        inboxLoading = true;
+        renderThreadList();
+        updateBadges();
+      }
       try {
         const suffix = conversationId ? `?conversation=${encodeURIComponent(conversationId)}` : '';
         const response = await fetch('/api/omnibox/inbox' + suffix, {
@@ -2200,6 +2218,7 @@
           currentThreadId = selectedId;
         }
 
+        inboxLoading = false;
         onDataUpdated();
 
         if (hasNewInquiry && currentThreadId) {
@@ -2222,6 +2241,7 @@
         return true;
       } catch (error) {
         console.error('Live inbox load failed:', error);
+        inboxLoading = false;
         if (threads.length === 0) onDataUpdated();
         if (!silent) {
           showToast('受信箱を読み込めませんでした。接続設定をご確認ください');
@@ -2455,11 +2475,14 @@
           currentPlanFeatures = session.features || currentPlanFeatures;
           requiresOrganizationSetup = session.requiresOrganizationSetup === true;
           isDemoSession = session.isDemo === true;
+          sessionReady = true;
+          loadAiTrialQuota();
           updateHeaderUserUI();
           applyPlanAccess();
           document.getElementById('session-loading-overlay')?.classList.add('hidden');
 
           if (isDemoSession) {
+            inboxLoading = false;
             threads = structuredClone(defaultThreads);
             connectedAccounts = structuredClone(defaultAccounts);
             scheduledPosts = structuredClone(defaultScheduledPosts);
@@ -2467,9 +2490,11 @@
             renderScheduledPosts();
             onDataUpdated();
           } else if (requiresOrganizationSetup && loggedInUser.roleKey === 'owner') {
+            inboxLoading = false;
             onDataUpdated();
             window.openSettings('organization');
           } else if (session.membershipReady === false) {
+            inboxLoading = false;
             threads = [];
             connectedAccounts = [];
             onDataUpdated();
@@ -2494,6 +2519,8 @@
           }
         } else {
           stopLiveInboxRefresh();
+          sessionReady = true;
+          inboxLoading = false;
           loggedInUser = null;
           currentOrganization = null;
           requiresOrganizationSetup = false;
@@ -2503,6 +2530,8 @@
       } catch (err) {
         console.error('Session init failed:', err);
         stopLiveInboxRefresh();
+        sessionReady = true;
+        inboxLoading = false;
         loggedInUser = null;
         currentOrganization = null;
         requiresOrganizationSetup = false;
@@ -2514,7 +2543,7 @@
       }
 
       checkExistingSession();
-      loadAiTrialQuota();
+      if (!loggedInUser) loadAiTrialQuota();
       if (loggedInUser) restoreActiveView();
       document.getElementById('session-loading-overlay')?.classList.add('hidden');
     }
@@ -2543,15 +2572,35 @@
       }
     }
 
+    function getAiMonthlyLimit() {
+      const configured = Number(currentPlanFeatures.aiResponsesPerMonth);
+      return currentPlanFeatures.ai === true && Number.isFinite(configured)
+        ? Math.max(0, Math.floor(configured))
+        : 0;
+    }
+
+    function getAiUsageStorageKey() {
+      const now = new Date();
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const org = currentOrganization?.id || currentOrganization?.loginId || 'account';
+      return `matomeet_ai_usage_${org}_${month}`;
+    }
+
     function loadAiTrialQuota() {
+      const limit = getAiMonthlyLimit();
+      if (limit <= 0) {
+        aiTrialQuotaRemaining = 0;
+        updateAiQuotaLabels();
+        return;
+      }
+
       try {
-        const raw = localStorage.getItem('omnibox_ai_trial_quota');
-        const parsed = Number(raw);
-        aiTrialQuotaRemaining = Number.isFinite(parsed)
-          ? Math.max(0, Math.floor(parsed))
-          : AI_TRIAL_QUOTA_MAX;
+        const raw = localStorage.getItem(getAiUsageStorageKey());
+        const used = Number(raw);
+        const safeUsed = Number.isFinite(used) ? Math.max(0, Math.floor(used)) : 0;
+        aiTrialQuotaRemaining = Math.max(0, limit - safeUsed);
       } catch {
-        aiTrialQuotaRemaining = AI_TRIAL_QUOTA_MAX;
+        aiTrialQuotaRemaining = limit;
       }
       updateAiQuotaLabels();
     }
@@ -2568,10 +2617,10 @@
       if (aiBadge) {
         aiBadge.textContent = !canUseAi ? 'プロ以上' : exhausted ? '残り0回' : `残り${aiTrialQuotaRemaining}回`;
         aiBadge.className = !canUseAi
-          ? 'text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded'
+          ? 'text-[10px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.5 rounded'
           : exhausted
-            ? 'text-[9px] bg-amber-100 text-amber-800 font-mono px-1.5 py-0.2 rounded'
-            : 'text-[9px] bg-emerald-100 text-emerald-700 font-mono px-1.5 py-0.2 rounded';
+            ? 'text-[10px] bg-amber-100 text-amber-800 font-mono px-1.5 py-0.5 rounded'
+            : 'text-[10px] bg-emerald-100 text-emerald-700 font-mono px-1.5 py-0.5 rounded';
       }
       ['ai-draft-button', 'ai-post-draft-button'].forEach(id => {
         const button = document.getElementById(id);
@@ -2595,15 +2644,16 @@
     }
 
     function consumeTemporaryAiQuota() {
+      const limit = getAiMonthlyLimit();
+      if (limit <= 0) return;
       aiTrialQuotaRemaining = Math.max(0, aiTrialQuotaRemaining - 1);
       try {
-        localStorage.setItem('omnibox_ai_trial_quota', String(aiTrialQuotaRemaining));
+        localStorage.setItem(
+          getAiUsageStorageKey(),
+          String(Math.max(0, limit - aiTrialQuotaRemaining))
+        );
       } catch {}
       updateAiQuotaLabels();
-
-      if (aiTrialQuotaRemaining <= 0) {
-        window.alert('AI生成回数の上限に達しました。決済システム実装後はここで生成を停止します。現在は次回生成時に回数を回復します。');
-      }
     }
 
     window.showAiComingSoon = function() {
@@ -2734,6 +2784,25 @@
       const container = document.getElementById('thread-list-container');
       if (!container) return;
       container.innerHTML = '';
+
+      if (inboxLoading) {
+        container.innerHTML = `
+          <div class="p-4 space-y-3" aria-live="polite" aria-busy="true">
+            <div class="text-[11px] font-semibold text-slate-500 mb-2">問い合わせを読み込んでいます...</div>
+            ${[0, 1, 2, 3].map(() => `
+              <div class="flex items-start gap-3 p-2.5 rounded-xl bg-[#FCF8F8]">
+                <div class="w-10 h-10 rounded-full bg-[#EDE3E5] animate-pulse shrink-0"></div>
+                <div class="flex-1 min-w-0 space-y-2">
+                  <div class="h-3 w-1/3 rounded bg-[#EDE3E5] animate-pulse"></div>
+                  <div class="h-2.5 w-5/6 rounded bg-[#F0E7E8] animate-pulse"></div>
+                  <div class="h-2.5 w-2/3 rounded bg-[#F0E7E8] animate-pulse"></div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        return;
+      }
 
       const filtered = threads.filter(t => {
         const matchesStatus = currentStatusFilter === 'all' 
@@ -3659,8 +3728,8 @@
                   ${meta.icon}
                 </div>
                 <div class="min-w-0">
-                  <div class="flex items-center gap-1.5">
-                    <h3 class="font-bold text-slate-800 text-sm truncate">${escapeHtml(acc.accountName)}</h3>
+                  <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                    <h3 class="font-bold text-slate-800 text-sm truncate max-w-full">${escapeHtml(acc.accountName)}</h3>
                     <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-medium shrink-0">${acc.connectedVia === 'oauth' ? 'OAuth連携済' : 'API連携済'}</span>
                   </div>
                   <p class="text-xs text-slate-500 font-mono truncate">${acc.handle}</p>
@@ -3693,11 +3762,11 @@
                   <i data-lucide="refresh-cw" class="w-3 h-3"></i><span>Gmailを同期</span>
                 </button>`
               : acc.provider === 'x'
-                ? `<button onclick="manualSyncXInbox(this)" class="text-slate-700 font-medium hover:underline flex items-center gap-1">
+                ? `<button onclick="manualSyncXInbox(this)" class="text-brand-700 font-medium hover:underline flex items-center gap-1">
                     <i data-lucide="refresh-cw" class="w-3 h-3"></i><span>X DMを同期</span>
                   </button>`
               : acc.provider === 'instagram'
-                ? `<button onclick="showInstagramWebhookInfo('${acc.providerConnectionId || ''}')" class="text-pink-600 font-medium hover:underline flex items-center gap-1">
+                ? `<button onclick="showInstagramWebhookInfo('${acc.providerConnectionId || ''}')" class="text-brand-700 font-medium hover:underline flex items-center gap-1">
                     <i data-lucide="radio" class="w-3 h-3"></i><span>DM受信設定</span>
                   </button>`
                 : `<button onclick="window.testSyncAccount('${acc.id}', this)" class="text-brand-600 font-medium hover:underline flex items-center gap-1">
@@ -3708,7 +3777,7 @@
                 <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                 <span>名前変更</span>
               </button>
-              <button onclick="window.removeAccount('${acc.id}')" class="text-slate-400 hover:text-red-600 transition flex items-center gap-1">
+              <button onclick="window.removeAccount('${acc.id}')" class="text-red-600 hover:text-red-700 transition flex items-center gap-1">
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 <span>連携解除</span>
               </button>
@@ -5062,6 +5131,17 @@
     };
 
     function updateBadges() {
+      if (inboxLoading) {
+        document.getElementById('unread-total-badge').textContent = '確認中';
+        ['badge-count-all', 'badge-count-unread', 'badge-count-progress', 'badge-count-resolved', 'badge-all-accounts']
+          .forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = '—';
+          });
+        document.getElementById('nav-account-count').textContent = connectedAccounts.length || '—';
+        return;
+      }
+
       const unreadCount = threads.filter(t => t.status === 'unread' || t.unreadCount > 0).length;
       const progressCount = threads.filter(t => t.status === 'in_progress').length;
       const resolvedCount = threads.filter(t => t.status === 'resolved').length;
@@ -5763,6 +5843,10 @@
     }
 
     window.openSettings = function(tab = 'account') {
+      if (!sessionReady || !loggedInUser) {
+        showToast('アカウント情報を確認しています。少ししてからもう一度お試しください', 'info');
+        return;
+      }
       document.getElementById('user-menu-dropdown')?.classList.add('hidden');
       window.switchView('settings');
 
@@ -5831,6 +5915,10 @@
 
     window.saveAccountSettings = async function(e) {
       e.preventDefault();
+      if (!sessionReady || !loggedInUser) {
+        showToast('ログイン情報の確認が完了していないため保存できません', 'warning');
+        return;
+      }
       const name = document.getElementById('settings-account-name').value.trim();
       const password = document.getElementById('settings-account-password').value;
       const currentPassword = document.getElementById('settings-account-current-password').value;
