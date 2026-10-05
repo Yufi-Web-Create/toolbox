@@ -83,6 +83,34 @@
     }
 
     @media (max-width: 1199px) and (min-width: 768px) {
+      #active-chat-content > .chat-header {
+        min-height: 104px;
+        height: auto !important;
+        padding: 10px 12px !important;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-content: center;
+      }
+      #active-chat-content > .chat-header .chat-main-info {
+        width: 100%;
+        flex: 0 0 100%;
+      }
+      #active-chat-content > .chat-header .chat-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+        gap: 6px;
+      }
+      #active-chat-content > .chat-header select { width: 100%; min-width: 0; }
+      #chat-recipient-account-badge {
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+      }
+      #chat-status-pill { white-space: nowrap; flex-shrink: 0; }
+      #send-main-button { min-width: 104px; justify-content: center; white-space: nowrap; }
       #chat-customer-handle {
         max-width: 110px;
         overflow: hidden;
@@ -344,7 +372,7 @@
                 <span id="badge-count-all" class="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700">0</span>
               </button>
               <button onclick="filterByStatus('unread')" class="status-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 font-medium" data-status="unread">
-                <span class="flex items-center gap-2"><i data-lucide="bell" class="w-3.5 h-3.5 text-red-500"></i>未対応・未読</span>
+                <span class="flex items-center gap-2"><i data-lucide="bell" class="w-3.5 h-3.5 text-red-500"></i>未対応</span>
                 <span id="badge-count-unread" class="text-[11px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-bold">0</span>
               </button>
               <button onclick="filterByStatus('in_progress')" class="status-filter-btn w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 font-medium" data-status="in_progress">
@@ -479,7 +507,10 @@
                 <option value="">👤 未割り当て</option>
               </select>
 
-              <button onclick="toggleSideInfoPanel()" class="inline-flex p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition" title="顧客カルテ・社内メモを表示">
+              <button onclick="openDeleteConversationModal()" class="inline-flex p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition" title="迷惑メッセージ・スレッドを削除" aria-label="このスレッドを削除">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+              <button onclick="toggleSideInfoPanel()" class="inline-flex p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition" title="顧客カルテ・社内メモを表示" aria-label="顧客カルテを開閉">
                 <i data-lucide="sidebar" class="w-4 h-4"></i>
               </button>
             </div>
@@ -500,7 +531,6 @@
                       <div class="text-[10px] text-pink-700 mt-0.5">フォロワー外からの会話はRequestsに入ります。初回返信を送るとInstagram側で承認され、Generalへ移動します。</div>
                     </div>
                   </div>
-                  <button type="button" onclick="focusInstagramRequestReply()" class="shrink-0 px-2.5 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-bold text-[11px]">返信する（Requestsなら承認）</button>
                 </div>
                 <div class="composer-actions flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div class="flex items-center gap-1.5 flex-wrap">
@@ -540,7 +570,7 @@
                       </span>
                     </div>
 
-                    <button onclick="sendMessage()" id="send-main-button" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition">
+                    <button onclick="sendMessage()" id="send-main-button" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl text-xs md:text-sm font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm transition min-w-[104px] whitespace-nowrap">
                       <span id="send-button-label">送信する</span>
                       <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
                     </button>
@@ -1174,6 +1204,21 @@
     </div>
   </div>
 
+  <!-- 迷惑メッセージ・スレッド削除確認 -->
+  <div id="delete-conversation-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[125] hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 p-5 space-y-4">
+      <div class="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center"><i data-lucide="trash-2" class="w-5 h-5"></i></div>
+      <div>
+        <h3 class="font-bold text-sm text-slate-900">このスレッドを削除しますか？</h3>
+        <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">スパム・迷惑メッセージなど不要な会話を削除できます。メッセージ履歴と社内メモも削除され、元に戻せません。</p>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="closeDeleteConversationModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">キャンセル</button>
+        <button id="delete-conversation-button" type="button" onclick="deleteCurrentConversation(this)" class="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl inline-flex items-center gap-2">削除する</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 定型文選択モーダル -->
   <div id="template-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-xl border border-slate-100 space-y-3">
@@ -1432,6 +1477,7 @@
     let liveInboxInitialized = false;
     let liveInboxLastSeen = new Map();
     let assignableStaff = [];
+    const viewedConversationIds = new Set();
     let customerNameEditingThreadId = null;
     const composerDrafts = {
       reply: new Map(),
@@ -1930,10 +1976,13 @@
         if (!response.ok || !result.ok || !Array.isArray(result.employees)) {
           throw new Error(result.message || 'スタッフ一覧を読み込めませんでした');
         }
-        assignableStaff = result.employees.map(employee => ({
-          id: employee.id,
-          name: employee.name || employee.loginId || '従業員'
-        }));
+        assignableStaff = [
+          ...(loggedInUser?.id ? [{ id: loggedInUser.id, name: loggedInUser.name || loggedInUser.loginId || '管理者' }] : []),
+          ...result.employees.map(employee => ({
+            id: employee.id,
+            name: employee.name || employee.loginId || '従業員'
+          }))
+        ].filter((staff, index, array) => array.findIndex(item => item.id === staff.id) === index);
         renderAssigneeOptions();
         return true;
       } catch (error) {
@@ -2053,6 +2102,10 @@
           const messages = isSelected
             ? selectedMessages.map((message) => ({
                 sender: message.direction === 'inbound' ? 'customer' : 'agent',
+                author: message.direction === 'outbound'
+                  ? (assignableStaff.find(staff => staff.id === message.sent_by_user_id)?.name || (message.sent_by_user_id === loggedInUser?.id ? loggedInUser.name : 'スタッフ'))
+                  : '',
+                sentByUserId: message.sent_by_user_id || null,
                 text: message.body,
                 time: formatLiveTime(message.created_at)
               }))
@@ -2082,7 +2135,7 @@
             assignee: assignableStaff.find(staff => staff.id === conversation.assignee_user_id)?.name || '未割り当て',
             lastMessage: conversation.last_message_preview || '',
             lastTime: formatLiveTime(conversation.last_message_at),
-            unreadCount: conversation.status === 'unread' ? 1 : 0,
+            unreadCount: conversation.status === 'unread' && !viewedConversationIds.has(conversation.id) ? 1 : 0,
             tags: [meta.name, matchedAccount?.accountName || '実データ'],
             notes: isSelected
               ? selectedNotes.map(note => ({
@@ -2326,6 +2379,7 @@
 
         if (session.authenticated && session.user) {
           loggedInUser = {
+            id: session.user.id || '',
             name: session.user.name || session.user.loginId || 'スタッフ',
             loginId: session.user.loginId || '',
             role: session.user.role || '従業員',
@@ -2634,8 +2688,15 @@
         return matchesStatus && matchesAccount && matchesSearch;
       });
 
+      if (searchQuery && currentThreadId && !filtered.some(thread => thread.id === currentThreadId)) {
+        currentThreadId = null;
+        document.getElementById('active-chat-content')?.classList.add('hidden');
+        document.getElementById('no-chat-selected')?.classList.remove('hidden');
+      }
+      updateBadges();
+
       if (filtered.length === 0) {
-        container.innerHTML = `
+        container.innerHTML = 
           <div class="p-8 text-center text-slate-400">
             <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 text-slate-300"></i>
             <p class="text-xs">該当する問い合わせはありません</p>
@@ -2654,8 +2715,10 @@
         item.onclick = () => selectThread(thread.id);
 
         let statusBadge = '';
-        if (thread.status === 'unread' || thread.unreadCount > 0) {
-          statusBadge = '<span class="w-2 h-2 rounded-full bg-red-500 inline-block animate-pulse"></span>';
+        if (thread.unreadCount > 0) {
+          statusBadge = '<span class="w-2 h-2 rounded-full bg-red-500 inline-block animate-pulse" title="未読"></span>';
+        } else if (thread.status === 'unread') {
+          statusBadge = '<span class="text-[10px] bg-red-50 text-red-700 px-1.5 py-0.2 rounded font-medium whitespace-nowrap">未対応</span>';
         } else if (thread.status === 'in_progress') {
           statusBadge = '<span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-medium">対応中</span>';
         } else {
@@ -2774,6 +2837,10 @@
         thread.messages = [
           ...messages.map(message => ({
             sender: message.direction === 'inbound' ? 'customer' : 'agent',
+            author: message.direction === 'outbound'
+              ? (assignableStaff.find(staff => staff.id === message.sent_by_user_id)?.name || (message.sent_by_user_id === loggedInUser?.id ? loggedInUser.name : 'スタッフ'))
+              : '',
+            sentByUserId: message.sent_by_user_id || null,
             text: message.body,
             type: message.message_type || 'text',
             metadata: message.metadata || {},
@@ -2819,6 +2886,7 @@
         customerNameEditingThreadId = null;
       }
       currentThreadId = id;
+      viewedConversationIds.add(id);
       let thread = threads.find(t => t.id === id);
       if (!thread) return;
 
@@ -3014,12 +3082,12 @@
           wrapper.innerHTML = `
             <div class="flex items-end gap-2 max-w-[85%] sm:max-w-[70%] justify-end">
               <div>
-                <div class="text-[10px] text-slate-400 mb-0.5 mr-1 text-right">担当スタッフ (${thread.assignee || 'オペレーター'})</div>
-                <div class="bg-teal-600 text-white p-3 rounded-2xl rounded-br-xs text-xs sm:text-sm shadow-xs leading-relaxed">
+                <div class="text-[10px] text-slate-400 mb-0.5 mr-1 text-right">${escapeHtml(msg.author || loggedInUser?.name || 'スタッフ')}</div>
+                <div class="${msg.deliveryStatus === 'sending' ? 'bg-teal-100 text-teal-800 border border-teal-200' : 'bg-teal-600 text-white'} p-3 rounded-2xl rounded-br-xs text-xs sm:text-sm shadow-xs leading-relaxed">
                   ${escapeHtml(msg.text)}
                 </div>
                 <div class="text-[10px] text-slate-400 mt-1 mr-1 text-right flex items-center justify-end gap-1">
-                  <span>配信済</span> • <span>${msg.time}</span>
+                  <span>${msg.deliveryStatus === 'sending' ? '送信中' : '配信済'}</span> • <span>${msg.time}</span>
                 </div>
               </div>
             </div>
@@ -3164,41 +3232,69 @@
       }
 
       const sendButton = document.getElementById('send-main-button');
-      sendButton.disabled = true;
-      const originalHtml = sendButton.innerHTML;
-      sendButton.innerHTML = '<span>送信中...</span>';
+      if (sendButton?.disabled) return;
+      const originalHtml = sendButton?.innerHTML || '';
+      const optimisticId = 'sending-' + Date.now();
+      const optimisticMessage = {
+        id: optimisticId,
+        sender: 'agent',
+        author: loggedInUser?.name || 'スタッフ',
+        text,
+        time: timeStr,
+        deliveryStatus: 'sending',
+        createdAt: new Date().toISOString()
+      };
+
+      input.value = '';
+      composerDrafts.reply.delete(thread.id);
+      thread.messages = thread.messages || [];
+      thread.messages.push(optimisticMessage);
+      renderMessages(thread);
+
+      if (sendButton) {
+        sendButton.disabled = true;
+        sendButton.innerHTML = '<span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span><span>送信中...</span>';
+      }
 
       try {
         const response = await fetch('/api/omnibox/reply', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            conversationId: thread.liveConversationId,
-            message: text
-          })
+          body: JSON.stringify({ conversationId: thread.liveConversationId, message: text })
         });
-
         const result = await response.json();
-        if (!response.ok || !result.ok) {
-          throw new Error(result.message || 'send failed');
-        }
+        if (!response.ok || !result.ok) throw new Error(result.message || '返信を送信できませんでした');
 
-        input.value = '';
-        const refreshed = await loadConversationDetail(thread.id);
-        if (refreshed) {
-          updateActiveChatPane(refreshed);
+        optimisticMessage.deliveryStatus = 'delivered';
+        thread.lastMessage = text;
+        thread.lastTime = timeStr;
+        thread.unreadCount = 0;
+        renderMessages(thread);
+        renderThreadList();
+        updateBadges();
+
+        void loadConversationDetail(thread.id).then(refreshed => {
+          if (refreshed && currentThreadId === thread.id) updateActiveChatPane(refreshed);
           renderThreadList();
           updateBadges();
-        }
-        const channelName = getChannelMeta(thread.channel).name;
-        showToast(`${channelName}へ返信を送信しました`);
+        });
+
+        showToast(`${getChannelMeta(thread.channel).name}へ返信を送信しました`, 'success');
       } catch (error) {
         console.error('Provider reply failed:', error);
-        showToast(error.message || '返信を送信できませんでした');
+        const index = thread.messages.findIndex(message => message.id === optimisticId);
+        if (index >= 0) thread.messages.splice(index, 1);
+        input.value = text;
+        composerDrafts.reply.set(thread.id, text);
+        renderMessages(thread);
+        input.focus();
+        showToast(error.message || '返信を送信できませんでした', 'error');
       } finally {
-        sendButton.disabled = false;
-        sendButton.innerHTML = originalHtml;
+        if (sendButton) {
+          sendButton.disabled = false;
+          sendButton.innerHTML = originalHtml;
+        }
         lucide.createIcons();
       }
     };
@@ -4903,7 +4999,7 @@
       if (!label) return;
       const statusLabels = {
         all: '全ステータス',
-        unread: '未対応・未読',
+        unread: '未対応',
         in_progress: '対応中',
         resolved: '対応完了'
       };
@@ -4911,7 +5007,9 @@
         ? null
         : connectedAccounts.find(item => item.id === currentAccountFilter);
       const accountLabel = account?.accountName || 'すべてのアカウント';
-      label.textContent = accountLabel + '・' + (statusLabels[currentStatusFilter] || 'すべてのステータス');
+      const base = accountLabel + '・' + (statusLabels[currentStatusFilter] || '全ステータス');
+      label.textContent = searchQuery?.trim() ? base + '・検索中' : base;
+      label.title = searchQuery?.trim() ? `「${searchQuery.trim()}」を検索中` : base;
     }
 
     window.filterByStatus = function(status) {
@@ -5041,13 +5139,71 @@
       } else {
         panel.classList.remove('hidden');
         panel.classList.add('lg:block');
+        const willOpen = panel.classList.contains('is-collapsed');
         panel.classList.toggle('is-collapsed');
+        if (willOpen && window.innerWidth < 1200) {
+          document.getElementById('status-sidebar')?.classList.add('is-collapsed');
+        }
         icon?.setAttribute(
           'data-lucide',
           panel.classList.contains('is-collapsed') ? 'panel-right-open' : 'panel-right-close'
         );
       }
       lucide.createIcons();
+    };
+
+    window.openDeleteConversationModal = function() {
+      if (!threads.some(item => item.id === currentThreadId)) return;
+      const modal = document.getElementById('delete-conversation-modal');
+      modal?.classList.remove('hidden');
+      modal?.classList.add('flex');
+      lucide.createIcons();
+    };
+
+    window.closeDeleteConversationModal = function() {
+      const modal = document.getElementById('delete-conversation-modal');
+      modal?.classList.add('hidden');
+      modal?.classList.remove('flex');
+    };
+
+    window.deleteCurrentConversation = async function(button) {
+      const thread = threads.find(item => item.id === currentThreadId);
+      if (!thread) return;
+      if (isDemoSession || !thread.liveConversationId) {
+        threads = threads.filter(item => item.id !== thread.id);
+        currentThreadId = null;
+        window.closeDeleteConversationModal();
+        onDataUpdated();
+        showToast('スレッドを削除しました', 'success');
+        return;
+      }
+      await runWithBusy(button, async () => {
+        const response = await fetch('/api/omnibox/inbox', {
+          method: 'DELETE',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId: thread.liveConversationId })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error('スレッドを削除できませんでした');
+        threads = threads.filter(item => item.id !== thread.id);
+        composerDrafts.reply.delete(thread.id);
+        composerDrafts.note.delete(thread.id);
+        viewedConversationIds.delete(thread.id);
+        currentThreadId = null;
+        window.closeDeleteConversationModal();
+        document.getElementById('active-chat-content')?.classList.add('hidden');
+        document.getElementById('no-chat-selected')?.classList.remove('hidden');
+        renderThreadList();
+        renderAccountFilters();
+        renderConnectedAccounts();
+        updateBadges();
+        return result;
+      }, {
+        busyText: '削除中...',
+        successMessage: 'スレッドを削除しました',
+        errorMessage: 'スレッドを削除できませんでした'
+      }).catch(() => {});
     };
 
     window.openAddAccountModal = function() {
