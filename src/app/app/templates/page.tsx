@@ -11,7 +11,7 @@ export default function TemplatesPage() {
       <div className={styles.grid}>
         <section className={styles.card}>
           <h2>定型文</h2>
-          <p>サロン、飲食、EC、企業問い合わせ向けなど、元OmniBoxデモのカテゴリ構成を引き継ぎます。</p>
+          <p>サロン、飲食、EC、企業問い合わせ向けなど、既存デモのカテゴリ構成を引き継ぎます。</p>
           <span className={`${styles.badge} ${styles.pending}`}>DB保存は次段階</span>
         </section>
         <section className={styles.card}>

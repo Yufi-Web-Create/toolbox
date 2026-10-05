@@ -20,6 +20,12 @@ const STATUS_LABELS = {
   completed: "対応完了",
 } as const;
 
+const STATUS_CLASSES = {
+  unread: styles.statusUnread,
+  in_progress: styles.statusProgress,
+  completed: styles.statusCompleted,
+} as const;
+
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -127,8 +133,8 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
             </section>
 
             <div className={styles.aiCard}>
-              <strong>AIアシスタント</strong>
-              <span>返信文案機能は次段階で接続予定です。</span>
+              <strong>AIで返信案を作る</strong>
+              <span>会話の内容をもとに、返信案の作成をサポートします。</span>
             </div>
           </div>
         </aside>
@@ -166,7 +172,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
                     <p>{conversation.last_message_preview}</p>
                     <div className={styles.threadBottom}>
                       <span>担当: 未割り当て</span>
-                      <em>{STATUS_LABELS[conversation.status]}</em>
+                      <em className={STATUS_CLASSES[conversation.status]}>{STATUS_LABELS[conversation.status]}</em>
                     </div>
                   </div>
                 </Link>
@@ -187,7 +193,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
                   <div>
                     <div className={styles.customerTitle}>
                       <h1>{inbox.selectedConversation.customer_display_name}</h1>
-                      <span>{STATUS_LABELS[inbox.selectedConversation.status]}</span>
+                      <span className={STATUS_CLASSES[inbox.selectedConversation.status]}>{STATUS_LABELS[inbox.selectedConversation.status]}</span>
                     </div>
                     <p>{inbox.selectedConversation.customer_external_id}</p>
                   </div>

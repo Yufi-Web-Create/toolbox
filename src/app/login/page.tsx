@@ -26,9 +26,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className={styles.page}>
       <section className={styles.portal}>
         <div className={styles.hero}>
-          <Link className={styles.logoMark} href="/master-login" aria-label="運営マスターログイン">◫</Link>
-          <h1>OmniBox ポータル</h1>
-          <p>複数SNSのメッセージ一元管理 &amp; 予約投稿ハブ</p>
+          <Link className={styles.logoMark} href="/master-login" aria-label="運営マスターログイン">
+            <img src="/matomeet-symbol.svg" alt="" />
+          </Link>
+          <h1><span>Mato</span>Meet</h1>
+          <p>問い合わせを、ひとつに。毎日の顧客対応をもっとやさしく。</p>
         </div>
         <LoginForm
           callbackErrorMessage={callbackErrorMessage}

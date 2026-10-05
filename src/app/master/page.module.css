@@ -1,8 +1,8 @@
 .page {
   min-height: 100vh;
   padding: 28px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: #fff7f8;
+  color: #3f3739;
 }
 
 .shell {
@@ -20,7 +20,7 @@
 
 .eyebrow {
   margin: 0 0 6px;
-  color: #0f766e;
+  color: #b96774;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: .08em;
@@ -34,7 +34,7 @@
 
 .header p {
   margin: 8px 0 0;
-  color: #64748b;
+  color: #756b6d;
   font-size: 13px;
 }
 
@@ -50,10 +50,10 @@
   align-items: center;
   justify-content: center;
   padding: 9px 13px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #ede5e7;
   border-radius: 10px;
   background: #fff;
-  color: #334155;
+  color: #3f3739;
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -63,8 +63,8 @@
 
 .logout:hover,
 .link:hover {
-  border-color: #94a3b8;
-  background: #f1f5f9;
+  border-color: #a49a9c;
+  background: #fdecef;
 }
 
 .grid {
@@ -75,10 +75,10 @@
 
 .card {
   padding: 20px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #ede5e7;
   border-radius: 18px;
   background: #fff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+  box-shadow: 0 8px 24px rgba(80, 50, 60, .06);
 }
 
 .cardWide {
@@ -101,8 +101,8 @@
   justify-content: space-between;
   gap: 14px;
   padding: 9px 0;
-  border-top: 1px solid #f1f5f9;
-  color: #475569;
+  border-top: 1px solid #fdecef;
+  color: #756b6d;
   font-size: 12px;
 }
 
@@ -112,7 +112,7 @@
 
 .value {
   max-width: 65%;
-  color: #0f172a;
+  color: #3f3739;
   font-weight: 700;
   text-align: right;
   overflow-wrap: anywhere;
@@ -128,7 +128,7 @@
 
 .note {
   margin: 12px 0 0;
-  color: #64748b;
+  color: #756b6d;
   font-size: 11px;
   line-height: 1.65;
 }
@@ -170,10 +170,10 @@
 .notice {
   margin-bottom: 16px;
   padding: 11px 14px;
-  border: 1px solid #99f6e4;
+  border: 1px solid #f8d8de;
   border-radius: 12px;
-  background: #f0fdfa;
-  color: #115e59;
+  background: #fdecef;
+  color: #b96774;
   font-size: 12px;
   font-weight: 700;
 }
@@ -186,7 +186,7 @@
 .field {
   display: grid;
   gap: 6px;
-  color: #475569;
+  color: #756b6d;
   font-size: 11px;
   font-weight: 700;
 }
@@ -195,10 +195,10 @@
 .field textarea {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #ede5e7;
   border-radius: 10px;
   background: #fff;
-  color: #0f172a;
+  color: #3f3739;
   padding: 10px 11px;
   font: inherit;
   font-size: 12px;
@@ -207,8 +207,8 @@
 
 .field input:focus,
 .field textarea:focus {
-  border-color: #14b8a6;
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, .12);
+  border-color: #f28b9d;
+  box-shadow: 0 0 0 3px rgba(242, 139, 157, .18);
 }
 
 .field textarea {
@@ -221,13 +221,13 @@
   gap: 6px;
   padding: 10px 11px;
   border-radius: 10px;
-  background: #f8fafc;
-  color: #64748b;
+  background: #fff7f8;
+  color: #756b6d;
   font-size: 10px;
 }
 
 .callbackBox code {
-  color: #0f172a;
+  color: #3f3739;
   overflow-wrap: anywhere;
 }
 
@@ -242,23 +242,23 @@
 }
 
 .primaryButton {
-  border: 1px solid #0d9488;
-  background: #0d9488;
+  border: 1px solid #f28b9d;
+  background: #f28b9d;
   color: #fff;
 }
 
 .primaryButton:hover {
-  background: #0f766e;
+  background: #e9788c;
 }
 
 .secondaryButton {
-  border: 1px solid #cbd5e1;
+  border: 1px solid #ede5e7;
   background: #fff;
-  color: #334155;
+  color: #3f3739;
 }
 
 .secondaryButton:hover {
-  background: #f8fafc;
+  background: #fff7f8;
 }
 
 .inlineForm {

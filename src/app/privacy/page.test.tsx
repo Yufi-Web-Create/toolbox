@@ -1,7 +1,7 @@
 import { isValidElement, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { CONTACT_EMAIL, OPERATOR_NAME } from "@/lib/legal";
+import { CONTACT_EMAIL, OPERATOR_NAME } from "../../lib/legal";
 import PrivacyPage from "./page";
 
 function textOf(node: ReactNode): string {

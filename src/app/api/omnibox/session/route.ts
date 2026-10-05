@@ -49,7 +49,7 @@ export async function GET() {
     // A newly-created administrator owns a workspace, but must complete its
     // human-facing organization name/login ID before normal app use.
     if (!membership && accountType === "owner") {
-      const created = await createOrganizationWithOwner("OmniBox Workspace");
+      const created = await createOrganizationWithOwner("MatoMeet Workspace");
       if (created.success) {
         membership = await getMembership(supabase, claims.sub);
       }

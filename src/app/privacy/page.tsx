@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { CONTACT_EMAIL, LEGAL_EFFECTIVE_DATE, OPERATOR_NAME } from "@/lib/legal";
+import { CONTACT_EMAIL, LEGAL_EFFECTIVE_DATE, OPERATOR_NAME } from "../../lib/legal";
 
 export const metadata: Metadata = {
-  title: "プライバシーポリシー | OmniBox",
+  title: "プライバシーポリシー | MatoMeet",
   robots: { index: true },
 };
 
@@ -19,7 +19,7 @@ export default function PrivacyPage() {
           <p>{LEGAL_EFFECTIVE_DATE}</p>
         </header>
 
-        <p>{OPERATOR_NAME}（以下「運営者」）は、運営者が提供するサービス「toolbox」およびその機能「OmniBox」（以下「本サービス」）における利用者の情報の取り扱いについて、以下のとおり定めます。</p>
+        <p>{OPERATOR_NAME}（以下「運営者」）は、運営者が提供するサービス「MatoMeet」（以下「本サービス」）における利用者の情報の取り扱いについて、以下のとおり定めます。</p>
 
         <section style={sectionStyle}>
           <h2>1. 取得する情報</h2>

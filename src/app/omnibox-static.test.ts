@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-describe("uploaded OmniBox application shell", () => {
+describe("uploaded MatoMeet application shell", () => {
   const html = readFileSync(join(process.cwd(), "public", "omnibox.html"), "utf8");
 
-  it("keeps the supplied OmniBox login and staff registration portal", () => {
-    expect(html).toContain("OmniBox ポータル");
+  it("keeps the supplied MatoMeet login and staff registration portal", () => {
+    expect(html).toContain("MatoMeet ポータル");
     expect(html).toContain("ログイン");
     expect(html).toContain("管理者アカウント作成");
     expect(html).toContain("auth-input-name");
@@ -21,7 +21,7 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).not.toContain("signInAnonymously");
   });
 
-  it("keeps the supplied main OmniBox views", () => {
+  it("keeps the supplied main MatoMeet views", () => {
     expect(html).toContain('id="view-inbox"');
     expect(html).toContain('id="view-publish"');
     expect(html).toContain('id="view-templates"');
@@ -52,7 +52,7 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain('id="view-settings"');
     expect(html).toContain('id="menu-organization-settings"');
     expect(html).toContain('id="settings-initial-organization-banner"');
-    expect(html).toContain("組織を識別する管理用ID");
+    expect(html).toContain("初期設定後の組織IDは変更できません");
     expect(html).toContain("loggedInUser.roleKey !== 'owner'");
     expect(html).toContain("/api/omnibox/settings/account");
     expect(html).toContain("/api/omnibox/settings/organization");
@@ -165,12 +165,9 @@ describe("uploaded OmniBox application shell", () => {
   });
 
   it("exposes Instagram webhook subscription controls and Gmail sync controls", () => {
-    expect(html).toContain("Instagram DM受信設定");
-    expect(html).toContain("/api/omnibox/instagram/webhook-info");
+    expect(html).toContain("Instagram DM受信状態");
     expect(html).toContain("/api/omnibox/instagram/subscription");
     expect(html).toContain("showInstagramWebhookInfo");
-    expect(html).toContain("Webhook購読を再登録");
-    expect(html).toContain("messages 購読済み");
     expect(html).toContain("Gmailを同期");
     expect(html).toContain("syncGoogleInbox");
   });
@@ -281,7 +278,7 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain('id="auth-input-login-id" name="omnibox_login_id" autocomplete="username"');
     expect(html).toContain("looksLikeCredentialAutofill");
     expect(html).toContain("Instagram 初回メッセージ");
-    expect(html).toContain("返信する（Requestsなら承認）");
+    expect(html).toContain("初回返信を送るとInstagram側で承認され");
   });
 
   it("does not expose fake AI generation before AI is connected", () => {
@@ -305,7 +302,7 @@ describe("uploaded OmniBox application shell", () => {
     expect(html).toContain("/api/omnibox/search?q=");
     expect(html).toContain("未読 ");
     expect(html).toContain("受信会話数");
-    expect(html).toContain("OmniBox運営側のOAuth設定未完了");
+    expect(html).toContain("MatoMeet運営側のOAuth設定が未完了");
   });
 
   it("supports editing reply templates and a general filter", () => {

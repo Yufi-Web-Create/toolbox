@@ -13,8 +13,8 @@ export default async function MasterLoginPage() {
     <main className={styles.page}>
       <section className={styles.portal}>
         <div className={styles.hero}>
-          <div className={styles.logoMark} aria-hidden="true">◫</div>
-          <h1>OmniBox 運営設定</h1>
+          <div className={styles.logoMark} aria-hidden="true"><img src="/matomeet-symbol.svg" alt="" /></div>
+          <h1>MatoMeet 運営設定</h1>
           <p>Master Operations Console</p>
         </div>
         <MasterLoginForm />

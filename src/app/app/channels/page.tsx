@@ -6,7 +6,7 @@ export default function ChannelsPage() {
     <SectionPage
       active="channels"
       title="接続アカウント & Webhook連携設定"
-      description="各SNS・メール窓口をOmniBoxへ接続する管理画面です。"
+      description="各SNS・メール窓口をMatoMeetへ接続する管理画面です。"
     >
       <div className={styles.grid}>
         <section className={styles.card}>

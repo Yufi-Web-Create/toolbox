@@ -143,7 +143,7 @@ export default async function MasterPage({
       <div className={styles.shell}>
         <header className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>OmniBox Operations</p>
+            <p className={styles.eyebrow}>MatoMeet Operations</p>
             <h1>運営側 設定・稼働確認</h1>
             <p>
               SNS連携に必要なDeveloper App設定と稼働状態を、ここで一元管理します。
@@ -151,7 +151,7 @@ export default async function MasterPage({
           </div>
           <div className={styles.actions}>
             <Link className={styles.link} href="/omnibox.html">
-              OmniBoxを開く
+              MatoMeetを開く
             </Link>
             <form action={masterLogout}>
               <button className={styles.logout} type="submit">
@@ -328,7 +328,7 @@ export default async function MasterPage({
           <article className={styles.card}>
             <h2>店舗側の接続操作</h2>
             <p className={styles.note}>
-              Developer Appの設定はこの運営画面で管理します。設定完了後、店舗側はOmniBoxの「接続アカウント」から公式認証画面へ進んでアカウントを許可するだけです。
+              Developer Appの設定はこの運営画面で管理します。設定完了後、店舗側はMatoMeetの「接続アカウント」から公式認証画面へ進んでアカウントを許可するだけです。
             </p>
             <div className={styles.actions}>
               <Link className={styles.link} href="/omnibox.html">

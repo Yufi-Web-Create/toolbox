@@ -27,16 +27,18 @@ export function OmniBoxShell({
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <Link href="/app/inbox" className={styles.brand}>
-          <span className={styles.logo}>◫</span>
+        <Link href="/app/inbox" className={styles.brand} aria-label="MatoMeet ホーム">
+          <span className={styles.logo}>
+            <img src="/matomeet-symbol.svg" alt="" />
+          </span>
           <span>
             <span className={styles.brandLine}>
-              <strong>OmniBox</strong>
+              <strong><span>Mato</span>Meet</strong>
               <span className={styles.cloud}>
-                <i /> Cloud Sync 有効
+                <i /> 同期中
               </span>
             </span>
-            <small>複数SNS一元管理 &amp; 予約投稿ハブ</small>
+            <small>問い合わせを、ひとつに。</small>
           </span>
         </Link>
 
@@ -56,7 +58,7 @@ export function OmniBoxShell({
           <div className={styles.avatar}>{avatar}</div>
           <div className={styles.userText}>
             <strong>ログイン中</strong>
-            <span>{userEmail || "OmniBox user"}</span>
+            <span>{userEmail || "MatoMeet user"}</span>
           </div>
           <form action={logout}>
             <button className={styles.logout} type="submit">ログアウト</button>

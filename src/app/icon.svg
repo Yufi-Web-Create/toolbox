@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="MatoMeet">
+  <defs>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F8BCC6"/>
+      <stop offset="1" stop-color="#F3A7B5"/>
+    </linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F6A4B3"/>
+      <stop offset="1" stop-color="#F28B9D"/>
+    </linearGradient>
+  </defs>
+  <path d="M17 39C17 23.5 29.5 11 45 11h18c15.5 0 28 12.5 28 28v12c0 15.5-12.5 28-28 28H48L27 94l4-18.2C22.6 71.1 17 62.1 17 51V39Z" fill="url(#left)"/>
+  <path d="M37 39c0-15.5 12.5-28 28-28h18c15.5 0 28 12.5 28 28v12c0 11.1-5.6 20.1-14 24.8L101 94 80 79H65c-15.5 0-28-12.5-28-28V39Z" fill="url(#right)" opacity=".96"/>
+  <path d="M37 39c0-7.5 2.9-14.3 7.7-19.3C54.9 23.7 63 33.6 63 45v6c0 11.4-8.1 21.3-18.3 25.3C39.9 71.3 37 64.5 37 57V39Z" fill="#D77D8F" opacity=".86" transform="translate(17 0)"/>
+</svg>
