@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <section className={styles.portal}>
         <div className={styles.hero}>
           <Link className={styles.logoMark} href="/master-login" aria-label="運営マスターログイン">
-            <img src="/matomeet-symbol.svg" alt="" />
+            <img src="/matomeet-icon.png" alt="" />
           </Link>
           <h1><span>Mato</span>Meet</h1>
           <p>問い合わせを、ひとつに。毎日の顧客対応をもっとやさしく。</p>
