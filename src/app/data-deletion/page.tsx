@@ -4,7 +4,7 @@ import Link from "next/link";
 import { CONTACT_EMAIL, LEGAL_EFFECTIVE_DATE, OPERATOR_NAME } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "データ削除について | OmniBox",
+  title: "データ削除について | MatoMeet",
   robots: { index: true },
 };
 
@@ -19,12 +19,12 @@ export default function DataDeletionPage() {
           <p>{LEGAL_EFFECTIVE_DATE}</p>
         </header>
 
-        <p>本サービス「toolbox / OmniBox」に保存されている利用者のデータは、次のいずれかの方法で削除できます。</p>
+        <p>本サービス「MatoMeet」に保存されている利用者のデータは、次のいずれかの方法で削除できます。</p>
 
         <section style={sectionStyle}>
           <h2>1. Instagram等の連携を解除する</h2>
           <ol>
-            <li>OmniBoxにログインし、「連携」画面を開きます。</li>
+            <li>MatoMeetにログインし、「連携」画面を開きます。</li>
             <li>削除したいアカウントのカードにある「連携解除」を選びます。</li>
           </ol>
           <p>連携を解除すると、そのアカウントのアクセストークンは直ちに削除され、本サービスからそのアカウントへのアクセスはできなくなります。</p>
