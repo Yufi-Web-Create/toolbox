@@ -28,29 +28,24 @@
 }
 
 .logoMark {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   display: grid;
   place-items: center;
   margin: 0 auto 13px;
-  border: 0;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #f8bcc6, #f28b9d);
-  color: #fff;
+  border: 1px solid #f8d8de;
+  border-radius: 18px;
+  background: #fff;
   cursor: pointer;
   text-decoration: none;
   box-shadow: 0 4px 16px rgba(80, 50, 60, .08);
   transition: transform .18s ease-out, box-shadow .18s ease-out;
 }
 
-.logoMark svg {
-  width: 36px;
-  height: 36px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.logoMark img {
+  width: 50px;
+  height: 50px;
+  display: block;
 }
 
 .logoMark:hover,
