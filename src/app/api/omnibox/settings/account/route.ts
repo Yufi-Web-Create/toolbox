@@ -8,6 +8,8 @@ export async function POST(request: Request) {
     const name = typeof payload?.name === "string" ? payload.name.trim() : "";
     const password =
       typeof payload?.password === "string" ? payload.password : "";
+    const currentPassword =
+      typeof payload?.currentPassword === "string" ? payload.currentPassword : "";
 
     if (!name || name.length > 100) {
       return NextResponse.json(
@@ -23,6 +25,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (password && !currentPassword) {
+      return NextResponse.json(
+        { ok: false, message: "パスワード変更には現在のパスワードが必要です。" },
+        { status: 400 },
+      );
+    }
+
     const supabase = await createClient();
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
 
@@ -31,6 +40,29 @@ export async function POST(request: Request) {
         { ok: false, message: "ログインが必要です。" },
         { status: 401 },
       );
+    }
+
+    if (password) {
+      const email =
+        typeof claimsData.claims.email === "string" ? claimsData.claims.email : "";
+      if (!email) {
+        return NextResponse.json(
+          { ok: false, message: "現在のログイン情報を確認できませんでした。" },
+          { status: 400 },
+        );
+      }
+
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+
+      if (verifyError) {
+        return NextResponse.json(
+          { ok: false, message: "現在のパスワードが正しくありません。" },
+          { status: 401 },
+        );
+      }
     }
 
     const update: {
