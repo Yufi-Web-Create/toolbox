@@ -17,15 +17,6 @@ const navItems = [
   { key: "analytics", label: "分析", href: "/app/analytics" },
 ] as const;
 
-function MatoMeetSymbol() {
-  return (
-    <svg viewBox="0 0 48 48" aria-hidden="true" className={styles.logoSvg}>
-      <path d="M7 11.5c0-3.04 2.46-5.5 5.5-5.5h17A5.5 5.5 0 0 1 35 11.5v10a5.5 5.5 0 0 1-5.5 5.5H19l-7.5 6v-6.1A5.5 5.5 0 0 1 7 21.5v-10Z" />
-      <path d="M19 20.5c0-3.04 2.46-5.5 5.5-5.5h11a5.5 5.5 0 0 1 5.5 5.5v9a5.5 5.5 0 0 1-5.5 5.5H34v6l-7.5-6h-2A5.5 5.5 0 0 1 19 29.5v-9Z" />
-    </svg>
-  );
-}
-
 export function OmniBoxShell({
   active,
   userEmail,
@@ -37,7 +28,9 @@ export function OmniBoxShell({
     <div className={styles.shell}>
       <header className={styles.header}>
         <Link href="/app/inbox" className={styles.brand} aria-label="MatoMeet ホーム">
-          <span className={styles.logo}><MatoMeetSymbol /></span>
+          <span className={styles.logo}>
+            <img src="/matomeet-symbol.svg" alt="" />
+          </span>
           <span>
             <span className={styles.brandLine}>
               <strong><span>Mato</span>Meet</strong>
