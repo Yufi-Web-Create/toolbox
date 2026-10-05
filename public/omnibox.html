@@ -873,7 +873,7 @@
             <div class="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-5">
               <div>
                 <div class="flex items-center gap-2">
-                  <div class="w-9 h-9 rounded-xl bg-violet-50 text-violet-700 flex items-center justify-center">
+                  <div class="w-9 h-9 rounded-xl bg-brand-50 text-brand-800 flex items-center justify-center">
                     <i data-lucide="badge-japanese-yen" class="w-4 h-4"></i>
                   </div>
                   <div>
@@ -882,7 +882,7 @@
                   </div>
                 </div>
               </div>
-              <span id="current-plan-badge" class="text-xs px-3 py-1.5 rounded-full bg-violet-50 text-violet-700 font-bold">スタンダード</span>
+              <span id="current-plan-badge" class="text-xs px-3 py-1.5 rounded-full bg-brand-50 text-brand-800 border border-brand-100 font-bold">スタンダード</span>
             </div>
 
             <div id="plan-options-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3"></div>
@@ -923,7 +923,7 @@
                 </div>
               </div>
               <div class="md:col-span-3">
-                <button type="submit" id="employee-create-button" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <button type="submit" id="employee-create-button" class="px-4 py-2.5 bg-brand-800 hover:bg-brand-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-2">
                   <i data-lucide="user-plus" class="w-4 h-4"></i>
                   従業員アカウントを作成
                 </button>
@@ -5207,13 +5207,25 @@
     function restoreActiveView() {
       if (!loggedInUser) return;
       let target = 'inbox';
+      let settingsTab = 'account';
       try {
         const saved = localStorage.getItem('omnibox_active_view');
         if (['inbox', 'publish', 'templates', 'channels', 'settings'].includes(saved)) {
           target = saved;
         }
+        const savedSettingsTab = localStorage.getItem('omnibox_settings_tab');
+        if (savedSettingsTab === 'organization' || savedSettingsTab === 'account') {
+          settingsTab = savedSettingsTab;
+        }
       } catch {}
-      if (requiresOrganizationSetup && loggedInUser?.roleKey === 'owner') target = 'settings';
+      if (requiresOrganizationSetup && loggedInUser?.roleKey === 'owner') {
+        target = 'settings';
+        settingsTab = 'organization';
+      }
+      if (target === 'settings') {
+        window.openSettings(settingsTab);
+        return;
+      }
       window.switchView(target);
     }
 
@@ -5891,6 +5903,9 @@
     window.switchSettingsTab = function(tab) {
       const isOwner = loggedInUser?.roleKey === 'owner';
       const target = tab === 'organization' && isOwner ? 'organization' : 'account';
+      try {
+        localStorage.setItem('omnibox_settings_tab', target);
+      } catch {}
 
       document.getElementById('settings-panel-organization').classList.toggle('hidden', target !== 'organization');
       document.getElementById('settings-panel-account').classList.toggle('hidden', target !== 'account');
