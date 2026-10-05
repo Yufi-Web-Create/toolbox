@@ -34,19 +34,14 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  color: #fff;
-  background: linear-gradient(135deg, #f8bcc6, #f28b9d);
-  box-shadow: 0 4px 16px rgba(80, 50, 60, .08);
+  background: #fff7f8;
+  box-shadow: 0 2px 8px rgba(80, 50, 60, .06);
 }
 
-.logoSvg {
-  width: 28px;
-  height: 28px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.logo img {
+  width: 34px;
+  height: 34px;
+  display: block;
 }
 
 .brandLine {
