@@ -402,7 +402,7 @@
 
           <div>
             <h2 class="font-bold text-sm text-slate-800">受信トレイ</h2>
-            <p id="inbox-filter-label" class="text-[11px] text-slate-500">すべての窓口・すべてのステータス</p>
+            <p id="inbox-filter-label" class="text-[10px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px]" title="現在の絞り込み">すべてのアカウント・全ステータス</p>
           </div>
           <div class="flex items-center gap-1">
             <span class="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
@@ -795,7 +795,7 @@
                 <input id="settings-organization-id" type="text" maxlength="32" autocomplete="off" autocapitalize="characters" spellcheck="false" required class="w-full max-w-xl text-sm font-mono uppercase px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="例: SAMPLE_SHOP">
                 <p id="settings-organization-id-help" class="text-[10px] text-slate-400 mt-1">3〜32文字の半角英数字・ハイフン・アンダースコア。初期設定後はログイン事故防止のため変更できません。</p>
               </div>
-              <button type="submit" class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition">
+              <button id="settings-organization-save-button" type="submit" class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-2">
                 組織設定を保存
               </button>
             </form>
@@ -899,10 +899,15 @@
               </div>
               <div>
                 <label class="text-xs font-bold text-slate-600 block mb-1.5">新しいパスワード</label>
-                <input id="settings-account-password" type="password" minlength="8" class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="変更しない場合は空欄">
+                <input id="settings-account-password" name="omnibox_new_account_password" type="password" minlength="8" autocomplete="new-password" data-lpignore="true" data-1p-ignore class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="変更しない場合は空欄">
                 <p class="text-[10px] text-slate-400 mt-1">変更する場合のみ8文字以上で入力してください。</p>
               </div>
-              <button type="submit" class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition">
+              <div>
+                <label class="text-xs font-bold text-slate-600 block mb-1.5">現在のパスワード <span class="font-normal text-slate-400">（パスワード変更時のみ）</span></label>
+                <input id="settings-account-current-password" name="omnibox_current_account_password" type="password" autocomplete="current-password" class="w-full max-w-xl text-sm px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="新しいパスワードを設定する場合に入力">
+                <p class="text-[10px] text-slate-400 mt-1">第三者による変更を防ぐため、新しいパスワードを設定するときは現在のパスワード確認が必要です。</p>
+              </div>
+              <button id="settings-account-save-button" type="submit" class="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-2">
                 アカウント設定を保存
               </button>
             </form>
@@ -1143,7 +1148,7 @@
 
       <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
         <button onclick="closeNewPostModal()" class="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl">キャンセル</button>
-        <button onclick="submitNewPost()" class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-xs">投稿を設定する</button>
+        <button id="new-post-submit-button" onclick="submitNewPost()" class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">投稿を設定する</button>
       </div>
     </div>
   </div>
@@ -1188,7 +1193,7 @@
       <div class="flex items-start justify-between gap-4">
         <div>
           <h3 class="font-bold text-sm text-slate-800 flex items-center gap-2">
-            <i data-lucide="instagram" class="w-4 h-4 text-pink-600"></i>
+            <span class="w-5 h-5 rounded-md bg-pink-500 text-white text-[9px] font-bold inline-flex items-center justify-center">IG</span>
             Instagram DM受信状態
           </h3>
           <p class="text-[11px] text-slate-500 mt-1">DMをOmniBoxで受信できる状態か確認します。</p>
@@ -1211,9 +1216,29 @@
     </div>
   </div>
 
+  <!-- 連携アカウント名変更 -->
+  <div id="rename-connected-account-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[115] hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 p-5 space-y-4">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h3 class="font-bold text-sm text-slate-800">連携アカウント名を変更</h3>
+          <p class="text-[11px] text-slate-500 mt-1">受信箱や投稿先に表示する名前です。</p>
+        </div>
+        <button type="button" onclick="closeRenameConnectedAccountModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" aria-label="名前変更を閉じる">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <input id="rename-connected-account-input" type="text" maxlength="120" autocomplete="off" class="w-full text-sm px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-teal-500" placeholder="表示名">
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="closeRenameConnectedAccountModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">キャンセル</button>
+        <button id="rename-connected-account-save-button" type="button" onclick="saveRenamedConnectedAccount(this)" class="px-4 py-2 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-xl inline-flex items-center gap-2">変更する</button>
+      </div>
+    </div>
+  </div>
+
   <!-- トースト通知 -->
   <div id="toast" class="fixed bottom-24 right-5 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs shadow-2xl flex items-center gap-2 transform translate-y-16 opacity-0 transition-all duration-300 z-[120] pointer-events-none">
-    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <i id="toast-icon" data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
     <span id="toast-message">処理が完了しました</span>
   </div>
 
@@ -2165,13 +2190,13 @@
       }
     }
 
-    async function syncXInbox({ silent = true, reloadInbox = false } = {}) {
+    async function syncXInbox({ silent = true, reloadInbox = false, button = null } = {}) {
       if (isDemoSession) return { ok: true, imported: 0 };
 
       const hasX = connectedAccounts.some(account => account.provider === 'x');
       if (!hasX) return { ok: true, imported: 0 };
 
-      try {
+      const task = async () => {
         const response = await fetch('/api/omnibox/x/sync', {
           method: 'POST',
           credentials: 'same-origin',
@@ -2182,22 +2207,34 @@
         if (!response.ok || !result.ok) {
           throw new Error(result.message || 'XのDMを同期できませんでした');
         }
+        if (reloadInbox) await loadLiveInbox(null, { silent: true });
+        return result;
+      };
 
-        if (reloadInbox) {
-          await loadLiveInbox();
+      if (button && !silent) {
+        try {
+          return await runWithBusy(button, task, {
+            busyText: '同期中...',
+            successMessage: result => result.imported > 0
+              ? `XのDMを同期しました（${result.imported}件を確認）`
+              : 'XのDMは最新の状態です',
+            errorMessage: 'XのDMを同期できませんでした'
+          });
+        } catch {
+          return { ok: false, imported: 0 };
         }
+      }
 
+      try {
+        const result = await task();
         if (!silent) {
           showToast(result.imported > 0
             ? `XのDMを同期しました（${result.imported}件を確認）`
-            : 'XのDMは最新の状態です');
+            : 'XのDMは最新の状態です', 'success');
         }
-
         return result;
       } catch (error) {
-        if (!silent) {
-          showToast(error.message || 'XのDMを同期できませんでした');
-        }
+        if (!silent) showToast(error.message || 'XのDMを同期できませんでした', 'error');
         return { ok: false, imported: 0 };
       }
     }
@@ -2302,6 +2339,7 @@
           isDemoSession = session.isDemo === true;
           updateHeaderUserUI();
           applyPlanAccess();
+          document.getElementById('session-loading-overlay')?.classList.add('hidden');
 
           if (isDemoSession) {
             threads = structuredClone(defaultThreads);
@@ -2319,15 +2357,14 @@
             onDataUpdated();
             showToast('所属組織を確認できません。管理者にアカウント設定をご確認ください');
           } else {
-            await loadProviderConnections();
-            await loadLiveInbox();
-            startLiveInboxRefresh();
-
-            void Promise.all([
+            await Promise.all([
+              loadProviderConnections(),
               loadTemplates(),
               loadAssignableStaff(),
-              loadSocialPosts()
+              currentPlanFeatures.socialPublishing ? loadSocialPosts() : Promise.resolve(true)
             ]);
+            await loadLiveInbox(null, { silent: true });
+            startLiveInboxRefresh();
 
             if (!providerInboxSyncStarted) {
               providerInboxSyncStarted = true;
@@ -2458,7 +2495,7 @@
           return {
             name: 'Instagram',
             color: 'bg-pink-500',
-            icon: '<i data-lucide="instagram" class="w-4 h-4 text-white stroke-[2.2]"></i>'
+            icon: '<svg viewBox="0 0 24 24" class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"></circle></svg>'
           };
         case 'x':
           return {
@@ -2504,7 +2541,7 @@
       }
 
       const platforms = [
-        { id: 'instagram', name: 'Instagram', dotColor: 'bg-pink-500', icon: '<i data-lucide="instagram" class="w-3 h-3 text-white"></i>' },
+        { id: 'instagram', name: 'Instagram', dotColor: 'bg-pink-500', icon: '<svg viewBox="0 0 24 24" class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"></circle></svg>' },
         { id: 'line', name: 'LINE公式', dotColor: 'bg-emerald-500' },
         { id: 'x', name: 'X (Twitter)', dotColor: 'bg-slate-900' },
         { id: 'email', name: 'メール', dotColor: 'bg-blue-600' }
@@ -3439,14 +3476,14 @@
                   <i data-lucide="refresh-cw" class="w-3 h-3"></i><span>Gmailを同期</span>
                 </button>`
               : acc.provider === 'x'
-                ? `<button onclick="syncXInbox({ silent: false, reloadInbox: true })" class="text-slate-700 font-medium hover:underline flex items-center gap-1">
+                ? `<button onclick="syncXInbox({ silent: false, reloadInbox: true, button: this })" class="text-slate-700 font-medium hover:underline flex items-center gap-1">
                     <i data-lucide="refresh-cw" class="w-3 h-3"></i><span>X DMを同期</span>
                   </button>`
               : acc.provider === 'instagram'
                 ? `<button onclick="showInstagramWebhookInfo('${acc.providerConnectionId || ''}')" class="text-pink-600 font-medium hover:underline flex items-center gap-1">
                     <i data-lucide="radio" class="w-3 h-3"></i><span>DM受信設定</span>
                   </button>`
-                : `<button onclick="window.testSyncAccount('${acc.id}')" class="text-teal-600 font-medium hover:underline flex items-center gap-1">
+                : `<button onclick="window.testSyncAccount('${acc.id}', this)" class="text-teal-600 font-medium hover:underline flex items-center gap-1">
                     <i data-lucide="refresh-cw" class="w-3 h-3"></i><span>再同期・疎通テスト</span>
                   </button>`}
             <div class="flex items-center gap-2">
@@ -3467,26 +3504,56 @@
     }
 
 
-    window.renameConnectedAccount = async function(accId) {
+    let renameConnectedAccountId = null;
+
+    window.renameConnectedAccount = function(accId) {
       const account = connectedAccounts.find(item => item.id === accId);
       if (!account) return;
+      renameConnectedAccountId = accId;
+      const input = document.getElementById('rename-connected-account-input');
+      if (input) input.value = account.accountName || '';
+      const modal = document.getElementById('rename-connected-account-modal');
+      modal?.classList.remove('hidden');
+      modal?.classList.add('flex');
+      setTimeout(() => {
+        input?.focus();
+        input?.select();
+      }, 0);
+      lucide.createIcons();
+    };
 
-      const name = window.prompt('連携アカウントの表示名を入力してください', account.accountName || '');
-      if (name === null) return;
-      const trimmed = name.trim();
+    window.closeRenameConnectedAccountModal = function() {
+      renameConnectedAccountId = null;
+      const modal = document.getElementById('rename-connected-account-modal');
+      modal?.classList.add('hidden');
+      modal?.classList.remove('flex');
+    };
+
+    window.saveRenamedConnectedAccount = async function(button) {
+      const account = connectedAccounts.find(item => item.id === renameConnectedAccountId);
+      const input = document.getElementById('rename-connected-account-input');
+      if (!account || !input) return;
+
+      const trimmed = input.value.trim();
       if (!trimmed) {
-        showToast('表示名を入力してください');
+        showToast('表示名を入力してください', 'warning');
+        input.focus();
+        return;
+      }
+      if (trimmed === (account.accountName || '').trim()) {
+        window.closeRenameConnectedAccountModal();
         return;
       }
 
       if (isDemoSession || !account.providerConnectionId) {
         account.accountName = trimmed;
         onDataUpdated();
-        showToast('連携アカウント名を変更しました');
+        window.closeRenameConnectedAccountModal();
+        showToast('連携アカウント名を変更しました', 'success');
         return;
       }
 
-      try {
+      await runWithBusy(button, async () => {
         const response = await fetch('/api/omnibox/connections', {
           method: 'PATCH',
           credentials: 'same-origin',
@@ -3500,13 +3567,15 @@
         if (!response.ok || !result.ok) {
           throw new Error(result.message || '連携アカウント名を変更できませんでした');
         }
-
         account.accountName = result.accountName || trimmed;
         onDataUpdated();
-        showToast('連携アカウント名を変更しました');
-      } catch (error) {
-        showToast(error.message || '連携アカウント名を変更できませんでした');
-      }
+        window.closeRenameConnectedAccountModal();
+        return result;
+      }, {
+        busyText: '変更中...',
+        successMessage: '連携アカウント名を変更しました',
+        errorMessage: '連携アカウント名を変更できませんでした'
+      }).catch(() => {});
     };
 
     window.switchConnectTab = function(mode) {
@@ -3662,12 +3731,12 @@
       if (hasMessages) {
         status.innerHTML = `
           <span class="text-emerald-700 font-semibold">受信OK</span>
-          <span class="block text-[10px] text-slate-400 mt-0.5">${escapeHtml(fields.join(', ') || 'messages')}</span>
+          <span class="block text-[10px] text-slate-400 mt-0.5">Instagram DMを受信できる状態です。</span>
         `;
       } else {
         status.innerHTML = `
-          <span class="text-amber-700 font-semibold">要再接続・再確認</span>
-          <span class="block text-[10px] text-slate-400 mt-0.5">${fields.length ? escapeHtml(fields.join(', ')) : 'subscribed_apps に有効な購読がありません'}</span>
+          <span class="text-amber-700 font-semibold">受信設定を確認してください</span>
+          <span class="block text-[10px] text-slate-400 mt-0.5">DMが届かない場合は、再確認またはアカウントの再接続をお試しください。</span>
         `;
       }
     }
@@ -3686,7 +3755,10 @@
       const modal = document.getElementById('instagram-webhook-modal');
       modal?.classList.remove('hidden');
       modal?.classList.add('flex');
-      renderInstagramSubscriptionStatus({ subscribedFields: [], messagesSubscribed: false });
+      const initialStatus = document.getElementById('instagram-subscription-status');
+      if (initialStatus) {
+        initialStatus.innerHTML = '<span class="text-slate-600 font-semibold inline-flex items-center gap-1.5"><span class="w-3 h-3 border-2 border-slate-300 border-t-pink-500 rounded-full animate-spin"></span>受信状態を確認中...</span>';
+      }
       lucide.createIcons();
 
       try {
@@ -3701,24 +3773,18 @@
         renderInstagramSubscriptionStatus(result);
       } catch (error) {
         const status = document.getElementById('instagram-subscription-status');
-        if (status) status.innerHTML = '<span class="text-amber-700 font-semibold">要再接続・再確認</span>';
+        if (status) status.innerHTML = '<span class="text-amber-700 font-semibold">受信状態を確認できませんでした</span><span class="block text-[10px] text-slate-400 mt-0.5">時間をおいて再確認するか、アカウントを再接続してください。</span>';
       }
     };
 
     window.registerInstagramWebhookSubscription = async function() {
       if (!instagramWebhookConnectionId) {
-        showToast('Instagram接続情報を確認できませんでした');
+        showToast('Instagram接続情報を確認できませんでした', 'warning');
         return;
       }
 
       const button = document.getElementById('instagram-subscription-register-button');
-      const original = button?.textContent || '受信設定を再確認';
-      if (button) {
-        button.disabled = true;
-        button.textContent = '登録中...';
-      }
-
-      try {
+      await runWithBusy(button, async () => {
         const response = await fetch('/api/omnibox/instagram/subscription', {
           method: 'POST',
           credentials: 'same-origin',
@@ -3732,19 +3798,14 @@
         }
 
         renderInstagramSubscriptionStatus(result);
-        showToast(
-          result.messagesSubscribed
-            ? 'Instagramの受信設定を再確認しました'
-            : '受信設定を確認しましたが、DM受信状態を確認できませんでした'
-        );
-      } catch (error) {
-        showToast(error.message || '受信設定を再確認できませんでした');
-      } finally {
-        if (button) {
-          button.disabled = false;
-          button.textContent = original;
-        }
-      }
+        return result;
+      }, {
+        busyText: '確認中...',
+        successMessage: result => result.messagesSubscribed
+          ? 'InstagramのDM受信設定を確認しました'
+          : '受信設定を確認しました。必要に応じてアカウントを再接続してください',
+        errorMessage: '受信設定を再確認できませんでした'
+      }).catch(() => {});
     };
 
     window.closeInstagramWebhookInfo = function() {
@@ -3768,7 +3829,7 @@
       }
     };
 
-    window.testSyncAccount = async function(accId) {
+    window.testSyncAccount = async function(accId, button = null) {
       const account = connectedAccounts.find(item => item.id === accId);
       if (!account) return;
 
@@ -3776,21 +3837,36 @@
         await syncGoogleInbox({ silent: false, reloadInbox: true });
         return;
       }
-
       if (account.provider === 'x') {
-        await syncXInbox({ silent: false, reloadInbox: true });
+        await syncXInbox({ silent: false, reloadInbox: true, button });
         return;
       }
 
-      await loadProviderConnections();
+      const task = async () => {
+        await loadProviderConnections();
+        return account;
+      };
 
-      if (account.provider === 'instagram') {
-        showToast(`「${account.accountName}」はWebhook受信待機中です`);
-      } else if (account.provider === 'line') {
-        showToast(`「${account.accountName}」のLINE接続状態を更新しました`);
-      } else {
-        showToast(`「${account.accountName}」の連携状態を更新しました`);
+      if (button) {
+        await runWithBusy(button, task, {
+          busyText: '確認中...',
+          successMessage: account.provider === 'line'
+            ? `「${account.accountName}」のLINE接続状態を更新しました`
+            : `「${account.accountName}」の連携状態を更新しました`,
+          errorMessage: '接続状態を確認できませんでした'
+        }).catch(() => {});
+        return;
       }
+
+      await task();
+      showToast(
+        account.provider === 'instagram'
+          ? `「${account.accountName}」はDM受信待機中です`
+          : account.provider === 'line'
+            ? `「${account.accountName}」のLINE接続状態を更新しました`
+            : `「${account.accountName}」の連携状態を更新しました`,
+        'success'
+      );
     };
 
     window.removeAccount = async function(accId) {
@@ -3864,6 +3940,7 @@
         showToast(`Xを含む投稿では画像は${limit}枚までです`);
       }
       renderPostImageLimitHelp();
+      window.updatePostCharacterCounter();
     };
 
     function renderPostImageLimitHelp() {
@@ -4022,10 +4099,21 @@
       if (!counter) return;
       const weighted = getXWeightedLength(content);
       const remaining = 280 - weighted;
-      counter.textContent = `${Array.from(content).length}文字 / X残り${remaining}`;
+      const hasXTarget = Array.from(document.querySelectorAll('input[name="post-target-acc"]:checked')).some(input => {
+        const account = getAccountById(input.value);
+        return account.provider === 'x' || account.platform === 'x';
+      });
+      counter.textContent = remaining < 0
+        ? `${Array.from(content).length}文字 / X ${Math.abs(remaining)}文字オーバー`
+        : `${Array.from(content).length}文字 / X残り${remaining}`;
       counter.classList.toggle('text-red-600', remaining < 0);
       counter.classList.toggle('font-bold', remaining < 0);
       counter.classList.toggle('text-slate-500', remaining >= 0);
+      const submit = document.getElementById('new-post-submit-button');
+      if (submit) {
+        submit.disabled = hasXTarget && remaining < 0;
+        submit.title = submit.disabled ? 'Xの文字数上限を超えています' : '';
+      }
     };
 
     window.submitNewPost = async function() {
@@ -4517,7 +4605,7 @@
         card.innerHTML = `
           <div>
             <div class="flex items-center justify-between gap-2 mb-2">
-              <span class="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md">${escapeHtml({general:'一般',salon:'美容・サロン',restaurant:'飲食店',ec:'EC・物販'}[tmpl.category] || tmpl.category)}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md">${escapeHtml({general:'一般',salon:'美容・サロン',restaurant:'飲食・レストラン',ec:'EC・物販',business:'士業・企業問い合わせ'}[tmpl.category] || tmpl.category)}</span>
               <div class="flex items-center gap-1">
                 <button onclick="window.copyToClipboard(decodeURIComponent('${encodedBody}'))" class="p-1.5 text-slate-400 hover:text-teal-600 rounded-lg hover:bg-teal-50" title="コピー" aria-label="定型文をコピー">
                   <i data-lucide="copy" class="w-3.5 h-3.5"></i>
@@ -4814,7 +4902,7 @@
       const label = document.getElementById('inbox-filter-label');
       if (!label) return;
       const statusLabels = {
-        all: 'すべてのステータス',
+        all: '全ステータス',
         unread: '未対応・未読',
         in_progress: '対応中',
         resolved: '対応完了'
@@ -4989,18 +5077,22 @@
         const minimum = new Date(Date.now() + 60 * 1000);
         input.min = toLocalDateTimeInputValue(minimum);
 
-        let target = new Date(Date.now() + 60 * 60 * 1000);
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+        let target = tomorrow;
         if (dateKey) {
-          const parsed = new Date(dateKey + 'T12:00:00');
+          const parsed = new Date(dateKey + 'T09:00:00');
           if (!Number.isNaN(parsed.getTime())) {
             target = parsed;
             publishCalendarCursor = new Date(parsed.getFullYear(), parsed.getMonth(), 1);
           }
         }
         if (target.getTime() <= minimum.getTime()) {
-          target = new Date(minimum.getTime() + 60 * 60 * 1000);
+          target = new Date(minimum);
+          target.setDate(target.getDate() + 1);
+          target.setHours(9, 0, 0, 0);
         }
-        target.setMinutes(Math.ceil(target.getMinutes() / 5) * 5, 0, 0);
         input.value = toLocalDateTimeInputValue(target);
       }
       window.updatePostCharacterCounter();
@@ -5022,11 +5114,24 @@
     };
 
     let toastTimeout;
-    window.showToast = function(msg) {
+    window.showToast = function(msg, type = 'success') {
       const toast = document.getElementById('toast');
       const text = document.getElementById('toast-message');
+      const icon = document.getElementById('toast-icon');
       text.textContent = msg;
 
+      const config = {
+        success: { icon: 'check-circle', className: 'text-emerald-400' },
+        warning: { icon: 'triangle-alert', className: 'text-amber-400' },
+        error: { icon: 'circle-alert', className: 'text-red-400' },
+        info: { icon: 'info', className: 'text-sky-400' }
+      }[type] || { icon: 'check-circle', className: 'text-emerald-400' };
+
+      if (icon) {
+        icon.setAttribute('data-lucide', config.icon);
+        icon.className = 'w-4 h-4 ' + config.className;
+      }
+      lucide.createIcons();
       toast.classList.remove('translate-y-16', 'opacity-0');
       toast.classList.add('translate-y-0', 'opacity-100');
 
@@ -5035,6 +5140,32 @@
         toast.classList.remove('translate-y-0', 'opacity-100');
         toast.classList.add('translate-y-16', 'opacity-0');
       }, 3500);
+    };
+
+    window.runWithBusy = async function(button, task, {
+      busyText = '処理中...',
+      successMessage = '',
+      errorMessage = '処理に失敗しました'
+    } = {}) {
+      if (!button || typeof task !== 'function') return;
+      const originalHtml = button.innerHTML;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.innerHTML = '<span class="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin shrink-0"></span><span>' + escapeHtml(busyText) + '</span>';
+      try {
+        const result = await task();
+        if (result === false) return false;
+        if (successMessage) showToast(typeof successMessage === 'function' ? successMessage(result) : successMessage, 'success');
+        return result;
+      } catch (error) {
+        showToast(error?.message || errorMessage, 'error');
+        throw error;
+      } finally {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        button.innerHTML = originalHtml;
+        lucide.createIcons();
+      }
     };
 
     window.copyToClipboard = function(text) {
@@ -5304,6 +5435,7 @@
       document.getElementById('settings-account-name').value = loggedInUser?.name || '';
       document.getElementById('settings-account-login-id').value = loggedInUser?.loginId || '';
       document.getElementById('settings-account-password').value = '';
+      document.getElementById('settings-account-current-password').value = '';
 
       const initialBanner = document.getElementById('settings-initial-organization-banner');
       if (initialBanner) {
@@ -5362,13 +5494,21 @@
       e.preventDefault();
       const name = document.getElementById('settings-account-name').value.trim();
       const password = document.getElementById('settings-account-password').value;
+      const currentPassword = document.getElementById('settings-account-current-password').value;
+      const button = e.submitter || document.getElementById('settings-account-save-button');
 
-      try {
+      if (password && !currentPassword) {
+        showToast('パスワードを変更する場合は現在のパスワードを入力してください', 'warning');
+        document.getElementById('settings-account-current-password')?.focus();
+        return;
+      }
+
+      await runWithBusy(button, async () => {
         const response = await fetch('/api/omnibox/settings/account', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, password })
+          body: JSON.stringify({ name, password, currentPassword })
         });
         const result = await response.json();
 
@@ -5379,18 +5519,21 @@
         loggedInUser.name = result.name;
         loggedInUser.avatar = result.name.slice(0, 1);
         document.getElementById('settings-account-password').value = '';
+        document.getElementById('settings-account-current-password').value = '';
         updateHeaderUserUI();
-        showToast('アカウント設定を保存しました');
-      } catch (error) {
-        showToast(error.message || 'アカウント設定を更新できませんでした');
-      }
+        return result;
+      }, {
+        busyText: '保存中...',
+        successMessage: 'アカウント設定を保存しました',
+        errorMessage: 'アカウント設定を更新できませんでした'
+      }).catch(() => {});
     };
 
     window.saveOrganizationSettings = async function(e) {
       e.preventDefault();
 
       if (loggedInUser?.roleKey !== 'owner') {
-        showToast('組織設定は管理者のみ変更できます');
+        showToast('組織設定は管理者のみ変更できます', 'warning');
         return;
       }
 
@@ -5398,8 +5541,9 @@
       const requestedLoginId = document.getElementById('settings-organization-id').value.trim().toUpperCase();
       const loginId = requiresOrganizationSetup ? requestedLoginId : (currentOrganization?.loginId || requestedLoginId);
       const wasInitialSetup = requiresOrganizationSetup;
+      const button = e.submitter || document.getElementById('settings-organization-save-button');
 
-      try {
+      await runWithBusy(button, async () => {
         const response = await fetch('/api/omnibox/settings/organization', {
           method: 'POST',
           credentials: 'same-origin',
@@ -5418,18 +5562,17 @@
         document.getElementById('settings-organization-id').value = currentOrganization.loginId || '';
         document.getElementById('settings-initial-organization-banner')?.classList.add('hidden');
 
-        await window.loadEmployees();
+        void window.loadEmployees();
 
         if (wasInitialSetup) {
-          await loadLiveInbox();
-          window.switchView('inbox');
-          showToast('初期組織設定が完了しました。OmniBoxを利用できます');
-        } else {
-          showToast('組織設定を保存しました');
+          void loadLiveInbox().then(() => window.switchView('inbox'));
         }
-      } catch (error) {
-        showToast(error.message || '組織設定を更新できませんでした');
-      }
+        return result;
+      }, {
+        busyText: '保存中...',
+        successMessage: wasInitialSetup ? '初期組織設定を保存しました' : '組織設定を保存しました',
+        errorMessage: '組織設定を更新できませんでした'
+      }).catch(() => {});
     };
 
     window.loadEmployees = async function() {
