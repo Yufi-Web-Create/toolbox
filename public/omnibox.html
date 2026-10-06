@@ -1575,6 +1575,7 @@
     let instagramWebhookConnectionId = null;
     let liveInboxEventSource = null;
     let liveInboxEventDebounceTimer = null;
+    let liveInboxFallbackTimer = null;
     let liveInboxRefreshInFlight = false;
     let liveInboxInitialized = false;
     let inboxLoading = true;
@@ -2130,6 +2131,16 @@
         // EventSource reconnects automatically. Keep the current UI state intact.
       };
 
+      liveInboxFallbackTimer = window.setInterval(async () => {
+        if (document.hidden || liveInboxRefreshInFlight || !loggedInUser) return;
+        liveInboxRefreshInFlight = true;
+        try {
+          await loadLiveInbox(currentThreadId, { silent: true });
+        } finally {
+          liveInboxRefreshInFlight = false;
+        }
+      }, 15000);
+
       document.removeEventListener('visibilitychange', handleInboxVisibilityRefresh);
       document.addEventListener('visibilitychange', handleInboxVisibilityRefresh);
     }
@@ -2152,6 +2163,8 @@
       }
       window.clearTimeout(liveInboxEventDebounceTimer);
       liveInboxEventDebounceTimer = null;
+      if (liveInboxFallbackTimer) window.clearInterval(liveInboxFallbackTimer);
+      liveInboxFallbackTimer = null;
       document.removeEventListener('visibilitychange', handleInboxVisibilityRefresh);
     }
 
