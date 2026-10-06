@@ -151,6 +151,10 @@ export function getBridgeConfiguration(env = process.env) {
     vapidSubject:
       env.MATOMEET_VAPID_SUBJECT?.trim() ||
       "https://omnibox-line-bridge.onrender.com",
+    lineOrganizationIds: (env.MATOMEET_LINE_ORGANIZATION_IDS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => isUuid(value)),
     port: Number.parseInt(env.PORT ?? "8787", 10) || 8787,
   };
 }
@@ -400,7 +404,7 @@ async function storeProviderConfig(fetchImpl, config, organizationId, providerCo
 
 async function loadProviderConfig(fetchImpl, config, organizationId, force = false) {
   const cached = cachedProviderConfigs.get(organizationId);
-  if (!force && cached?.value && Date.now() < cached.until) {
+  if (!force && cached?.value) {
     return cached.value;
   }
 
@@ -1445,11 +1449,29 @@ export function createLineBridgeServer({
 
 export function startLineBridge(options = {}) {
   const env = options.env ?? process.env;
-  const server = createLineBridgeServer(options);
-  const port = getBridgeConfiguration(env).port;
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const config = getBridgeConfiguration(env);
+  const server = createLineBridgeServer({ ...options, env, fetchImpl });
+  const port = config.port;
 
   server.listen(port, () => {
     console.log(`LINE bridge listening on port ${port}`);
+
+    for (const organizationId of config.lineOrganizationIds) {
+      void (async () => {
+        const providerConfig = await loadProviderConfig(
+          fetchImpl,
+          config,
+          organizationId,
+          true,
+        );
+        if (!providerConfig) return;
+        await issueStatelessLineToken(fetchImpl, providerConfig, organizationId);
+        console.log(`LINE connection warmed: organization=${organizationId}`);
+      })().catch(() => {
+        console.log(`LINE connection warmup failed: organization=${organizationId}`);
+      });
+    }
   });
 
   return server;
