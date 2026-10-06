@@ -1093,56 +1093,69 @@ async function handleLineWebhook({ request, response, config, fetchImpl, organiz
   }
 
   const events = Array.isArray(payload?.events) ? payload.events : [];
-  const lineAccessToken = await issueStatelessLineToken(fetchImpl, providerConfig, organizationId);
-  let shouldNotifyPush = false;
 
-  const messageTypes = events
-    .filter((event) => event?.type === "message")
-    .map((event) => String(event?.message?.type ?? "unknown"));
-  if (messageTypes.length > 0) {
-    console.log(`LINE webhook message types: ${messageTypes.join(",")}`);
-  }
-
-  for (const event of events) {
-    const normalized = normalizeLineMessageEvent(event);
-    if (!normalized) {
-      if (event?.type === "message") {
-        console.log(
-          `LINE webhook message ignored: type=${String(event?.message?.type ?? "unknown")} source=${String(event?.source?.type ?? "unknown")}`,
-        );
-      }
-      continue;
-    }
-
-    const profile = await fetchLineProfile(
-      fetchImpl,
-      lineAccessToken,
-      normalized.customerExternalId,
-    );
-
-    const { response: persistResponse } = await signedEdgeRequest(fetchImpl, config, {
-      action: "inbound",
-      organizationId,
-      ...normalized,
-      customerDisplayName: profile.displayName,
-      customerAvatarUrl: profile.pictureUrl,
-    });
-
-    if (!persistResponse.ok) {
-      console.log(`LINE inbound persistence failed: type=${normalized.messageType}`);
-      throw new Error("inbound persistence failed");
-    }
-    console.log(`LINE inbound persisted: type=${normalized.messageType}`);
-    shouldNotifyPush = true;
-  }
-
+  // LINE expects webhook endpoints to acknowledge quickly. Do not wait for
+  // profile lookups, token issuance, persistence, or push delivery before 200.
   sendJson(response, 200, { ok: true });
 
-  if (shouldNotifyPush) {
-    void notifyPushSubscribers(fetchImpl, config, organizationId).catch(() => {
-      console.log("Push notification fanout failed");
-    });
-  }
+  void (async () => {
+    const lineAccessToken = await issueStatelessLineToken(
+      fetchImpl,
+      providerConfig,
+      organizationId,
+    );
+    let shouldNotifyPush = false;
+
+    const messageTypes = events
+      .filter((event) => event?.type === "message")
+      .map((event) => String(event?.message?.type ?? "unknown"));
+    if (messageTypes.length > 0) {
+      console.log(`LINE webhook message types: ${messageTypes.join(",")}`);
+    }
+
+    for (const event of events) {
+      const normalized = normalizeLineMessageEvent(event);
+      if (!normalized) {
+        if (event?.type === "message") {
+          console.log(
+            `LINE webhook message ignored: type=${String(event?.message?.type ?? "unknown")} source=${String(event?.source?.type ?? "unknown")}`,
+          );
+        }
+        continue;
+      }
+
+      const profile = await fetchLineProfile(
+        fetchImpl,
+        lineAccessToken,
+        normalized.customerExternalId,
+      );
+
+      const { response: persistResponse } = await signedEdgeRequest(fetchImpl, config, {
+        action: "inbound",
+        organizationId,
+        ...normalized,
+        customerDisplayName: profile.displayName,
+        customerAvatarUrl: profile.pictureUrl,
+      });
+
+      if (!persistResponse.ok) {
+        console.log(`LINE inbound persistence failed: type=${normalized.messageType}`);
+        throw new Error("inbound persistence failed");
+      }
+
+      console.log(`LINE inbound persisted: type=${normalized.messageType}`);
+      shouldNotifyPush = true;
+    }
+
+    if (shouldNotifyPush) {
+      await notifyPushSubscribers(fetchImpl, config, organizationId);
+    }
+  })().catch((error) => {
+    console.error(
+      "LINE webhook background processing failed",
+      error instanceof Error ? error.message : "unknown_error",
+    );
+  });
 }
 
 async function handleLineProfile({ request, response, config, fetchImpl }) {
