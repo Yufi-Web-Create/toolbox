@@ -74,7 +74,8 @@ Deno.serve(async (req) => {
     typeof payload.organizationId === "string" ? payload.organizationId.trim() : "";
   const operatorAction =
     payload.action === "store-operator-config" ||
-    payload.action === "get-operator-config";
+    payload.action === "get-operator-config" ||
+    payload.action === "list-line-configs";
 
   if (!operatorAction && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(organizationId)) {
     return json(400, { ok: false, error: "invalid_organization_id" });
@@ -159,6 +160,17 @@ Deno.serve(async (req) => {
     if (!data) return json(404, { ok: false, error: "config_not_found" });
 
     return json(200, { ok: true, config: data });
+  }
+
+  if (payload.action === "list-line-configs") {
+    const { data, error } = await supabase
+      .from("provider_connections")
+      .select("organization_id, encrypted_key, encrypted_payload, iv, auth_tag, updated_at")
+      .eq("provider", "line")
+      .eq("status", "active");
+
+    if (error) return json(500, { ok: false, error: "config_list_failed" });
+    return json(200, { ok: true, configs: data ?? [] });
   }
 
 
