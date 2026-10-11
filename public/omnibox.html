@@ -70,6 +70,46 @@
     .border-slate-100 { border-color: #EEE4E6 !important; }
     .text-slate-400 { color: #7D7074 !important; }
     .text-slate-500 { color: #685D60 !important; }
+    .plan-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-width: 0;
+      height: 100%;
+      padding: 24px 18px;
+      text-align: center;
+      border: 1px solid #EDE5E7;
+      border-radius: 20px;
+      background: #fff;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+    .plan-card:hover { border-color: #B94A61; }
+    .plan-card:focus-visible { outline: 3px solid #B94A61; outline-offset: 3px; }
+    .plan-card[aria-pressed="true"] {
+      border-color: #B94A61;
+      background: #FFF7F8;
+      box-shadow: 0 0 0 1px #B94A61;
+    }
+    .plan-card-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 26px;
+      margin-bottom: 12px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: #F6EFEF;
+      color: #685D60;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .plan-card[aria-pressed="true"] .plan-card-label { background: #B94A61; color: #fff; }
+    .plan-card-description { min-height: 44px; margin-top: 10px; font-size: 12px; line-height: 1.8; color: #685D60; }
+    .plan-card-features { width: 100%; margin: 20px 0; padding: 18px 0 0; border-top: 1px solid #EDE5E7; list-style: none; }
+    .plan-card-features li { margin-bottom: 10px; font-size: 12px; line-height: 1.7; color: #51464A; }
+    .plan-card-action { width: 100%; margin-top: auto; padding: 10px 12px; border-radius: 12px; background: #FDECEF; color: #8E4F59; font-size: 12px; font-weight: 700; }
+    .plan-card[aria-pressed="true"] .plan-card-action { background: #B94A61; color: #fff; }
     @keyframes pulse-subtle {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
@@ -915,7 +955,7 @@
               <span id="current-plan-badge" class="text-xs px-3 py-1.5 rounded-full bg-brand-50 text-brand-800 border border-brand-100 font-bold">スタンダード</span>
             </div>
 
-            <div id="plan-options-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3"></div>
+            <div id="plan-options-grid" class="grid grid-cols-1 lg:grid-cols-3 gap-4"></div>
 
             <div class="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-600 leading-relaxed">
               プラン変更後、利用可能な機能は即時切り替わります。既存の会話・連携データは削除されず、上位プランへ戻すと再び利用できます。
@@ -1550,21 +1590,27 @@
     const planCatalog = {
       lite: {
         name: 'ライト',
-        price: '¥9,800/月',
-        description: '問い合わせ管理を小さく開始',
-        features: ['LINE問い合わせ', '利用3名まで', 'SNS投稿なし']
+        price: '無料',
+        priceNote: '月額0円',
+        label: 'まずは気軽に',
+        description: 'LINEの問い合わせをまとめて、<br>日々の対応をすっきり。',
+        features: ['LINEの問い合わせ管理', '定型文・社内メモ', '管理者を含め3名まで', 'SNS投稿・AI機能は対象外']
       },
       standard: {
         name: 'スタンダード',
-        price: '¥29,800/月',
-        description: '問い合わせとSNS投稿を一元化',
-        features: ['Instagram・X・LINE問い合わせ', 'Instagram・X予約投稿', '利用人数無制限']
+        price: '¥6,980',
+        priceNote: '月額・税込',
+        label: '日々の運用に',
+        description: '問い合わせ対応とSNS投稿を、<br>ひとつの場所で管理。',
+        features: ['ライトの基本機能', 'Instagram・Xの問い合わせ管理', 'SNSの予約投稿・下書き保存', '利用人数の制限なし']
       },
       pro: {
         name: 'プロ',
-        price: '¥44,800/月',
-        description: 'スタンダード + AI応答枠',
-        features: ['スタンダード全機能', 'AI応答 月500件', 'AI返信案を受信箱で生成']
+        price: '¥19,800',
+        priceNote: '月額・税込',
+        label: 'AIで対応をもっと楽に',
+        description: '返信や投稿の文章づくりをAIに。<br>チームの作業時間を減らします。',
+        features: ['スタンダードの全機能', 'AIで返信案を作成', 'AIで投稿文作成・X用文章へ変換', 'AIの利用枠：月500回']
       },
     };
 
@@ -1802,16 +1848,16 @@
       grid.innerHTML = Object.entries(planCatalog).map(([key, plan]) => {
         const active = key === currentPlan;
         return `
-          <button type="button" onclick="changeOrganizationPlan('${key}')" class="text-left p-3 rounded-xl border transition h-full flex flex-col justify-start self-stretch ${active ? 'border-brand-400 bg-brand-50 ring-1 ring-brand-200' : 'border-[#EDE5E7] bg-white hover:border-brand-300'}">
-            <div class="flex items-start justify-between gap-2">
-              <div class="font-bold text-xs ${active ? 'text-brand-900' : 'text-slate-800'}">${plan.name}</div>
-              ${active ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-brand-600 text-white">現在</span>' : ''}
-            </div>
-            <div class="text-sm font-bold text-slate-900 mt-1">${plan.price}</div>
-            <div class="text-[10px] text-slate-500 mt-1">${plan.description}</div>
-            <ul class="mt-2 space-y-1">
-              ${plan.features.map(feature => `<li class="text-[10px] text-slate-600">・${feature}</li>`).join('')}
+          <button type="button" onclick="changeOrganizationPlan('${key}')" class="plan-card" aria-pressed="${active}" aria-label="${plan.name}、${plan.price}、${plan.priceNote}${active ? '、現在のプラン' : 'を選ぶ'}">
+            <span class="plan-card-label">${active ? 'ご利用中' : plan.label}</span>
+            <span class="font-bold text-base text-slate-800">${plan.name}</span>
+            <span class="text-3xl font-bold text-slate-900 mt-4 whitespace-nowrap">${plan.price}</span>
+            <span class="text-xs text-slate-500 mt-2">${plan.priceNote}</span>
+            <span class="plan-card-description">${plan.description}</span>
+            <ul class="plan-card-features">
+              ${plan.features.map(feature => `<li>${feature}</li>`).join('')}
             </ul>
+            <span class="plan-card-action">${active ? '現在のプラン' : 'このプランを選ぶ'}</span>
           </button>
         `;
       }).join('');
@@ -1827,7 +1873,7 @@
       if (!planCatalog[plan] || plan === currentPlan) return;
 
       const next = planCatalog[plan];
-      if (!window.confirm(`${next.name}（${next.price}）へ変更しますか？\n現在は支払い処理なしで即時反映されます。`)) {
+      if (!window.confirm(`${next.name}（${next.price}・${next.priceNote}）へ変更しますか？\n現在は支払い処理なしで即時反映されます。`)) {
         return;
       }
 
