@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       const { data: conversation, error: conversationError } = await supabase
         .from("conversations")
         .select(
-          "id, organization_id, provider, provider_connection_id, provider_thread_id, customer_external_id, customer_display_name, customer_avatar_url, customer_name_source, assignee_user_id, status, last_message_preview, last_message_at, created_at, updated_at",
+          "id, organization_id, provider, provider_connection_id, provider_thread_id, customer_external_id, customer_display_name, customer_avatar_url, provider_metadata, customer_name_source, assignee_user_id, status, last_message_preview, last_message_at, created_at, updated_at",
         )
         .eq("id", conversationId)
         .eq("organization_id", organizationId)
@@ -240,6 +240,19 @@ export async function PATCH(request: Request) {
       }
 
       updates.assignee_user_id = assigneeUserId;
+    }
+
+    if ("tags" in body) {
+      if (!Array.isArray(body.tags) || body.tags.length > 12 ||
+          body.tags.some((tag: unknown) => typeof tag !== "string" || tag.trim().length > 24 || !tag.trim())) {
+        return NextResponse.json({ ok: false, error: "invalid_tags" }, { status: 400 });
+      }
+      const tags = [...new Set((body.tags as string[]).map((tag) => tag.trim()))];
+      const { data: existing, error: metadataError } = await supabase
+        .from("conversations").select("provider_metadata")
+        .eq("id", conversationId).eq("organization_id", organizationId).maybeSingle();
+      if (metadataError || !existing) return NextResponse.json({ ok: false, error: "conversation_unavailable" }, { status: 404 });
+      updates.provider_metadata = { ...(existing.provider_metadata || {}), customer_tags: tags };
     }
 
     if (Object.keys(updates).length === 1) {
