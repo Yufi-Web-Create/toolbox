@@ -3174,7 +3174,7 @@
           : '';
       
       document.getElementById('chat-recipient-account-badge').textContent = acc?.accountName || meta.name;
-      document.getElementById('chat-customer-last-active').textContent = `データ取得: ${thread.lastTime || '時刻不明'}`;
+      document.getElementById('chat-customer-last-active').textContent = `最終メッセージ: ${thread.lastTime || '時刻不明'}`;
 
       const channelBadge = document.getElementById('chat-customer-channel-badge');
       channelBadge.className = `absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] text-white font-bold ${meta.color}`;
