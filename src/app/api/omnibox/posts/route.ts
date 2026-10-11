@@ -73,7 +73,7 @@ export async function GET() {
     const { data, error } = await ctx.supabase
       .from("social_posts")
       .select(
-        "id, content, media_url, media_urls, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
+        "id, content, x_content, media_url, media_urls, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
       )
       .eq("organization_id", ctx.organizationId)
       .order("created_at", { ascending: false })
@@ -115,6 +115,7 @@ export async function POST(request: Request) {
     const payload = await request.json();
     const content =
       typeof payload?.content === "string" ? payload.content.trim() : "";
+    const xContent = typeof payload?.xContent === "string" ? payload.xContent.trim() : "";
     const mediaUrls = Array.isArray(payload?.mediaUrls)
       ? [...new Set(
           payload.mediaUrls
@@ -215,6 +216,10 @@ export async function POST(request: Request) {
       );
     }
 
+    if (includesX && (!xContent || xContent.length > 5000)) {
+      return NextResponse.json({ ok: false, message: "X用の投稿本文を入力してください。" }, { status: 400 });
+    }
+
     if (includesX && mediaUrls.length > 4) {
       return NextResponse.json(
         { ok: false, message: "X投稿の画像は4枚までです。" },
@@ -228,6 +233,7 @@ export async function POST(request: Request) {
         organization_id: ctx.organizationId,
         created_by: ctx.userId,
         content,
+        x_content: includesX ? xContent : null,
         media_url: mediaUrl || null,
         media_urls: mediaUrls,
         target_connection_ids: targetConnectionIds,
@@ -236,7 +242,7 @@ export async function POST(request: Request) {
         status: timing === "schedule" ? "scheduled" : "publishing",
       })
       .select(
-        "id, content, media_url, media_urls, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
+        "id, content, x_content, media_url, media_urls, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
       )
       .single();
 
@@ -278,7 +284,7 @@ export async function POST(request: Request) {
     const { data: refreshed } = await ctx.supabase
       .from("social_posts")
       .select(
-        "id, content, media_url, media_urls, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
+        "id, content, x_content, media_url, media_urls, target_connection_ids, scheduled_at, status, results, last_error, created_at, published_at",
       )
       .eq("id", post.id)
       .maybeSingle();
