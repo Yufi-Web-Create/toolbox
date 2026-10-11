@@ -3004,6 +3004,34 @@
       } catch {}
     };
 
+    const avatarRefreshPending = new Set();
+    window.refreshSocialAvatar = async function(thread) {
+      if (isDemoSession || !thread?.liveConversationId ||
+          !['instagram', 'x'].includes(thread.channel) || thread.avatar ||
+          avatarRefreshPending.has(thread.liveConversationId)) return;
+      avatarRefreshPending.add(thread.liveConversationId);
+      try {
+        const response = await fetch('/api/omnibox/customer/avatar-refresh', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId: thread.liveConversationId })
+        });
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!result.ok || !result.customerAvatarUrl) return;
+        thread.avatar = result.customerAvatarUrl;
+        if (thread.customerNameSource !== 'custom' && result.customerDisplayName)
+          thread.customerName = result.customerDisplayName;
+        renderThreadList();
+        if (thread.id === currentThreadId) updateActiveChatPane(thread);
+      } catch (error) {
+        console.warn('Customer avatar refresh unavailable', error);
+      } finally {
+        avatarRefreshPending.delete(thread.liveConversationId);
+      }
+    };
+
     async function loadConversationDetail(id) {
       const thread = threads.find(t => t.id === id);
       if (!thread?.liveConversationId) return thread;
@@ -3070,6 +3098,7 @@
 
         if (!thread.avatar) {
           await window.refreshCustomerProfile(thread);
+          await window.refreshSocialAvatar(thread);
         }
 
         return thread;
