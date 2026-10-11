@@ -298,6 +298,7 @@ export default async function MasterPage({
               x?.scopes ?? [
                 "tweet.read",
                 "tweet.write",
+                "media.write",
                 "users.read",
                 "dm.read",
                 "dm.write",
