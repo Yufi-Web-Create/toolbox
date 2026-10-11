@@ -1277,6 +1277,7 @@
 
       <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
         <button onclick="closeNewPostModal()" class="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl">キャンセル</button>
+        <button id="new-post-save-draft" type="button" onclick="saveSocialPostDraft()" class="px-4 py-2 text-xs font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-xl">下書き保存</button>
         <button id="new-post-submit-button" onclick="submitNewPost()" class="px-5 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">投稿を設定する</button>
       </div>
     </div>
@@ -1589,6 +1590,8 @@
     let threads = [];
     let connectedAccounts = [];
     let scheduledPosts = [];
+    let editingSocialDraftId = null;
+    let existingDraftMediaUrls = [];
     let currentThreadId = null;
     let currentStatusFilter = 'all';
     let currentAccountFilter = 'all';
@@ -2484,6 +2487,8 @@
           return {
             id: post.id,
             content: post.content,
+            xContent: post.x_content || '',
+            targetConnectionIds: targets,
             mediaUrl: post.media_url || '',
             mediaUrls: Array.isArray(post.media_urls) ? post.media_urls : (post.media_url ? [post.media_url] : []),
             channels,
@@ -4586,6 +4591,58 @@
       finally { button.disabled = false; }
     };
 
+    window.saveSocialPostDraft = async function() {
+      const button = document.getElementById('new-post-save-draft');
+      const content = document.getElementById('new-post-content')?.value || '';
+      const xContent = document.getElementById('new-post-x-content')?.value || '';
+      const selected = Array.from(document.querySelectorAll('input[name="post-target-acc"]:checked'));
+      const targetConnectionIds = selected.map(input => getAccountById(input.value)?.providerConnectionId).filter(Boolean);
+      if (!content.trim() && !xContent.trim() && !selectedPostImages.length && !existingDraftMediaUrls.length) {
+        showToast('保存する文章または画像を入力してください');
+        return;
+      }
+      if (button) button.disabled = true;
+      try {
+        const mediaUrls = [...existingDraftMediaUrls, ...await uploadSelectedPostImages()];
+        if (isDemoSession) {
+          const id = editingSocialDraftId || 'draft-' + Date.now();
+          const item = { id, content, xContent, targetConnectionIds, mediaUrls, mediaUrl: mediaUrls[0] || '', channels: selected.map(input => getAccountById(input.value)?.accountName || '投稿先'), scheduledAt: '未設定', status: '下書き', statusKey: 'draft', createdAt: new Date().toISOString() };
+          scheduledPosts = [item, ...scheduledPosts.filter(post => post.id !== id)];
+        } else {
+          const response = await fetch('/api/omnibox/posts', { method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ saveAsDraft: true, draftId: editingSocialDraftId, content, xContent, mediaUrls, targetConnectionIds }) });
+          const result = await response.json();
+          if (!response.ok || !result.ok) throw new Error(result.message || '下書きを保存できませんでした');
+          await loadSocialPosts();
+        }
+        editingSocialDraftId = null;
+        existingDraftMediaUrls = [];
+        selectedPostTargetIds.clear();
+        clearSelectedPostImages();
+        document.getElementById('new-post-content').value = '';
+        document.getElementById('new-post-x-content').value = '';
+        document.getElementById('new-post-ai-brief').value = '';
+        document.getElementById('new-post-modal')?.classList.add('hidden');
+        renderScheduledPosts();
+        showToast('下書きを保存しました');
+      } catch(error) { showToast(error.message || '下書きを保存できませんでした', 'error'); }
+      finally { if (button) button.disabled = false; }
+    };
+
+    window.editSocialPostDraft = function(id) {
+      const post = scheduledPosts.find(item => item.id === id && item.statusKey === 'draft');
+      if (!post) return;
+      editingSocialDraftId = id;
+      existingDraftMediaUrls = [...(post.mediaUrls || [])];
+      selectedPostTargetIds = new Set(connectedAccounts.filter(acc => post.targetConnectionIds?.includes(acc.providerConnectionId)).map(acc => acc.id));
+      window.openNewPostModal();
+      document.getElementById('new-post-content').value = post.content || '';
+      document.getElementById('new-post-x-content').value = post.xContent || '';
+      window.updatePostCharacterCounter();
+      showToast('下書きを編集中です。画像は保存済みのものを保持します');
+    };
+
     window.submitNewPost = async function() {
       const content = document.getElementById('new-post-content').value.trim();
       const xContent = document.getElementById('new-post-x-content')?.value.trim() || '';
@@ -4675,7 +4732,7 @@
         .filter(Boolean);
 
       try {
-        const mediaUrls = await uploadSelectedPostImages();
+        const mediaUrls = [...existingDraftMediaUrls, ...await uploadSelectedPostImages()];
         const response = await fetch('/api/omnibox/posts', {
           method: 'POST',
           credentials: 'same-origin',
@@ -4708,6 +4765,11 @@
         if (briefInput) briefInput.value = '';
         selectedPostTargetIds.clear();
         clearSelectedPostImages();
+        if (editingSocialDraftId) {
+          await fetch('/api/omnibox/posts?id=' + encodeURIComponent(editingSocialDraftId), { method: 'DELETE', credentials: 'same-origin' });
+        }
+        editingSocialDraftId = null;
+        existingDraftMediaUrls = [];
         await loadSocialPosts();
         showPostSuccess(timing);
       } catch (error) {
@@ -4953,7 +5015,7 @@
       const container = document.getElementById('scheduled-posts-list');
       if (!container) return;
       container.innerHTML = '';
-      document.getElementById('scheduled-count').textContent = scheduledPosts.length;
+      document.getElementById('scheduled-count').textContent = scheduledPosts.filter(post => post.statusKey !== 'draft').length;
       renderPublishCalendar();
 
       if (scheduledPosts.length === 0) {
@@ -4970,11 +5032,14 @@
               ${(post.channels || []).map(ch => `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700">${ch}</span>`).join('')}
               <span class="text-xs text-brand-700 font-semibold flex items-center gap-1">
                 <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
-                ${post.scheduledAt} 配信
+                ${post.statusKey === 'draft' ? '下書き・未公開' : post.scheduledAt + ' 配信'}
               </span>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-[10px] px-2 py-0.5 rounded-full ${post.statusKey === 'published' ? 'bg-emerald-100 text-emerald-800' : post.statusKey === 'failed' || post.statusKey === 'partial_failed' ? 'bg-red-100 text-red-700' : post.statusKey === 'cancelled' ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-800'} font-bold">${post.status}</span>
+              ${post.statusKey === 'draft' ? `
+                <button type="button" onclick="editSocialPostDraft('${post.id}')" class="text-xs text-brand-700 hover:underline">編集</button>
+                <button type="button" onclick="cancelPost('${post.id}')" class="text-xs text-red-600 hover:underline">削除</button>` : ''}
               ${post.statusKey === 'scheduled' ? `
                 <button onclick="window.cancelPost('${post.id}')" class="text-xs text-red-500 hover:text-red-700 p-1" title="予約を取り消す">
                   <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -4998,7 +5063,7 @@
       if (isDemoSession) {
         scheduledPosts = scheduledPosts.filter(p => p.id !== postId);
         renderScheduledPosts();
-        showToast('デモ用の予約投稿を取り消しました');
+        showToast('投稿データを削除しました');
         return;
       }
 
@@ -5017,7 +5082,7 @@
         }
 
         await loadSocialPosts();
-        showToast('予約投稿を取り消しました');
+        showToast('投稿データを削除しました');
       } catch (error) {
         showToast(error.message || '予約投稿を取り消せませんでした');
       }
@@ -5714,6 +5779,7 @@
       const xDraft = document.getElementById('new-post-x-content')?.value.trim() || '';
       const hasDraft = Boolean(content || brief || xDraft || selectedPostImages.length);
       if (!force && hasDraft && !window.confirm('入力中の投稿内容を破棄して閉じますか？')) return;
+      if (!force) { editingSocialDraftId = null; existingDraftMediaUrls = []; }
       if (!force && hasDraft) {
         const postContent = document.getElementById('new-post-content');
         const aiBrief = document.getElementById('new-post-ai-brief');
