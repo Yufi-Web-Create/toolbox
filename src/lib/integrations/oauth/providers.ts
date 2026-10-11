@@ -153,8 +153,8 @@ export async function getProviderConfig(
       clientSecret,
       authorizeUrl: "https://x.com/i/oauth2/authorize",
       tokenUrl: "https://api.x.com/2/oauth2/token",
-      scopes:
-        stored?.scopes?.length
+      scopes: Array.from(new Set([
+        ...(stored?.scopes?.length
           ? stored.scopes
           : scopeEnv("OMNIBOX_X_SCOPES", [
               "tweet.read",
@@ -163,7 +163,9 @@ export async function getProviderConfig(
               "dm.read",
               "dm.write",
               "offline.access",
-            ]),
+            ])),
+        "media.write",
+      ])),
       redirectUri,
     };
   }
