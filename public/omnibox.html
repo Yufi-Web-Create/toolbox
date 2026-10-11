@@ -1565,18 +1565,6 @@
         description: 'スタンダード + AI応答枠',
         features: ['スタンダード全機能', 'AI応答 月500件', 'AI返信案を受信箱で生成']
       },
-      premium: {
-        name: 'プレミアム',
-        price: '¥98,000/月',
-        description: '多店舗・大規模運用向け',
-        features: ['AI応答 月1,500件', '3店舗分', '多店舗機能は今後実装']
-      },
-      enterprise: {
-        name: 'エンタープライズ',
-        price: '個別見積もり',
-        description: '専用環境・カスタマイズ',
-        features: ['全機能', '専用環境/SLA', '個別機能は今後実装']
-      }
     };
 
     let providerInboxSyncStarted = false;
@@ -1805,13 +1793,13 @@
       const badge = document.getElementById('current-plan-badge');
       if (!grid || !badge) return;
 
-      const current = planCatalog[currentPlan] || planCatalog.standard;
+      const current = planCatalog[currentPlan] || planCatalog.pro;
       badge.textContent = current.name;
 
       grid.innerHTML = Object.entries(planCatalog).map(([key, plan]) => {
         const active = key === currentPlan;
         return `
-          <button type="button" onclick="changeOrganizationPlan('${key}')" class="text-left p-3 rounded-xl border transition ${active ? 'border-brand-400 bg-brand-50 ring-1 ring-brand-200' : 'border-[#EDE5E7] bg-white hover:border-brand-300'}">
+          <button type="button" onclick="changeOrganizationPlan('${key}')" class="text-left p-3 rounded-xl border transition h-full flex flex-col justify-start self-stretch ${active ? 'border-brand-400 bg-brand-50 ring-1 ring-brand-200' : 'border-[#EDE5E7] bg-white hover:border-brand-300'}">
             <div class="flex items-start justify-between gap-2">
               <div class="font-bold text-xs ${active ? 'text-brand-900' : 'text-slate-800'}">${plan.name}</div>
               ${active ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-brand-600 text-white">現在</span>' : ''}
