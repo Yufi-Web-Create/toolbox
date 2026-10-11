@@ -566,6 +566,16 @@
                   <i data-lucide="more-horizontal" class="w-4 h-4"></i>
                 </button>
                 <div id="conversation-actions-menu" class="hidden absolute right-0 top-full mt-1 w-44 bg-white border border-[#EDE5E7] rounded-xl shadow-xl p-1 z-40">
+                  <button type="button" onclick="closeConversationActionsMenu(); updateCurrentThreadStatus('unread')" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-50 text-left">
+                    <i data-lucide="circle-dot" class="w-3.5 h-3.5"></i><span>未対応に戻す</span>
+                  </button>
+                  <button type="button" onclick="closeConversationActionsMenu(); updateCurrentThreadStatus('in_progress')" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-50 text-left">
+                    <i data-lucide="clock-3" class="w-3.5 h-3.5"></i><span>対応中にする</span>
+                  </button>
+                  <button type="button" onclick="closeConversationActionsMenu(); updateCurrentThreadStatus('resolved')" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-50 text-left">
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i><span>対応完了にする</span>
+                  </button>
+                  <div class="border-t border-slate-100 my-1"></div>
                   <button type="button" onclick="closeConversationActionsMenu(); openDeleteConversationModal()" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-red-600 hover:bg-red-50 text-left">
                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     <span>迷惑スレッドを削除</span>
@@ -5636,6 +5646,14 @@
       const brief = document.getElementById('new-post-ai-brief')?.value.trim() || '';
       const hasDraft = Boolean(content || brief || selectedPostImages.length);
       if (!force && hasDraft && !window.confirm('入力中の投稿内容を破棄して閉じますか？')) return;
+      if (!force && hasDraft) {
+        const postContent = document.getElementById('new-post-content');
+        const aiBrief = document.getElementById('new-post-ai-brief');
+        if (postContent) postContent.value = '';
+        if (aiBrief) aiBrief.value = '';
+        clearSelectedPostImages();
+        window.updatePostCharacterCounter();
+      }
       modal?.classList.add('hidden');
     };
 
