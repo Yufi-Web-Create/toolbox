@@ -2258,6 +2258,7 @@
             assignee: assignableStaff.find(staff => staff.id === conversation.assignee_user_id)?.name || '未割り当て',
             lastMessage: conversation.last_message_preview || '',
             lastTime: formatLiveTime(conversation.last_message_at),
+            fetchedAt: new Date().toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
             unreadCount: conversation.status === 'unread' && !viewedConversationIds.has(conversation.id) ? 1 : 0,
             userTags: Array.isArray(conversation.provider_metadata?.customer_tags) ? conversation.provider_metadata.customer_tags.filter(tag => typeof tag === 'string') : [],
             tags: [meta.name, matchedAccount?.accountName || '実データ', ...(Array.isArray(conversation.provider_metadata?.customer_tags) ? conversation.provider_metadata.customer_tags.filter(tag => typeof tag === 'string') : [])],
@@ -3073,6 +3074,7 @@
           thread.customerHandle = conversation.customer_external_id || thread.customerHandle;
           thread.lastMessage = conversation.last_message_preview || thread.lastMessage;
           thread.lastTime = formatLiveTime(conversation.last_message_at);
+          thread.fetchedAt = new Date().toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
           thread.status = conversation.status === 'completed' ? 'resolved' : conversation.status;
         }
 
@@ -3174,7 +3176,7 @@
           : '';
       
       document.getElementById('chat-recipient-account-badge').textContent = acc?.accountName || meta.name;
-      document.getElementById('chat-customer-last-active').textContent = `最終メッセージ: ${thread.lastTime || '時刻不明'}`;
+      document.getElementById('chat-customer-last-active').textContent = thread.fetchedAt ? `データ取得: ${thread.fetchedAt}` : '';
 
       const channelBadge = document.getElementById('chat-customer-channel-badge');
       channelBadge.className = `absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] text-white font-bold ${meta.color}`;
