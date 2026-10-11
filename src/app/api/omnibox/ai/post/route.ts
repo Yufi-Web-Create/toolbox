@@ -32,6 +32,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const brief = typeof body?.brief === "string" ? body.brief.trim() : "";
+    const xTarget = body?.target === "x";
 
     if (!brief) {
       return NextResponse.json(
@@ -121,7 +122,9 @@ export async function POST(request: Request) {
         model: aiRuntime.model,
         store: false,
         instructions:
-          "あなたは店舗・事業者向けSNS投稿文アシスタントです。ユーザーが入力した事実だけを使い、InstagramとXの両方で違和感なく使える自然な日本語の投稿文を1案作成してください。未確認の価格・営業時間・在庫・キャンペーン条件などを勝手に補完しないでください。必要に応じて読みやすい改行と関連性の高いハッシュタグを加えてください。説明や分析は書かず、投稿本文だけを返してください。",
+          xTarget
+            ? "あなたはX向けSNS編集者です。与えられた共通投稿文をX用に短く自然な日本語へリライトしてください。意味・事実・URLを保持し、価格・営業時間などを捏造しないでください。絵文字やハッシュタグは必要最小限にします。URLはXで23文字として数えられ、全角文字は概ね2文字、ASCIIは1文字です。必ず十分余裕を持たせてX加重280文字未満にし、本文だけ返してください。"
+            : "あなたは店舗・事業者向けSNS投稿文アシスタントです。ユーザーが入力した事実だけを使い、InstagramとXの両方で違和感なく使える自然な日本語の投稿文を1案作成してください。未確認の価格・営業時間・在庫・キャンペーン条件などを勝手に補完しないでください。必要に応じて読みやすい改行と関連性の高いハッシュタグを加えてください。説明や分析は書かず、投稿本文だけを返してください。",
         input:
           "投稿に載せたい情報:\n" +
           brief +
