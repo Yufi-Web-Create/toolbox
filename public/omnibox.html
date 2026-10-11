@@ -2802,7 +2802,7 @@
         header.innerHTML = `
           <span class="w-4 h-4 rounded-md ${p.dotColor} flex items-center justify-center">${p.icon || '<span class="w-1.5 h-1.5 rounded-full bg-white"></span>'}</span>
           <span>${p.name}</span>
-          <span class="text-[9px] bg-slate-100 text-slate-500 px-1 rounded">${accs.length}</span>
+          <span class="text-[9px] bg-slate-100 text-slate-500 px-1 rounded" title="連携アカウント数">${accs.length}アカウント</span>
         `;
         groupEl.appendChild(header);
 
@@ -2818,7 +2818,7 @@
               <span class="block truncate">${acc.accountName}</span>
               <span class="text-[10px] text-slate-400 block truncate">${acc.handle}</span>
             </div>
-            <span class="text-[10px] bg-slate-100 px-1 rounded shrink-0 ml-1 text-slate-500">${count}</span>
+            <span class="text-[10px] bg-slate-100 px-1.5 rounded shrink-0 ml-1 text-slate-500" title="問い合わせスレッド数">${count}件</span>
           `;
           groupEl.appendChild(btn);
         });
