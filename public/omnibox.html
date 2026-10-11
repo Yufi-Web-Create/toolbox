@@ -3005,11 +3005,14 @@
     };
 
     const avatarRefreshPending = new Set();
+    const avatarRefreshAttempted = new Set();
     window.refreshSocialAvatar = async function(thread) {
       if (isDemoSession || !thread?.liveConversationId ||
-          !['instagram', 'x'].includes(thread.channel) || thread.avatar ||
+          !['instagram', 'x'].includes(thread.channel) ||
+          avatarRefreshAttempted.has(thread.liveConversationId) ||
           avatarRefreshPending.has(thread.liveConversationId)) return;
       avatarRefreshPending.add(thread.liveConversationId);
+      avatarRefreshAttempted.add(thread.liveConversationId);
       try {
         const response = await fetch('/api/omnibox/customer/avatar-refresh', {
           method: 'POST',
@@ -3096,10 +3099,8 @@
           updateActiveChatPane(thread);
         }
 
-        if (!thread.avatar) {
-          await window.refreshCustomerProfile(thread);
-          await window.refreshSocialAvatar(thread);
-        }
+        if (!thread.avatar) await window.refreshCustomerProfile(thread);
+        await window.refreshSocialAvatar(thread);
 
         return thread;
       } catch (error) {
