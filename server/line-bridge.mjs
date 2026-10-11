@@ -287,6 +287,42 @@ async function notifyPushSubscribers(fetchImpl, config, organizationId) {
   }
 }
 
+async function handleCrossPlatformPush({ request, response, config, fetchImpl }) {
+  let payload;
+  try { payload = await readJsonBody(request); }
+  catch { sendJson(response, 400, { ok: false, error: "invalid_json" }); return; }
+  const organizationId = String(payload?.organizationId ?? "");
+  const messageId = String(payload?.messageId ?? "");
+  if (!isUuid(organizationId) || !isUuid(messageId)) {
+    sendJson(response, 400, { ok: false, error: "invalid_ids" });
+    return;
+  }
+  if (!config.vapidPrivateKey || !config.vapidPublicKey) {
+    sendJson(response, 503, { ok: false, error: "push_not_configured" });
+    return;
+  }
+  // A candidate is not trusted: verify its existence, freshness and uniqueness
+  // with the authenticated Supabase persistence function before sending.
+  const { response: checkResponse, data } = await signedEdgeRequest(fetchImpl, config, {
+    action: "claim-push-event", organizationId, messageId
+  });
+  if (!checkResponse.ok || !data?.ok) {
+    sendJson(response, 502, { ok: false, error: "push_event_validation_failed" });
+    return;
+  }
+  if (!data.claimed) {
+    sendJson(response, 200, { ok: true, ignored: true });
+    return;
+  }
+  try {
+    await notifyPushSubscribers(fetchImpl, config, organizationId);
+    sendJson(response, 200, { ok: true, notified: true });
+  } catch {
+    console.error("Cross-platform push notification failed");
+    sendJson(response, 502, { ok: false, error: "push_delivery_failed" });
+  }
+}
+
 async function signedEdgeRequest(fetchImpl, config, payload) {
   const body = JSON.stringify(payload);
   const timestamp = String(Date.now());
@@ -1422,6 +1458,11 @@ export function createLineBridgeServer({
           fetchImpl,
           organizationId,
         });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/push/dispatch") {
+        await handleCrossPlatformPush({ request, response, config, fetchImpl });
         return;
       }
 
