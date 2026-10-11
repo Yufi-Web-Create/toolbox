@@ -4635,7 +4635,8 @@
       if (!post) return;
       editingSocialDraftId = id;
       existingDraftMediaUrls = [...(post.mediaUrls || [])];
-      selectedPostTargetIds = new Set(connectedAccounts.filter(acc => post.targetConnectionIds?.includes(acc.providerConnectionId)).map(acc => acc.id));
+      selectedPostTargetIds.clear();
+      connectedAccounts.filter(acc => post.targetConnectionIds?.includes(acc.providerConnectionId)).forEach(acc => selectedPostTargetIds.add(acc.id));
       window.openNewPostModal();
       document.getElementById('new-post-content').value = post.content || '';
       document.getElementById('new-post-x-content').value = post.xContent || '';
