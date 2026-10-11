@@ -1,7 +1,11 @@
 self.addEventListener("push", (event) => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch {}
+  const providers = { line: "LINE", instagram: "Instagram", x: "X", email: "メール" };
+  const channel = providers[payload.provider] || "";
   event.waitUntil(
-    self.registration.showNotification("MatoMeet", {
-      body: "新しいLINEメッセージが届きました。",
+    self.registration.showNotification(payload.title || "MatoMeet｜新着問い合わせ", {
+      body: payload.body || (channel ? channel + "から新しいメッセージが届きました。" : "新しいメッセージが届きました。"),
       icon: "/matomeet-icon.png",
       badge: "/matomeet-icon.png",
       tag: "matomeet-inbox",
