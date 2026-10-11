@@ -336,8 +336,9 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      ok: publishResult.status === "published",
+      ok: publishResult.status === "published" || publishResult.status === "partial_failed",
       partial: publishResult.status === "partial_failed",
+      message: publishResult.status === "partial_failed" ? "一部の投稿先への配信に失敗しました。成功した投稿先には公開済みです。" : undefined,
       post: refreshed ?? post,
     });
   } catch {
