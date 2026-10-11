@@ -674,6 +674,10 @@
                 <div>
                   <label class="text-slate-400 block text-[11px]">タグ</label>
                   <div id="info-customer-tags" class="flex flex-wrap gap-1 mt-1"></div>
+                  <div class="flex gap-1 mt-2">
+                    <input id="info-tag-input" type="text" maxlength="24" placeholder="タグを追加" class="flex-1 min-w-0 text-xs px-2 py-1.5 border border-[#EDE5E7] rounded-lg" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomerTag()}">
+                    <button type="button" onclick="addCustomerTag()" class="px-2 py-1 text-xs rounded-lg bg-brand-50 text-brand-800 border border-brand-200">追加</button>
+                  </div>
                 </div>
               </div>
 
@@ -2256,7 +2260,8 @@
             lastMessage: conversation.last_message_preview || '',
             lastTime: formatLiveTime(conversation.last_message_at),
             unreadCount: conversation.status === 'unread' && !viewedConversationIds.has(conversation.id) ? 1 : 0,
-            tags: [meta.name, matchedAccount?.accountName || '実データ'],
+            userTags: Array.isArray(conversation.provider_metadata?.customer_tags) ? conversation.provider_metadata.customer_tags.filter(tag => typeof tag === 'string') : [],
+            tags: [meta.name, matchedAccount?.accountName || '実データ', ...(Array.isArray(conversation.provider_metadata?.customer_tags) ? conversation.provider_metadata.customer_tags.filter(tag => typeof tag === 'string') : [])],
             notes: isSelected
               ? selectedNotes.map(note => ({
                   id: note.id,
@@ -3061,6 +3066,10 @@
         if (conversation) {
           thread.customerName = conversation.customer_display_name || thread.customerName;
           thread.customerNameSource = conversation.customer_name_source || thread.customerNameSource || 'provider';
+          if (Array.isArray(conversation.provider_metadata?.customer_tags)) {
+            thread.userTags = conversation.provider_metadata.customer_tags.filter(tag => typeof tag === 'string');
+            thread.tags = [...new Set([...(thread.tags || []).filter(tag => !(thread.userTags || []).includes(tag)), ...thread.userTags])];
+          }
           thread.avatar = conversation.customer_avatar_url || thread.avatar || '';
           thread.customerHandle = conversation.customer_external_id || thread.customerHandle;
           thread.lastMessage = conversation.last_message_preview || thread.lastMessage;
@@ -3219,15 +3228,56 @@
       }
       
       const tagContainer = document.getElementById('info-customer-tags');
-      tagContainer.innerHTML = (thread.tags || []).map(tag => `
-        <span class="bg-brand-50 text-brand-800 text-[10px] px-2 py-0.5 rounded-full border border-brand-200">${tag}</span>
-      `).join('');
+      tagContainer.innerHTML = (thread.userTags || []).map((tag, index) => `
+        <span class="inline-flex items-center gap-1 bg-brand-50 text-brand-800 text-[10px] px-2 py-0.5 rounded-full border border-brand-200">
+          ${escapeHtml(tag)}
+          <button type="button" onclick="removeCustomerTag(${index})" aria-label="${escapeHtml(tag)}を削除" title="タグを削除">×</button>
+        </span>
+      `).join('') || '<span class="text-[10px] text-slate-400">タグはまだありません</span>';
 
       renderInternalNotes(thread);
       renderMessages(thread);
       renderInstagramRequestState(thread);
       lucide.createIcons();
     }
+
+    async function saveCustomerTags(nextTags) {
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) return;
+      if (!isDemoSession) {
+        const response = await fetch('/api/omnibox/inbox', {
+          method: 'PATCH', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId: thread.liveConversationId || thread.id, tags: nextTags })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error('タグを保存できませんでした');
+      }
+      const oldUserTags = thread.userTags || [];
+      thread.tags = [...new Set([...(thread.tags || []).filter(tag => !oldUserTags.includes(tag)), ...nextTags])];
+      thread.userTags = nextTags;
+      renderThreadList();
+      if (thread.id === currentThreadId) updateActiveChatPane(thread);
+    }
+
+    window.addCustomerTag = async function() {
+      const thread = threads.find(t => t.id === currentThreadId);
+      const input = document.getElementById('info-tag-input');
+      const tag = input?.value.trim() || '';
+      if (!thread || !tag) return;
+      const existing = thread.userTags || [];
+      if (existing.includes(tag)) { showToast('既に登録されているタグです'); return; }
+      if (existing.length >= 12) { showToast('タグは12個まで登録できます'); return; }
+      try { await saveCustomerTags([...existing, tag]); if(input) input.value = ''; showToast('タグを保存しました'); }
+      catch (error) { showToast(error.message || 'タグを保存できませんでした', 'error'); }
+    };
+
+    window.removeCustomerTag = async function(index) {
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) return;
+      try { await saveCustomerTags((thread.userTags || []).filter((_, i) => i !== index)); showToast('タグを削除しました'); }
+      catch (error) { showToast(error.message || 'タグを削除できませんでした', 'error'); }
+    };
 
     window.markCustomerNameEditing = function() {
       customerNameEditingThreadId = currentThreadId;
