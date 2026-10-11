@@ -3,6 +3,18 @@ import { NextResponse } from "next/server";
 import { isPlanKey, PLAN_DEFINITIONS } from "../../../../lib/plans";
 import { createClient } from "../../../../lib/supabase/server";
 
+function xWeightedLength(text: string) {
+  const normalized = text.replace(/https?:\/\/[^\s<>"'「」『』]+/gi, (match) => {
+    const trailing = match.match(/[.,!?;:。、「」！？）)]*$/)?.[0] || "";
+    return "x".repeat(23) + trailing;
+  });
+  return Array.from(normalized).reduce((total, character) => {
+    const cp = character.codePointAt(0) || 0;
+    return total + (cp <= 0x10ff || (cp >= 0x2000 && cp <= 0x200d) ||
+      (cp >= 0x2010 && cp <= 0x201f) || (cp >= 0x2032 && cp <= 0x2037) ? 1 : 2);
+  }, 0);
+}
+
 function publisherUrl() {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   return base ? new URL("/functions/v1/omnibox-provider-publish", base) : null;
@@ -216,7 +228,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (includesX && (!xContent || xContent.length > 5000)) {
+    if (includesX && (!xContent || xWeightedLength(xContent) > 280)) {
       return NextResponse.json({ ok: false, message: "X用の投稿本文を入力してください。" }, { status: 400 });
     }
 
