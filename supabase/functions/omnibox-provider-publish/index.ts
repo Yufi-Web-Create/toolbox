@@ -190,7 +190,7 @@ async function publishX(
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      text: content,
+      ...(content.trim() ? { text: content } : {}),
       ...(mediaIds.length > 0 ? { media: { media_ids: mediaIds } } : {}),
     }),
   });
