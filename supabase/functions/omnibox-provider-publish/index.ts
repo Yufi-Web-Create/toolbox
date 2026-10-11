@@ -417,7 +417,7 @@ Deno.serve(async (req) => {
   const { data: post, error: postError } = await admin
     .from("social_posts")
     .select(
-      "id, organization_id, created_by, content, media_url, media_urls, target_connection_ids, scheduled_at, status",
+      "id, organization_id, created_by, content, x_content, media_url, media_urls, target_connection_ids, scheduled_at, status",
     )
     .eq("id", postId)
     .maybeSingle();
@@ -489,7 +489,7 @@ Deno.serve(async (req) => {
         : [];
 
     if (connection.provider === "x") {
-      result = await publishX(admin, connection, post.content, mediaUrls);
+      result = await publishX(admin, connection, post.x_content || post.content, mediaUrls);
     } else if (connection.provider === "instagram") {
       result = await publishInstagram(
         admin,
