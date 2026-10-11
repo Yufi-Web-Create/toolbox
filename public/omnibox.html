@@ -4680,7 +4680,7 @@
           getXWeightedLength(document.getElementById('new-post-x-content').value) > 280);
         button.textContent = active ? '処理中...' : '投稿を設定する';
       }
-      if (title) title.textContent = timing === 'now' ? '今すぐ投稿しています' : '予約投稿を設定中です';
+      if (title) title.textContent = timing === 'now' ? '投稿中' : '予約投稿を設定中です';
       if (description) description.textContent = timing === 'now'
         ? 'SNSへ画像と文章を送信しています。完了までお待ちください。'
         : '投稿内容と予約日時を保存しています。';
