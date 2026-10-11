@@ -116,15 +116,17 @@ async function uploadXImage(accessToken: string, mediaUrl: string) {
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      media: arrayBufferToBase64(buffer),
+      media_data: arrayBufferToBase64(buffer),
       media_category: "tweet_image",
     }),
   });
 
   const result = await upload.json().catch(() => ({}));
-  return upload.ok && typeof result?.data?.id === "string"
-    ? result.data.id
-    : null;
+  if (!upload.ok) {
+    console.error("X media upload rejected", { status: upload.status, errors: result?.errors, title: result?.title });
+    return null;
+  }
+  return String(result?.data?.id ?? result?.media_id_string ?? result?.media_id ?? "") || null;
 }
 
 async function publishX(
