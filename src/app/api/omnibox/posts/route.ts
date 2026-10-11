@@ -147,6 +147,29 @@ export async function POST(request: Request) {
             .filter(Boolean),
         )]
       : [];
+    if (payload?.saveAsDraft === true) {
+      const draftId = typeof payload.draftId === "string" ? payload.draftId.trim() : "";
+      if (content.length > 5000 || xContent.length > 5000 || targetConnectionIds.length > 20) {
+        return NextResponse.json({ ok: false, message: "下書きの文字数または投稿先が多すぎます。" }, { status: 400 });
+      }
+      const draftValues = {
+        content, x_content: xContent || null, media_url: mediaUrl || null,
+        media_urls: mediaUrls, target_connection_ids: targetConnectionIds,
+        updated_at: new Date().toISOString()
+      };
+      if (draftId) {
+        const { data, error } = await ctx.supabase.from("social_posts").update(draftValues)
+          .eq("id", draftId).eq("organization_id", ctx.organizationId)
+          .eq("status", "draft").select("id").maybeSingle();
+        if (error || !data) return NextResponse.json({ ok: false, message: "下書きを更新できませんでした。" }, { status: 400 });
+        return NextResponse.json({ ok: true, draftId: data.id });
+      }
+      const { data, error } = await ctx.supabase.from("social_posts").insert({
+        organization_id: ctx.organizationId, created_by: ctx.userId, status: "draft", ...draftValues
+      }).select("id").single();
+      if (error || !data) return NextResponse.json({ ok: false, message: "下書きを保存できませんでした。" }, { status: 500 });
+      return NextResponse.json({ ok: true, draftId: data.id });
+    }
     const timing = payload?.timing === "now" ? "now" : "schedule";
     const scheduledAt =
       typeof payload?.scheduledAt === "string" && payload.scheduledAt
@@ -355,7 +378,7 @@ export async function DELETE(request: Request) {
       .update({ status: "cancelled", updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("organization_id", ctx.organizationId)
-      .eq("status", "scheduled")
+      .in("status", ["scheduled", "draft"])
       .select("id")
       .maybeSingle();
 
