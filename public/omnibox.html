@@ -4636,7 +4636,7 @@
         document.getElementById('new-post-ai-brief').value = '';
         document.getElementById('new-post-modal')?.classList.add('hidden');
         renderScheduledPosts();
-        showToast('下書きを保存しました');
+        showPostSuccess('draft');
       } catch(error) { showToast(error.message || '下書きを保存できませんでした', 'error'); }
       finally { if (button) button.disabled = false; }
     };
@@ -4786,7 +4786,7 @@
         editingSocialDraftId = null;
         existingDraftMediaUrls = [];
         await loadSocialPosts();
-        showPostSuccess(timing);
+        showPostSuccess(result.partial ? 'partial' : timing);
       } catch (error) {
         showToast(error.message || '投稿処理に失敗しました');
       }
@@ -5005,11 +5005,14 @@
       if (!modal) return;
 
       if (title) title.textContent =
-        timing === 'schedule' ? '予約投稿を設定しました' : '投稿が完了しました';
+        timing === 'draft' ? '下書きを保存しました'
+        : timing === 'partial' ? '一部の投稿先へ公開しました'
+        : timing === 'schedule' ? '予約投稿を設定しました' : '投稿が完了しました';
       if (message) message.textContent =
-        timing === 'schedule'
-          ? '指定した日時に自動投稿します。投稿カレンダーを更新します。'
-          : 'SNSへの投稿が完了しました。投稿カレンダーを更新します。';
+        timing === 'draft' ? '投稿一覧の「編集」からいつでも再開できます。SNSには公開されていません。'
+        : timing === 'partial' ? '一部のSNSへの投稿が失敗しました。成功した投稿先には公開されています。投稿履歴で結果を確認してください。'
+        : timing === 'schedule' ? '指定した日時に自動投稿します。'
+        : '選択したSNSへの投稿が完了しました。';
 
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -5017,13 +5020,15 @@
 
       window.clearTimeout(postSuccessReloadTimer);
       postSuccessReloadTimer = window.setTimeout(() => {
-        window.location.reload();
-      }, 3500);
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }, 6000);
     }
 
     window.finishPostSuccess = function() {
       window.clearTimeout(postSuccessReloadTimer);
-      window.location.reload();
+      document.getElementById('post-success-modal')?.classList.add('hidden');
+      document.getElementById('post-success-modal')?.classList.remove('flex');
     };
 
     function renderScheduledPosts() {
@@ -5075,6 +5080,9 @@
     }
 
     window.cancelPost = async function(postId) {
+      const target = scheduledPosts.find(post => post.id === postId);
+      if (!target) return;
+      if (!window.confirm(target.statusKey === 'draft' ? 'この下書きを削除しますか？' : 'この予約投稿を取り消しますか？')) return;
       if (isDemoSession) {
         scheduledPosts = scheduledPosts.filter(p => p.id !== postId);
         renderScheduledPosts();
@@ -5097,7 +5105,7 @@
         }
 
         await loadSocialPosts();
-        showToast('投稿データを削除しました');
+        showToast(target.statusKey === 'draft' ? '下書きを削除しました' : '予約投稿を取り消しました');
       } catch (error) {
         showToast(error.message || '予約投稿を取り消せませんでした');
       }
