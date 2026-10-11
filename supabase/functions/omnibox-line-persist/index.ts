@@ -221,6 +221,28 @@ Deno.serve(async (req) => {
     return json(200, { ok: true, config: data });
   }
 
+  if (payload.action === "claim-push-event") {
+    const messageId = typeof payload.messageId === "string" ? payload.messageId : "";
+    if (!/^[0-9a-f-]{36}$/i.test(messageId)) return json(400, { ok: false });
+    const { data: message } = await supabase.from("messages")
+      .select("id,organization_id,conversation_id,direction,created_at")
+      .eq("id", messageId).eq("organization_id", organizationId)
+      .eq("direction", "inbound").maybeSingle();
+    if (!message || Math.abs(Date.now() - new Date(message.created_at).getTime()) > 10 * 60_000)
+      return json(200, { ok: true, claimed: false });
+    const { data: conversation } = await supabase.from("conversations")
+      .select("provider").eq("id", message.conversation_id)
+      .eq("organization_id", organizationId).maybeSingle();
+    if (!conversation || !["instagram", "x", "email"].includes(conversation.provider))
+      return json(200, { ok: true, claimed: false });
+    const { data: claimed, error: updateError } = await supabase.from("messages")
+      .update({ push_notified_at: new Date().toISOString() })
+      .eq("id", messageId).eq("organization_id", organizationId)
+      .is("push_notified_at", null).select("id").maybeSingle();
+    if (updateError) return json(500, { ok: false });
+    return json(200, { ok: true, claimed: Boolean(claimed) });
+  }
+
   if (payload.action === "list-push-subscriptions") {
     const { data, error } = await supabase
       .from("push_subscriptions")
