@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const plan = body?.plan as PlanKey;
 
-    if (!isPlanKey(plan)) {
+    if (!isPlanKey(plan) || plan === "premium" || plan === "enterprise") {
       return NextResponse.json(
         { ok: false, message: "プランを確認してください。" },
         { status: 400 },
