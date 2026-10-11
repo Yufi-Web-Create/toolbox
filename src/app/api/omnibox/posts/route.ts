@@ -373,12 +373,23 @@ export async function DELETE(request: Request) {
       );
     }
 
+    const { data: deleted, error: deleteError } = await ctx.supabase
+      .from("social_posts")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", ctx.organizationId)
+      .eq("status", "draft")
+      .select("id")
+      .maybeSingle();
+    if (deleteError) return NextResponse.json({ ok: false, message: "下書きを削除できませんでした。" }, { status: 500 });
+    if (deleted) return NextResponse.json({ ok: true });
+
     const { data, error } = await ctx.supabase
       .from("social_posts")
       .update({ status: "cancelled", updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("organization_id", ctx.organizationId)
-      .in("status", ["scheduled", "draft"])
+      .eq("status", "scheduled")
       .select("id")
       .maybeSingle();
 
