@@ -22,7 +22,7 @@ const globals = Object.fromEntries(
   [
     "window","document","console","fetch","URL","URLSearchParams","FormData",
     "setTimeout","clearTimeout","setInterval","clearInterval","structuredClone",
-    "navigator","location","crypto","Event","CustomEvent","Image","HTMLElement",
+    "navigator","location","Notification","crypto","Event","CustomEvent","Image","HTMLElement",
     "Node","localStorage","sessionStorage","alert","confirm","requestAnimationFrame",
     "cancelAnimationFrame","atob","btoa","TextEncoder","TextDecoder","AbortController",
     "lucide","tailwind","__app_id",
