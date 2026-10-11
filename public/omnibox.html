@@ -4569,6 +4569,11 @@
     };
 
     window.generateAiXPostDraft = async function() {
+      if (currentPlanFeatures.ai !== true || isDemoSession) {
+        showToast('AI文章変換はAI対応プランの実アカウントで利用できます');
+        return;
+      }
+      if (!checkTemporaryAiQuota()) return;
       const source = document.getElementById('new-post-content')?.value.trim() || '';
       const input = document.getElementById('new-post-x-content');
       const button = document.getElementById('ai-x-rewrite-button');
@@ -4584,6 +4589,7 @@
         const result = await response.json();
         if (!response.ok || !result.ok || !result.draft) throw new Error(result.message || 'AI変換に失敗しました');
         input.value = result.draft;
+        consumeTemporaryAiQuota();
         window.updatePostCharacterCounter();
         if (getXWeightedLength(result.draft) > 280) {
           showToast('Xの文字数上限を超えています。文章を短くしてください', 'warning');
