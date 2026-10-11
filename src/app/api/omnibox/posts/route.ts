@@ -374,31 +374,29 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const { data: deleted, error: deleteError } = await ctx.supabase
-      .from("social_posts")
-      .delete()
-      .eq("id", id)
-      .eq("organization_id", ctx.organizationId)
-      .eq("status", "draft")
-      .select("id")
-      .maybeSingle();
-    if (deleteError) return NextResponse.json({ ok: false, message: "下書きを削除できませんでした。" }, { status: 500 });
-    if (deleted) return NextResponse.json({ ok: true });
-
-    const { data, error } = await ctx.supabase
-      .from("social_posts")
-      .update({ status: "cancelled", updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .eq("organization_id", ctx.organizationId)
-      .eq("status", "scheduled")
-      .select("id")
-      .maybeSingle();
-
-    if (error || !data) {
-      return NextResponse.json(
-        { ok: false, message: "予約投稿を取り消せませんでした。" },
-        { status: 400 },
+    const { data: existing, error: lookupError } = await ctx.supabase
+      .from("social_posts").select("id,status").eq("id", id)
+      .eq("organization_id", ctx.organizationId).maybeSingle();
+    if (lookupError || !existing) return NextResponse.json(
+      { ok: false, message: "投稿が見つかりません。画面を再読み込みしてください。" }, { status: 404 }
+    );
+    if (existing.status === "draft") {
+      const { data: deleted, error } = await ctx.supabase.from("social_posts")
+        .delete().eq("id", id).eq("organization_id", ctx.organizationId)
+        .eq("status", "draft").select("id").maybeSingle();
+      if (error || !deleted) return NextResponse.json(
+        { ok: false, message: "下書きを削除できませんでした。" }, { status: 500 }
       );
+    } else if (existing.status === "scheduled") {
+      const { data: cancelled, error } = await ctx.supabase.from("social_posts")
+        .update({ status: "cancelled", updated_at: new Date().toISOString() })
+        .eq("id", id).eq("organization_id", ctx.organizationId)
+        .eq("status", "scheduled").select("id").maybeSingle();
+      if (error || !cancelled) return NextResponse.json(
+        { ok: false, message: "予約投稿を取り消せませんでした。投稿状態を更新して確認してください。" }, { status: 409 }
+      );
+    } else {
+      return NextResponse.json({ ok: false, message: "この投稿は既に処理が始まっているため取り消せません。" }, { status: 409 });
     }
 
     return NextResponse.json({ ok: true });
