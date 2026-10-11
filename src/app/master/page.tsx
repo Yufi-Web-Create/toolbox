@@ -150,7 +150,7 @@ export default async function MasterPage({
             </p>
           </div>
           <div className={styles.actions}>
-            <Link className={styles.link} href="/omnibox.html">
+            <Link className={styles.link} href="/">
               MatoMeetを開く
             </Link>
             <form action={masterLogout}>
@@ -332,7 +332,7 @@ export default async function MasterPage({
               Developer Appの設定はこの運営画面で管理します。設定完了後、店舗側はMatoMeetの「接続アカウント」から公式認証画面へ進んでアカウントを許可するだけです。
             </p>
             <div className={styles.actions}>
-              <Link className={styles.link} href="/omnibox.html">
+              <Link className={styles.link} href="/">
                 接続アカウントを開く
               </Link>
             </div>
