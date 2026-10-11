@@ -566,16 +566,6 @@
                   <i data-lucide="more-horizontal" class="w-4 h-4"></i>
                 </button>
                 <div id="conversation-actions-menu" class="hidden absolute right-0 top-full mt-1 w-44 bg-white border border-[#EDE5E7] rounded-xl shadow-xl p-1 z-40">
-                  <button type="button" onclick="closeConversationActionsMenu(); updateCurrentThreadStatus('unread')" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-50 text-left">
-                    <i data-lucide="circle-dot" class="w-3.5 h-3.5"></i><span>未対応に戻す</span>
-                  </button>
-                  <button type="button" onclick="closeConversationActionsMenu(); updateCurrentThreadStatus('in_progress')" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-50 text-left">
-                    <i data-lucide="clock-3" class="w-3.5 h-3.5"></i><span>対応中にする</span>
-                  </button>
-                  <button type="button" onclick="closeConversationActionsMenu(); updateCurrentThreadStatus('resolved')" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-700 hover:bg-slate-50 text-left">
-                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i><span>対応完了にする</span>
-                  </button>
-                  <div class="border-t border-slate-100 my-1"></div>
                   <button type="button" onclick="closeConversationActionsMenu(); openDeleteConversationModal()" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-red-600 hover:bg-red-50 text-left">
                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     <span>迷惑スレッドを削除</span>
@@ -4490,8 +4480,11 @@
     }
 
     function getXWeightedLength(text) {
-      // X converts each recognized URL to a 23-character t.co link.
-      const normalized = String(text || '').replace(/https?:\/\/[^\s<>]+/gi, 'xxxxxxxxxxxxxxxxxxxxxxx');
+      // Links use the fixed t.co length. Do not swallow punctuation attached to a URL.
+      const normalized = String(text || '').replace(/https?:\/\/[^\s<>"'「」『』]+/gi, match => {
+        const trailing = match.match(/[.,!?;:。、「」！？）)]*$/)?.[0] || '';
+        return 'x'.repeat(23) + trailing;
+      });
       return Array.from(normalized).reduce((sum, char) => {
         const cp = char.codePointAt(0);
         // Twitter's weighted ranges include Latin, some punctuation, and select CJK punctuation.
