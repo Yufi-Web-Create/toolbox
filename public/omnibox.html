@@ -1196,7 +1196,7 @@
 
   <!-- 新規SNS予約投稿モーダル -->
   <div id="new-post-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl border border-slate-100 space-y-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl border border-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
           <i data-lucide="send" class="w-5 h-5 text-brand-600"></i>
@@ -1235,10 +1235,15 @@
           <label class="text-xs font-bold text-slate-600">投稿本文</label>
         </div>
         <textarea id="new-post-content" rows="4" oninput="updatePostCharacterCounter()" placeholder="フォロワーに届けたい情報を入力してください... #ハッシュタグ など" class="w-full text-xs md:text-sm p-3 border border-[#EDE5E7] rounded-xl focus:outline-none focus:border-brand-500 resize-none"></textarea>
-        <div class="mt-1 flex items-center justify-between gap-2 text-[10px]">
-          <span class="text-slate-400">Xは全角文字を約2文字分として計算します</span>
-          <span id="new-post-character-count" class="font-mono text-slate-500">0文字 / X残り280</span>
+        <p class="text-[10px] text-slate-400 mt-1">Instagramなどに使用する共通本文です。</p>
+      </div>
+      <div id="new-post-x-section" class="hidden p-3 rounded-xl border border-brand-200 bg-brand-50/40">
+        <div class="flex justify-between gap-2 items-center mb-2">
+          <label for="new-post-x-content" class="text-xs font-bold text-brand-900">X専用の本文</label>
+          <button id="ai-x-rewrite-button" type="button" onclick="generateAiXPostDraft()" class="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">AIでX用に変換</button>
         </div>
+        <textarea id="new-post-x-content" rows="3" oninput="updatePostCharacterCounter()" placeholder="Xに投稿する文章を入力してください。共通本文とは別に編集できます。" class="w-full p-3 text-xs border border-brand-200 rounded-lg"></textarea>
+        <div id="new-post-character-count" class="text-right font-mono text-[10px] text-slate-500">X残り280</div>
       </div>
 
       <div>
@@ -4542,7 +4547,7 @@
     }
 
     window.updatePostCharacterCounter = function() {
-      const content = document.getElementById('new-post-content')?.value || '';
+      const content = document.getElementById('new-post-x-content')?.value || '';
       const counter = document.getElementById('new-post-character-count');
       if (!counter) return;
       const weighted = getXWeightedLength(content);
@@ -4551,9 +4556,8 @@
         const account = getAccountById(input.value);
         return account.provider === 'x' || account.platform === 'x';
       });
-      counter.textContent = remaining < 0
-        ? `${Array.from(content).length}文字 / X ${Math.abs(remaining)}文字オーバー`
-        : `${Array.from(content).length}文字 / X残り${remaining}`;
+      counter.textContent = remaining < 0 ? `X ${Math.abs(remaining)}文字オーバー` : `X残り${remaining}`;
+      document.getElementById('new-post-x-section')?.classList.toggle('hidden', !hasXTarget);
       counter.classList.toggle('text-red-600', remaining < 0);
       counter.classList.toggle('font-bold', remaining < 0);
       counter.classList.toggle('text-slate-500', remaining >= 0);
@@ -4564,8 +4568,33 @@
       }
     };
 
+    window.generateAiXPostDraft = async function() {
+      const source = document.getElementById('new-post-content')?.value.trim() || '';
+      const input = document.getElementById('new-post-x-content');
+      const button = document.getElementById('ai-x-rewrite-button');
+      if (!source) { showToast('先に共通本文を入力してください'); return; }
+      if (input?.value.trim() && !window.confirm('X専用本文を生成結果で置き換えますか？')) return;
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/omnibox/ai/post', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brief: source, target: 'x' })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok || !result.draft) throw new Error(result.message || 'AI変換に失敗しました');
+        input.value = result.draft;
+        window.updatePostCharacterCounter();
+        if (getXWeightedLength(result.draft) > 280) {
+          showToast('Xの文字数上限を超えています。文章を短くしてください', 'warning');
+        } else showToast('X専用本文を生成しました。確認してから投稿してください');
+      } catch (error) { showToast(error.message || 'AI変換に失敗しました', 'error'); }
+      finally { button.disabled = false; }
+    };
+
     window.submitNewPost = async function() {
       const content = document.getElementById('new-post-content').value.trim();
+      const xContent = document.getElementById('new-post-x-content')?.value.trim() || '';
       const timing =
         document.querySelector('input[name="post-timing"]:checked')?.value === 'now'
           ? 'now'
@@ -4602,9 +4631,9 @@
       const includesX = selectedAccounts.some(
         acc => acc.provider === 'x' || acc.platform === 'x'
       );
-      if (includesX && getXWeightedLength(content) > 280) {
-        showToast('Xの文字数上限を超えています。本文を短くしてください');
-        document.getElementById('new-post-content')?.focus();
+      if (includesX && (!xContent || getXWeightedLength(xContent) > 280)) {
+        showToast(!xContent ? 'X専用本文を入力してください' : 'Xの文字数上限を超えています');
+        document.getElementById('new-post-x-content')?.focus();
         return;
       }
       if (includesX && selectedPostImages.length > 4) {
@@ -4640,6 +4669,7 @@
         renderScheduledPosts();
         window.closeNewPostModal(true);
         document.getElementById('new-post-content').value = '';
+        document.getElementById('new-post-x-content').value = '';
         selectedPostTargetIds.clear();
         clearSelectedPostImages();
         showPostSuccess(timing);
@@ -4658,6 +4688,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             content,
+            xContent,
             mediaUrls,
             targetConnectionIds,
             timing,
@@ -4678,6 +4709,7 @@
 
         window.closeNewPostModal(true);
         document.getElementById('new-post-content').value = '';
+        document.getElementById('new-post-x-content').value = '';
         const briefInput = document.getElementById('new-post-ai-brief');
         if (briefInput) briefInput.value = '';
         selectedPostTargetIds.clear();
@@ -5685,12 +5717,15 @@
       const modal = document.getElementById('new-post-modal');
       const content = document.getElementById('new-post-content')?.value.trim() || '';
       const brief = document.getElementById('new-post-ai-brief')?.value.trim() || '';
-      const hasDraft = Boolean(content || brief || selectedPostImages.length);
+      const xDraft = document.getElementById('new-post-x-content')?.value.trim() || '';
+      const hasDraft = Boolean(content || brief || xDraft || selectedPostImages.length);
       if (!force && hasDraft && !window.confirm('入力中の投稿内容を破棄して閉じますか？')) return;
       if (!force && hasDraft) {
         const postContent = document.getElementById('new-post-content');
         const aiBrief = document.getElementById('new-post-ai-brief');
         if (postContent) postContent.value = '';
+        const xInput = document.getElementById('new-post-x-content');
+        if (xInput) xInput.value = '';
         if (aiBrief) aiBrief.value = '';
         clearSelectedPostImages();
         window.updatePostCharacterCounter();
