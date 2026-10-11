@@ -537,15 +537,14 @@
                 <span id="chat-customer-channel-badge" class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] text-white"></span>
               </div>
               <div class="min-w-0">
+                <div id="chat-customer-last-active" class="text-[10px] text-slate-400 leading-tight mb-0.5"></div>
                 <div class="flex items-center gap-2 min-w-0">
                   <h3 id="chat-customer-name" class="font-bold text-sm text-slate-800"></h3>
                   <span id="chat-customer-handle" class="text-xs text-slate-400"></span>
                   <span id="chat-status-pill" class="text-[10px] font-medium px-2 py-0.5 rounded-full"></span>
                 </div>
                 <div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                  <span id="chat-recipient-account-badge" class="font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-[#E6DCDE] text-[11px] flex items-center gap-1"></span>
-                  <span>•</span>
-                  <span id="chat-customer-last-active" class="whitespace-nowrap"></span>
+                  <span id="chat-recipient-account-badge" class="font-medium text-slate-500 text-[10px] truncate max-w-[180px]"></span>
                 </div>
               </div>
             </div>
@@ -1018,8 +1017,8 @@
                 <i data-lucide="bell-ring" class="w-4 h-4"></i>
               </div>
               <div>
-                <h3 class="text-sm font-bold text-slate-800">スマホ通知</h3>
-                <p class="text-xs text-slate-500 mt-1">LINEの新着メッセージを、MatoMeetを閉じている時もこの端末へ通知します。</p>
+                <h3 class="text-sm font-bold text-slate-800">通知設定</h3>
+                <p class="text-xs text-slate-500 mt-1">LINE・Instagram・Xなど、連携したチャネルの新着メッセージを通知するための設定です。</p>
               </div>
             </div>
             <div id="settings-push-status" class="text-xs text-slate-600 bg-slate-50 border border-[#EDE5E7] rounded-xl px-3 py-2.5 mb-3">
@@ -3174,11 +3173,8 @@
           ? thread.customerHandle
           : '';
       
-      document.getElementById('chat-recipient-account-badge').innerHTML = `
-        <span class="w-2 h-2 rounded-full ${meta.color}"></span>
-        <span>宛先: <strong>${acc.accountName}</strong> (${acc.handle})</span>
-      `;
-      document.getElementById('chat-customer-last-active').textContent = `最新: ${thread.lastTime || '本日'}`;
+      document.getElementById('chat-recipient-account-badge').textContent = acc?.accountName || meta.name;
+      document.getElementById('chat-customer-last-active').textContent = `データ取得: ${thread.lastTime || '時刻不明'}`;
 
       const channelBadge = document.getElementById('chat-customer-channel-badge');
       channelBadge.className = `absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] text-white font-bold ${meta.color}`;
@@ -6062,7 +6058,7 @@
         const subscription = await getCurrentPushSubscription();
         const permission = Notification.permission;
         if (subscription && permission === 'granted') {
-          status.textContent = '通知は有効です。LINEの新着をこの端末へお知らせします。';
+          status.textContent = 'この端末で通知が許可されています。通知の配信は連携先ごとの受信処理に依存します。';
           status.className = 'text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 mb-3';
           enableButton.classList.add('hidden');
           disableButton.classList.remove('hidden');
@@ -6131,8 +6127,8 @@
         return true;
       }, {
         busyText: '通知を設定中...',
-        successMessage: 'スマホ通知を有効にしました',
-        errorMessage: 'スマホ通知を有効にできませんでした'
+        successMessage: '通知を有効にしました',
+        errorMessage: '通知を有効にできませんでした'
       }).catch(() => {});
     };
 
