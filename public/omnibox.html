@@ -4682,6 +4682,9 @@
       const includesInstagram = selectedAccounts.some(
         acc => acc.provider === 'instagram' || acc.platform === 'instagram'
       );
+      const includesX = selectedAccounts.some(
+        acc => acc.provider === 'x' || acc.platform === 'x'
+      );
       if (includesInstagram && !content) { showToast('Instagram用の共通本文を入力してください'); return; }
       if (includesX && !includesInstagram && !xContent && selectedPostImages.length + existingDraftMediaUrls.length === 0) { showToast('X専用本文または画像を入力してください'); return; }
       if (includesInstagram && selectedPostImages.length + existingDraftMediaUrls.length === 0) {
@@ -4689,9 +4692,6 @@
         return;
       }
 
-      const includesX = selectedAccounts.some(
-        acc => acc.provider === 'x' || acc.platform === 'x'
-      );
       if (includesX && xContent && getXWeightedLength(xContent) > 280) {
         showToast('Xの文字数上限を超えています');
         document.getElementById('new-post-x-content')?.focus();
