@@ -4900,7 +4900,7 @@
         const inMonth = date.getMonth() === month;
         const isToday = sameLocalDate(date, today);
         const dayPosts = scheduledPosts.filter(post => {
-          if (post.statusKey === 'cancelled') return false;
+          if (post.statusKey === 'cancelled' || post.statusKey === 'draft') return false;
           const postDate = postCalendarDate(post);
           return postDate ? sameLocalDate(postDate, date) : false;
         });
