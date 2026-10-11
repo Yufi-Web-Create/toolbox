@@ -1283,6 +1283,17 @@
     </div>
   </div>
 
+  <div id="post-submission-loading-modal" class="fixed inset-0 bg-slate-900/55 backdrop-blur-xs z-[120] hidden items-center justify-center p-4" role="status" aria-live="polite" aria-busy="true">
+    <div class="bg-white rounded-2xl max-w-xs w-full p-6 shadow-2xl border border-brand-100 text-center">
+      <div class="w-12 h-12 mx-auto flex items-center justify-center rounded-full bg-brand-50 text-brand-600">
+        <i data-lucide="loader-circle" class="w-7 h-7 animate-spin"></i>
+      </div>
+      <h3 id="post-submission-loading-title" class="font-bold text-slate-900 mt-3">投稿を設定中です</h3>
+      <p id="post-submission-loading-description" class="text-xs text-slate-500 mt-1.5">投稿先への処理が完了するまでお待ちください。</p>
+      <p class="text-[11px] text-slate-400 mt-3">処理中は画面を閉じず、再度ボタンを押さないでください。</p>
+    </div>
+  </div>
+
   <div id="employee-create-loading-modal" class="fixed inset-0 bg-slate-900/45 backdrop-blur-xs z-[140] hidden items-center justify-center p-4" aria-live="polite" aria-busy="true">
     <div class="bg-white rounded-2xl max-w-xs w-full p-6 shadow-2xl border border-slate-100 text-center">
       <div class="w-11 h-11 mx-auto rounded-full bg-brand-50 text-brand-700 flex items-center justify-center">
@@ -4567,7 +4578,7 @@
       counter.classList.toggle('text-slate-500', remaining >= 0);
       const submit = document.getElementById('new-post-submit-button');
       if (submit) {
-        submit.disabled = hasXTarget && remaining < 0;
+        submit.disabled = postSubmissionInProgress || (hasXTarget && remaining < 0);
         submit.title = submit.disabled ? 'Xの文字数上限を超えています' : '';
       }
     };
@@ -4656,7 +4667,30 @@
       showToast('下書きを編集中です。画像は保存済みのものを保持します');
     };
 
+    let postSubmissionInProgress = false;
+    function setPostSubmissionLoading(active, timing) {
+      postSubmissionInProgress = active;
+      const modal = document.getElementById('post-submission-loading-modal');
+      const button = document.getElementById('new-post-submit-button');
+      const title = document.getElementById('post-submission-loading-title');
+      const description = document.getElementById('post-submission-loading-description');
+      if (button) {
+        button.disabled = active || (document.getElementById('new-post-x-content') &&
+          Array.from(document.querySelectorAll('input[name="post-target-acc"]:checked')).some(input => getAccountById(input.value)?.provider === 'x' || getAccountById(input.value)?.platform === 'x') &&
+          getXWeightedLength(document.getElementById('new-post-x-content').value) > 280);
+        button.textContent = active ? '処理中...' : '投稿を設定する';
+      }
+      if (title) title.textContent = timing === 'now' ? '今すぐ投稿しています' : '予約投稿を設定中です';
+      if (description) description.textContent = timing === 'now'
+        ? 'SNSへ画像と文章を送信しています。完了までお待ちください。'
+        : '投稿内容と予約日時を保存しています。';
+      modal?.classList.toggle('hidden', !active);
+      modal?.classList.toggle('flex', active);
+      if (active) lucide.createIcons();
+    }
+
     window.submitNewPost = async function() {
+      if (postSubmissionInProgress) return;
       const content = document.getElementById('new-post-content').value.trim();
       const xContent = document.getElementById('new-post-x-content')?.value.trim() || '';
       const timing =
@@ -4744,6 +4778,7 @@
         .map(acc => acc.providerConnectionId)
         .filter(Boolean);
 
+      setPostSubmissionLoading(true, timing);
       try {
         const mediaUrls = [...existingDraftMediaUrls, ...await uploadSelectedPostImages()];
         const response = await fetch('/api/omnibox/posts', {
@@ -4787,6 +4822,8 @@
         showPostSuccess(result.partial ? 'partial' : timing);
       } catch (error) {
         showToast(error.message || '投稿処理に失敗しました');
+      } finally {
+        setPostSubmissionLoading(false, timing);
       }
     };
 
