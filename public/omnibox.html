@@ -2450,7 +2450,8 @@
         published: '公開完了',
         partial_failed: '一部失敗',
         failed: '失敗',
-        cancelled: '取消済'
+        cancelled: '取消済',
+        draft: '下書き'
       }[status] || status;
     }
 
@@ -4440,10 +4441,15 @@
     function renderSelectedPostImages() {
       const container = document.getElementById('post-image-preview-list');
       const count = document.getElementById('post-image-count');
-      if (count) count.textContent = `${selectedPostImages.length}枚`;
+      if (count) count.textContent = `${selectedPostImages.length + existingDraftMediaUrls.length}枚`;
       if (!container) return;
 
-      container.innerHTML = selectedPostImages.map((item, index) => `
+      container.innerHTML = existingDraftMediaUrls.map((url, index) => `
+        <div class="relative rounded-xl border border-[#EDE5E7] bg-white p-1.5">
+          <img src="${escapeHtml(url)}" alt="保存済み画像 ${index + 1}" class="w-full aspect-square object-cover rounded-lg">
+          <button type="button" onclick="removeStoredDraftImage(${index})" class="text-[10px] text-red-600 p-1">画像を削除</button>
+        </div>
+      `).join('') + selectedPostImages.map((item, index) => `
         <div draggable="true" ondragstart="startPostImageDrag(event, ${index})" ondragover="event.preventDefault()" ondrop="dropPostImage(event, ${index})" class="relative rounded-xl border border-[#EDE5E7] bg-white p-1.5 cursor-move">
           <img src="${item.previewUrl}" alt="投稿画像 ${index + 1}" class="w-full aspect-square object-cover rounded-lg">
           <div class="absolute top-2 left-2 text-[9px] font-bold bg-slate-900/75 text-white rounded-full px-1.5 py-0.5">${index + 1}</div>
@@ -4455,6 +4461,11 @@
         </div>
       `).join('');
     }
+
+    window.removeStoredDraftImage = function(index) {
+      existingDraftMediaUrls.splice(index, 1);
+      renderSelectedPostImages();
+    };
 
     function clearSelectedPostImages() {
       selectedPostImages.forEach(item => URL.revokeObjectURL(item.previewUrl));
@@ -4638,6 +4649,7 @@
       selectedPostTargetIds.clear();
       connectedAccounts.filter(acc => post.targetConnectionIds?.includes(acc.providerConnectionId)).forEach(acc => selectedPostTargetIds.add(acc.id));
       window.openNewPostModal();
+      renderSelectedPostImages();
       document.getElementById('new-post-content').value = post.content || '';
       document.getElementById('new-post-x-content').value = post.xContent || '';
       window.updatePostCharacterCounter();
@@ -4675,7 +4687,7 @@
       const includesInstagram = selectedAccounts.some(
         acc => acc.provider === 'instagram' || acc.platform === 'instagram'
       );
-      if (includesInstagram && selectedPostImages.length === 0) {
+      if (includesInstagram && selectedPostImages.length + existingDraftMediaUrls.length === 0) {
         showToast('Instagram投稿には画像を選択してください');
         return;
       }
@@ -4688,11 +4700,11 @@
         document.getElementById('new-post-x-content')?.focus();
         return;
       }
-      if (includesX && selectedPostImages.length > 4) {
+      if (includesX && selectedPostImages.length + existingDraftMediaUrls.length > 4) {
         showToast('X投稿の画像は4枚までです');
         return;
       }
-      if (includesInstagram && selectedPostImages.length > 10) {
+      if (includesInstagram && selectedPostImages.length + existingDraftMediaUrls.length > 10) {
         showToast('Instagram投稿の画像は10枚までです');
         return;
       }
@@ -4723,6 +4735,8 @@
         document.getElementById('new-post-content').value = '';
         document.getElementById('new-post-x-content').value = '';
         selectedPostTargetIds.clear();
+        existingDraftMediaUrls = [];
+        editingSocialDraftId = null;
         clearSelectedPostImages();
         showPostSuccess(timing);
         return;
