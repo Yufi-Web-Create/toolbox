@@ -4665,11 +4665,6 @@
           : 'schedule';
       const dt = document.getElementById('new-post-datetime').value;
 
-      if (!content) {
-        showToast('投稿本文を入力してください');
-        return;
-      }
-
       const checkedBoxes = Array.from(
         document.querySelectorAll('input[name="post-target-acc"]:checked')
       );
@@ -4687,6 +4682,8 @@
       const includesInstagram = selectedAccounts.some(
         acc => acc.provider === 'instagram' || acc.platform === 'instagram'
       );
+      if (includesInstagram && !content) { showToast('Instagram用の共通本文を入力してください'); return; }
+      if (includesX && !includesInstagram && !xContent && selectedPostImages.length + existingDraftMediaUrls.length === 0) { showToast('X専用本文または画像を入力してください'); return; }
       if (includesInstagram && selectedPostImages.length + existingDraftMediaUrls.length === 0) {
         showToast('Instagram投稿には画像を選択してください');
         return;
@@ -4695,8 +4692,8 @@
       const includesX = selectedAccounts.some(
         acc => acc.provider === 'x' || acc.platform === 'x'
       );
-      if (includesX && (!xContent || getXWeightedLength(xContent) > 280)) {
-        showToast(!xContent ? 'X専用本文を入力してください' : 'Xの文字数上限を超えています');
+      if (includesX && xContent && getXWeightedLength(xContent) > 280) {
+        showToast('Xの文字数上限を超えています');
         document.getElementById('new-post-x-content')?.focus();
         return;
       }
@@ -4722,6 +4719,7 @@
         scheduledPosts.unshift({
           id: 'post-' + Date.now(),
           content,
+          xContent,
           mediaUrl: mediaUrls[0] || '',
           mediaUrls,
           channels: selectedAccountNames,
