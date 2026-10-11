@@ -1796,7 +1796,7 @@
       const badge = document.getElementById('current-plan-badge');
       if (!grid || !badge) return;
 
-      const current = planCatalog[currentPlan] || planCatalog.pro;
+      const current = planCatalog[currentPlan] || { name: '旧プラン（継続中）' };
       badge.textContent = current.name;
 
       grid.innerHTML = Object.entries(planCatalog).map(([key, plan]) => {
@@ -5034,7 +5034,7 @@
       renderPublishCalendar();
 
       if (scheduledPosts.length === 0) {
-        container.innerHTML = `<div class="p-6 bg-white rounded-xl border border-[#EDE5E7] text-center text-xs text-slate-400">予約投稿はありません</div>`;
+        container.innerHTML = `<div class="p-6 bg-white rounded-xl border border-[#EDE5E7] text-center text-xs text-slate-400">予約投稿・下書きはありません</div>`;
         return;
       }
 
