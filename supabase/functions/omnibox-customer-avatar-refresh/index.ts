@@ -29,10 +29,6 @@ Deno.serve(async (req) => {
     .eq("id", conversationId).eq("organization_id", orgId).maybeSingle();
   if (!conversation || !["instagram", "x"].includes(conversation.provider))
     return respond(404, { ok: false });
-  if (conversation.customer_avatar_url) return respond(200, {
-    ok: true, customerAvatarUrl: conversation.customer_avatar_url,
-    customerDisplayName: conversation.customer_display_name
-  });
   const { data: connection } = await admin.from("provider_connections")
     .select("id,provider,status").eq("id", conversation.provider_connection_id)
     .eq("organization_id", orgId).eq("provider", conversation.provider).eq("status", "active").maybeSingle();
@@ -80,7 +76,7 @@ Deno.serve(async (req) => {
     updates.customer_display_name = name;
   const { data: saved, error: updateError } = await admin.from("conversations").update(updates)
     .eq("id", conversationId).eq("organization_id", orgId)
-    .is("customer_avatar_url", null).select("customer_avatar_url,customer_display_name").maybeSingle();
+    .select("customer_avatar_url,customer_display_name").maybeSingle();
   if (updateError) return respond(503, { ok: false });
   return respond(200, {
     ok: true, customerAvatarUrl: saved?.customer_avatar_url || safeAvatar,
