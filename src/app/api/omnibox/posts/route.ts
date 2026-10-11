@@ -177,7 +177,6 @@ export async function POST(request: Request) {
         : null;
 
     if (
-      !content ||
       content.length > 5000 ||
       targetConnectionIds.length === 0 ||
       targetConnectionIds.length > 20
@@ -237,6 +236,8 @@ export async function POST(request: Request) {
     );
     const includesX = selected.some((connection) => connection.provider === "x");
 
+    if (includesInstagram && !content) return NextResponse.json({ ok: false, message: "Instagram用の共通本文を入力してください。" }, { status: 400 });
+    if (includesX && !includesInstagram && !xContent && mediaUrls.length === 0) return NextResponse.json({ ok: false, message: "X専用本文または画像を入力してください。" }, { status: 400 });
     if (includesInstagram && mediaUrls.length === 0) {
       return NextResponse.json(
         { ok: false, message: "Instagram投稿には画像が必要です。" },
@@ -251,7 +252,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (includesX && (!xContent || xWeightedLength(xContent) > 280)) {
+    if (includesX && xContent && xWeightedLength(xContent) > 280) {
       return NextResponse.json({ ok: false, message: "X用の投稿本文を入力してください。" }, { status: 400 });
     }
 
