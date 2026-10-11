@@ -18,7 +18,7 @@ function appUrl(
   request: Request,
   params: Record<string, string>,
 ) {
-  const url = new URL("/omnibox.html", new URL(request.url).origin);
+  const url = new URL("/", new URL(request.url).origin);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }

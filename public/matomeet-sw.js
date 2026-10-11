@@ -10,7 +10,7 @@ self.addEventListener("push", (event) => {
       badge: "/matomeet-icon.png",
       tag: "matomeet-inbox",
       renotify: true,
-      data: { url: "/omnibox.html" },
+      data: { url: "/" },
     }),
   );
 });
@@ -18,7 +18,7 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetUrl = new URL(
-    event.notification?.data?.url || "/omnibox.html",
+    event.notification?.data?.url || "/",
     self.location.origin,
   ).href;
 

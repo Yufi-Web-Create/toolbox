@@ -14,7 +14,7 @@ type Context = { params: Promise<{ provider: string }> };
 
 function returnUrl(request: Request, provider: string, error: string): URL {
   const origin = new URL(request.url).origin;
-  const url = new URL("/omnibox.html", origin);
+  const url = new URL("/", origin);
   url.searchParams.set("oauth_error", error);
   url.searchParams.set("provider", provider);
   return url;
