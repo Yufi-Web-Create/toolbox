@@ -326,10 +326,14 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (!publishResponse.ok || publishResult.status === "failed") {
+      const errors = Array.isArray(publishResult.results) ? publishResult.results : [];
+      const creditExhausted = errors.some((item: { detail?: { status?: number; detail?: string } }) =>
+        item?.detail?.status === 402 && item?.detail?.detail === "credits depleted"
+      );
       return NextResponse.json(
         {
           ok: false,
-          message: "一部またはすべてのSNSへ投稿できませんでした。",
+          message: creditExhausted ? "XのAPIクレジットが不足しています。X開発者ポータルで利用残高をご確認ください。投稿は実行されていません。" : "一部またはすべてのSNSへ投稿できませんでした。",
           post: refreshed ?? post,
         },
         { status: 502 },
