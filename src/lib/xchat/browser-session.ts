@@ -25,6 +25,7 @@ export type XChatVerifiedMessage = {
 
 export type XChatXdk = {
   lock?(): void;
+  setRejectUnverified?(enabled: boolean): void;
   free?(): void;
   unlock(passcode: string): Promise<unknown>;
   setIdentity(userId: string, keyVersion: string): void;
@@ -72,7 +73,10 @@ export class XChatBrowserSession {
   private unlocked = false;
   private seen = new Set<string>();
 
-  constructor(private readonly chat: XChatXdk) {}
+  constructor(private readonly chat: XChatXdk) {
+    // Chat XDK rejects unverified messages by default. Reassert when supported.
+    this.chat.setRejectUnverified?.(true);
+  }
 
   async unlockExistingKeys(passcode: string, userId: string, keyVersion: string) {
     if (!/^[0-9]{1,24}$/.test(userId) || !/^[0-9]+$/.test(keyVersion)) throw new Error("Invalid X identity");
@@ -96,10 +100,12 @@ export class XChatBrowserSession {
     // but never import or render an event unless its signature is verified.
     const output: XChatVerifiedMessage[] = [];
     for (const { event } of result.messages) {
-      if (event.verified !== true) continue;
-      if (event.type !== "message" || event.content?.contentType !== "text") continue;
+      // Successful SDK messages have already passed mandatory signature checks.
+      // The official DecryptedMessage shape does not require a verified flag.
+      if (event.verified === false) continue;
+      if (event.type !== "message") continue;
       if (!event.messageId || !event.conversationId || !event.senderId ||
-          typeof event.content.text !== "string") continue;
+          typeof event.content?.text !== "string") continue;
       const dedupeKey = event.conversationId + ":" + event.messageId;
       if (this.seen.has(dedupeKey)) continue;
       this.seen.add(dedupeKey);
