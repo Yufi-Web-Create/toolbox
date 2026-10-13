@@ -122,11 +122,13 @@ Deno.serve(async (req) => {
   const requestBody = await req.json().catch(() => ({}));
   const chatStatusMode = requestBody?.mode === "chat_status";
   const chatKeyStatusMode = requestBody?.mode === "chat_key_status";
+  const chatReadMode = requestBody?.mode === "chat_read";
   let chatConversations = 0;
   let chatHasMore = false;
   let chatAccountsChecked = 0;
   let chatKeysRegistered = 0;
   let chatKeysMissing = 0;
+  let chatReadResult: unknown = null;
   let imported = 0;
   let accounts = 0;
   let receivedEvents = 0;
@@ -144,6 +146,7 @@ Deno.serve(async (req) => {
   }
 
   for (const connection of connections ?? []) {
+    if (chatReadMode && connection.id !== requestBody?.connection_id) continue;
     const { data: secretValue } = await admin.rpc(
       "omnibox_get_provider_secret",
       { p_connection_id: connection.id },
@@ -183,6 +186,51 @@ Deno.serve(async (req) => {
       }
 
       if (!xToken) { fail("x_reconnect_required"); continue; }
+
+      if (chatReadMode) {
+        // The output of this branch is ciphertext and PUBLIC metadata only.
+        // Callers must be authenticated members of the connection's organization.
+        const accountId = String(connection.external_account_id ?? "");
+        const kind = String(requestBody?.resource ?? "");
+        const conversationId = String(requestBody?.conversation_id ?? "");
+        const publicUserId = String(requestBody?.user_id ?? "");
+        const xBase = "https://api.x.com/2";
+        let safeUrl: URL;
+        if (kind === "bootstrap") {
+          if (!/^[0-9]{1,24}$/.test(accountId)) { fail("xchat_account_unavailable"); continue; }
+          safeUrl = new URL(xBase + "/users/" + accountId + "/public_keys");
+          safeUrl.searchParams.set("public_key.fields", "public_key_version,public_key,signing_public_key,identity_public_key_signature,juicebox_config");
+        } else if (kind === "conversations") {
+          safeUrl = new URL(xBase + "/chat/conversations");
+          safeUrl.searchParams.set("max_results", "20");
+        } else if (kind === "events") {
+          if (!/^(?:[0-9]+(?:[:-][0-9]+)?|g[A-Za-z0-9_-]+)$/.test(conversationId) || conversationId.length > 128) {
+            fail("xchat_invalid_conversation"); continue;
+          }
+          safeUrl = new URL(xBase + "/chat/conversations/" + encodeURIComponent(conversationId.replaceAll(":", "-")) + "/events");
+          safeUrl.searchParams.set("max_results", "100");
+        } else if (kind === "public_keys") {
+          if (!/^[0-9]{1,24}$/.test(publicUserId)) { fail("xchat_invalid_user"); continue; }
+          safeUrl = new URL(xBase + "/users/" + publicUserId + "/public_keys");
+          safeUrl.searchParams.set("public_key.fields", "public_key_version,public_key,signing_public_key,identity_public_key_signature");
+        } else {
+          fail("xchat_invalid_resource"); continue;
+        }
+        const chatResponse = await fetch(safeUrl, { headers: { authorization: "Bearer " + xToken } });
+        if (!chatResponse.ok) {
+          fail(chatResponse.status === 429 ? "x_rate_limited" :
+            chatResponse.status === 401 ? "x_reconnect_required" :
+            chatResponse.status === 403 ? "xchat_access_denied" :
+            chatResponse.status === 402 ? "x_credits_depleted" : "xchat_api_error", chatResponse.status);
+          continue;
+        }
+        const payload = await chatResponse.json();
+        // Do not log/store this body: even ciphertext and public metadata can be sensitive.
+        chatReadResult = { resource: kind, account_id: accountId, data: payload.data ?? [],
+          meta: payload.meta ?? {}, errors: Array.isArray(payload.errors) ? payload.errors.map(() => ({ code: "partial_result" })) : [] };
+        chatAccountsChecked += 1;
+        break;
+      }
 
       if (chatKeyStatusMode) {
         // Public-key record metadata only; no keys, PINs, or ciphertext leave the server.
@@ -346,6 +394,11 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (chatReadMode) {
+    if (failures.length) return json(502, { ok: false, error: failures[0].code });
+    if (!chatReadResult) return json(404, { ok: false, error: "xchat_connection_not_found" });
+    return json(200, { ok: true, ...chatReadResult as object });
+  }
   if (chatKeyStatusMode) {
     const keySummary = { accounts_checked: chatAccountsChecked, registered: chatKeysRegistered, unregistered: chatKeysMissing };
     console.info("omnibox-x-chat-key-status", JSON.stringify(keySummary));
