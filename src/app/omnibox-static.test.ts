@@ -350,7 +350,7 @@ describe("uploaded MatoMeet application shell", () => {
     expect(html).toContain("700: '#A84459'");
     expect(html).not.toContain("border-violet-400 bg-violet-50");
     expect(html).toContain("MatoMeet warm neutrals");
-    expect(html).toContain('id="chat-recipient-account-badge" class="font-medium text-slate-700 bg-slate-100');
+    expect(html).toContain('id="chat-recipient-account-badge" class="font-medium text-slate-500 text-[10px]');
   });
 
   it("shows actual connection state and plan-aware AI quota", () => {

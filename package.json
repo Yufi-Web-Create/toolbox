@@ -21,7 +21,9 @@
     "@supabase/supabase-js": "2.117.2",
     "next": "16.3.8",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "@xdevplatform/chat-xdk": "0.5.0",
+    "juicebox-sdk": "0.3.7"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
