@@ -40,6 +40,7 @@ describe("X Chat browser-only cryptographic coordinator", () => {
   });
   it("encrypts replies locally; transport receives only SDK ciphertext", async () => {
     const chat = stubChat();
+    chat.lock = vi.fn();
     const session = new XChatBrowserSession(chat);
     await session.unlockExistingKeys("local-only-test-passcode", "123", "1");
     expect(session.prepareEncryptedReply("1-2", "Hello there")).toEqual({
@@ -51,6 +52,7 @@ describe("X Chat browser-only cryptographic coordinator", () => {
       conversationId: "1-2", text: "Hello there",
     });
     session.lock();
+    expect(chat.lock).toHaveBeenCalledOnce();
     expect(() => session.prepareEncryptedReply("1-2", "again")).toThrow("locked");
   });
   it("maps public signing keys according to official Chat XDK types", () => {
