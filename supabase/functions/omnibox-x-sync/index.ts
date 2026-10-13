@@ -235,11 +235,25 @@ Deno.serve(async (req) => {
           const hasBackupConfig = records.some((item: Record<string, unknown>) =>
             item && typeof item === "object" && Boolean(item.juicebox_config)
           );
+          // Inspect only structure, NEVER expose realm identifiers or token values.
+          const backupConfigs = records.map((item: Record<string, unknown>) => item.juicebox_config).filter(Boolean);
+          const hasEmbeddedRealmTokens = backupConfigs.some((config: unknown) => {
+            if (!config || typeof config !== "object") return false;
+            const c = config as Record<string, unknown>;
+            const tokenMap = c.token_map ?? (c.sdk_config && typeof c.sdk_config === "object"
+              ? (c.sdk_config as Record<string, unknown>).token_map : null);
+            if (!tokenMap || typeof tokenMap !== "object") return false;
+            return Object.values(tokenMap).some((entry) =>
+              entry && typeof entry === "object" && typeof (entry as Record<string, unknown>).token === "string"
+                && String((entry as Record<string, unknown>).token).length > 0
+            );
+          });
           // X OAuth does not itself provide Juicebox realm authorization. Never
           // claim that a PIN unlock is operational based on a public record alone.
           chatReadResult = { resource: kind, account_id: accountId, data: {
             has_public_key_record: records.length > 0,
             has_backup_config: hasBackupConfig,
+            has_embedded_realm_tokens: hasEmbeddedRealmTokens,
             realm_auth_ready: false,
             pin_unlock_ready: false
           }, meta: {}, errors: [] };
