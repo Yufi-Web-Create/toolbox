@@ -78,6 +78,63 @@ describe("X sync Edge Function", () => {
     expect(await response.json()).toMatchObject({ error: "x_sync_unavailable" });
     expect(JSON.stringify(h.log.mock.calls)).not.toContain("private");
   });
+  it("rejects X Chat plaintext import without explicit team-storage consent", async () => {
+    const h = harness();
+    const response = await h.handler(new Request("https://test.invalid", {
+      method: "POST",
+      headers: { authorization: "Bearer user-token", "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "chat_import", connection_id: "connection", conversation_id: "123-456",
+        messages: [{ message_id: "valid", sender_id: "123", text: "hello",
+          occurred_at: "2026-10-13T00:00:00Z" }]
+      })
+    }));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: "xchat_storage_consent_required" });
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects X Chat imports from another organization's connection", async () => {
+    const h = harness();
+    const response = await h.handler(new Request("https://test.invalid", {
+      method: "POST",
+      headers: { authorization: "Bearer user-token", "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "chat_import", connection_id: "other-org", conversation_id: "123-456",
+        explicit_team_storage_consent: true,
+        messages: [{ message_id: "valid", sender_id: "123", text: "hello",
+          occurred_at: "2026-10-13T00:00:00Z" }]
+      })
+    }));
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error: "xchat_connection_not_found" });
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+
+  it("stores only consented inbound X Chat text in its own provider thread", async () => {
+    const h = harness();
+    const response = await h.handler(new Request("https://test.invalid", {
+      method: "POST",
+      headers: { authorization: "Bearer user-token", "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "chat_import", connection_id: "connection", conversation_id: "123-456",
+        explicit_team_storage_consent: true,
+        messages: [{ message_id: "abc", sender_id: "123", text: "test message",
+          occurred_at: "2026-10-13T00:00:00Z" }]
+      })
+    }));
+    expect(await response.json()).toMatchObject({ok:true, processed:1});
+    expect(h.rpc).toHaveBeenCalledWith("omnibox_ingest_external_message",
+      expect.objectContaining({
+        p_provider_connection_id: "connection",
+        p_provider: "x",
+        p_provider_thread_id: "xchat:123-456",
+        p_provider_message_id: "xchat:abc",
+        p_body: "test message",
+      }));
+    expect(h.fetcher).not.toHaveBeenCalled();
+  });
+
   it("rejects unauthenticated callers before accessing credentials", async () => {
     const h = harness();
     const response = await h.handler(new Request("https://test.invalid", { method: "POST" }));
