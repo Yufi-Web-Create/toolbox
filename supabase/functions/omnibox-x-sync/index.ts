@@ -121,6 +121,8 @@ Deno.serve(async (req) => {
   let imported = 0;
   let accounts = 0;
   let receivedEvents = 0;
+  let apiReportedEvents = 0;
+  let emptyWithPagination = 0;
   let skippedOwn = 0;
   let skippedEmptyText = 0;
   let skippedMalformed = 0;
@@ -178,7 +180,7 @@ Deno.serve(async (req) => {
       url.searchParams.set("max_results", "100");
       url.searchParams.set(
         "dm_event.fields",
-        "id,text,event_type,dm_conversation_id,created_at,sender_id,participant_ids",
+        "id,text,event_type,dm_conversation_id,created_at",
       );
       url.searchParams.set("expansions", "sender_id,participant_ids");
       url.searchParams.set(
@@ -218,6 +220,8 @@ Deno.serve(async (req) => {
       accounts += 1;
 
       receivedEvents += events.length;
+      apiReportedEvents += typeof result.meta?.result_count === "number" ? result.meta.result_count : 0;
+      if (events.length === 0 && typeof result.meta?.next_token === "string") emptyWithPagination += 1;
       for (const event of events) {
         if (!event || typeof event !== "object") continue;
 
@@ -286,7 +290,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  const diagnostics = { accounts, received_events: receivedEvents, imported, skipped_own: skippedOwn, skipped_empty_text: skippedEmptyText, skipped_malformed: skippedMalformed };
+  const diagnostics = { accounts, received_events: receivedEvents, api_reported_events: apiReportedEvents, empty_with_pagination: emptyWithPagination, imported, skipped_own: skippedOwn, skipped_empty_text: skippedEmptyText, skipped_malformed: skippedMalformed };
   // Counts only. Never log customer identifiers, DM contents, or OAuth credentials.
   console.info("omnibox-x-sync summary", JSON.stringify(diagnostics));
   if (failures.length) {
