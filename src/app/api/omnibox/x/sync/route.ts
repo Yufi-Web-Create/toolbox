@@ -18,6 +18,10 @@ const syncErrors: Record<string, string> = {
   xchat_api_error: "X Chat APIから情報を取得できませんでした。",
   xchat_account_unavailable: "X Chatのアカウント識別情報を確認できませんでした。",
   xchat_key_record_unavailable: "X Chatの公開鍵登録を確認できませんでした。",
+  xchat_connection_not_found: "この組織のX連携が見つかりません。",
+  xchat_invalid_conversation: "X Chatの会話識別子が無効です。",
+  xchat_invalid_user: "X Chatの利用者識別子が無効です。",
+  xchat_invalid_resource: "X Chatの読み取り対象が無効です。",
 };
 
 function syncUrl() {
@@ -85,10 +89,19 @@ export async function POST(request?: Request) {
     const input = await request?.json().catch(() => ({})) ?? {};
     const chatStatusMode = input?.mode === "chat_status";
     const chatKeyStatusMode = input?.mode === "chat_key_status";
+    const chatReadMode = input?.mode === "chat_read";
+    if (chatReadMode && (
+      typeof input.connection_id !== "string" || !/^[a-f0-9-]{36}$/i.test(input.connection_id) ||
+      !["bootstrap", "conversations", "events", "public_keys"].includes(input.resource) ||
+      (input.resource === "events" && typeof input.conversation_id !== "string") ||
+      (input.resource === "public_keys" && typeof input.user_id !== "string")
+    )) {
+      return NextResponse.json({ ok: false, message: "X Chatの取得条件が無効です。" }, { status: 400 });
+    }
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify(chatKeyStatusMode ? { mode: "chat_key_status" } : chatStatusMode ? { mode: "chat_status" } : {}),
+      body: JSON.stringify(chatReadMode ? { mode: "chat_read", resource: input.resource, connection_id: input.connection_id, conversation_id: input.conversation_id, user_id: input.user_id } : chatKeyStatusMode ? { mode: "chat_key_status" } : chatStatusMode ? { mode: "chat_status" } : {}),
       cache: "no-store",
     });
 
@@ -101,6 +114,10 @@ export async function POST(request?: Request) {
       );
     }
 
+    if (chatReadMode) {
+      // Only pre-encryption-key metadata and encrypted event payloads. Never forward OAuth credentials.
+      return NextResponse.json({ ok: true, resource: result.resource, account_id: result.account_id, data: result.data, meta: result.meta, errors: result.errors }, { headers: { "Cache-Control": "no-store" } });
+    }
     if (chatKeyStatusMode) {
       return NextResponse.json({ ok: true, mode: "chat_key_status", accounts_checked: Number(result.accounts_checked ?? 0), registered: Number(result.registered ?? 0), unregistered: Number(result.unregistered ?? 0) });
     }
