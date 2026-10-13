@@ -118,8 +118,71 @@ Deno.serve(async (req) => {
     return json(500, { ok: false, error: "connections_unavailable" });
   }
 
-  // Explicit, read-only X Chat metadata check. Never fetch or store ciphertext or private keys.
+  // X Chat decrypted messages are stored only after a signed-in member has
+  // explicitly opted to share verified browser-decrypted text with the team.
+  // Never accept PINs, private keys, OAuth secrets or embedded realm tokens.
   const requestBody = await req.json().catch(() => ({}));
+  if (requestBody?.mode === "chat_import") {
+    const connectionId = String(requestBody.connection_id ?? "");
+    const connection = (connections ?? []).find((candidate) => candidate.id === connectionId);
+    if (!connection) return json(404, { ok: false, error: "xchat_connection_not_found" });
+    if (requestBody.explicit_team_storage_consent !== true) {
+      return json(403, { ok: false, error: "xchat_storage_consent_required" });
+    }
+    const conversationId = String(requestBody.conversation_id ?? "");
+    if (!/^(?:[0-9]+(?:[:-][0-9]+)?|g[A-Za-z0-9_-]+)$/.test(conversationId) ||
+      conversationId.length > 128) {
+      return json(400, { ok: false, error: "xchat_invalid_conversation" });
+    }
+    const messages: unknown[] = requestBody.messages;
+    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 20) {
+      return json(400, { ok: false, error: "xchat_invalid_import_batch" });
+    }
+    const ownId = String(connection.external_account_id ?? "");
+    let imported = 0;
+    for (const entry of messages) {
+      if (!entry || typeof entry !== "object") {
+        return json(400, { ok: false, error: "xchat_invalid_import_batch" });
+      }
+      const m = entry as Record<string, unknown>;
+      const messageId = String(m.message_id ?? "");
+      const senderId = String(m.sender_id ?? "");
+      const text = m.text;
+      const occurredAt = String(m.occurred_at ?? "");
+      const parsed = Date.parse(occurredAt);
+      const allowedKeys = "message_id,occurred_at,sender_id,text";
+      if (Object.keys(m).sort().join(",") !== allowedKeys ||
+        !/^[A-Za-z0-9_-]{1,128}$/.test(messageId) ||
+        !/^[0-9]{1,24}$/.test(senderId) || senderId === ownId ||
+        typeof text !== "string" || !text.trim() || text.length > 5000 ||
+        !Number.isFinite(parsed) || parsed > Date.now() + 300_000 ||
+        parsed < Date.parse("2006-01-01T00:00:00Z")) {
+        return json(400, { ok: false, error: "xchat_invalid_import_batch" });
+      }
+    }
+    // Never log plaintext. The existing database RPC is idempotent by
+    // (organization_id, provider_message_id), scoped to the active connection.
+    for (const raw of messages) {
+      const m = raw as Record<string, unknown>;
+      const senderId = String(m.sender_id);
+      const { error: persistError } = await admin.rpc("omnibox_ingest_external_message", {
+        p_provider_connection_id: connectionId,
+        p_provider: "x",
+        p_provider_thread_id: "xchat:" + conversationId,
+        p_customer_external_id: senderId,
+        p_customer_display_name: "X Chat " + senderId,
+        p_customer_avatar_url: null,
+        p_provider_message_id: "xchat:" + String(m.message_id),
+        p_body: m.text,
+        p_occurred_at: new Date(String(m.occurred_at)).toISOString(),
+        p_metadata: { source: "xchat", import_consent: "explicit_browser_team_share" },
+      });
+      if (persistError) return json(500, { ok: false, error: "xchat_import_failed", imported });
+      imported += 1;
+    }
+    return json(200, { ok: true, mode: "chat_import", processed: imported });
+  }
+
   const chatStatusMode = requestBody?.mode === "chat_status";
   const chatKeyStatusMode = requestBody?.mode === "chat_key_status";
   const chatReadMode = requestBody?.mode === "chat_read";
