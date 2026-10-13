@@ -136,3 +136,38 @@ test("getLineWebhookStatus reports active and matching webhook state", async () 
     "https://omnibox-line-bridge.onrender.com/webhooks/line",
   );
 });
+
+test("push dispatch rejects invalid message identifiers without contacting Supabase", async () => {
+  let calls = 0;
+  const server = createLineBridgeServer({
+    env: {
+      SUPABASE_URL: "https://example.supabase.co",
+      SUPABASE_PUBLISHABLE_KEY: "public-key",
+      BRIDGE_SIGNING_PRIVATE_KEY_PEM: "unused",
+    },
+    fetchImpl: async () => {
+      calls += 1;
+      throw new Error("Unexpected outbound request");
+    },
+  });
+  server.listen(0);
+  await once(server, "listening");
+
+  try {
+    const address = server.address();
+    const response = await fetch(`http://127.0.0.1:${address.port}/internal/push/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        organizationId: "wrong",
+        messageId: "wrong",
+      }),
+    });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error, "invalid_message");
+    assert.equal(calls, 0);
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});
