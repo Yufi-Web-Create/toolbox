@@ -92,7 +92,7 @@ export async function POST(request?: Request) {
     const chatReadMode = input?.mode === "chat_read";
     if (chatReadMode && (
       typeof input.connection_id !== "string" || !/^[a-f0-9-]{36}$/i.test(input.connection_id) ||
-      !["bootstrap", "conversations", "events", "public_keys"].includes(input.resource) ||
+      !["bootstrap", "conversations", "events", "public_keys", "recovery_status"].includes(input.resource) ||
       (input.resource === "events" && typeof input.conversation_id !== "string") ||
       (input.resource === "public_keys" && typeof input.user_id !== "string")
     )) {
@@ -116,6 +116,18 @@ export async function POST(request?: Request) {
 
     if (chatReadMode) {
       // Only pre-encryption-key metadata and encrypted event payloads. Never forward OAuth credentials.
+      if (input.resource === "recovery_status") {
+        return NextResponse.json({
+          ok: true,
+          resource: "recovery_status",
+          data: {
+            has_public_key_record: result.data?.has_public_key_record === true,
+            has_backup_config: result.data?.has_backup_config === true,
+            realm_auth_ready: false,
+            pin_unlock_ready: false,
+          },
+        }, { headers: { "Cache-Control": "no-store" } });
+      }
       return NextResponse.json({ ok: true, resource: result.resource, account_id: result.account_id, data: result.data, meta: result.meta, errors: result.errors }, { headers: { "Cache-Control": "no-store" } });
     }
     if (chatKeyStatusMode) {
