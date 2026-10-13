@@ -104,12 +104,31 @@ export default function XChatLabClient() {
       if (!id) throw Error("X Chatの会話がありません");
       const eventResult = await request("events", { conversation_id: id });
       const events = records(eventResult.data);
-      const encoded = events
+      const encryptedMessages = events
         .map((item) => item.encoded_event ?? item.encoded_message_event ?? item.encoded_message_create_event)
         .filter((value): value is string => typeof value === "string" && value.length > 0);
-      if (!encoded.length) throw Error("暗号化イベントの形式を確認する必要があります");
-      const userIds = [...new Set(events.map((event) => String(event.sender_id || ""))
-        .filter((value) => /^[0-9]{1,24}$/.test(value)))];
+      // Key-change history must precede messages so the official XDK can
+      // recover each conversation key and cache it for encrypted replies.
+      const meta = eventResult.meta && typeof eventResult.meta === "object"
+        ? eventResult.meta as Record<string, unknown> : {};
+      const keyChanges = Array.isArray(meta.conversation_key_events)
+        ? meta.conversation_key_events
+          .map((value: unknown) => typeof value === "string" ? value
+            : value && typeof value === "object" && typeof (value as Record<string, unknown>).encoded_event === "string"
+            ? String((value as Record<string, unknown>).encoded_event) : "")
+          .filter(Boolean) : [];
+      const encoded = [...keyChanges, ...encryptedMessages];
+      if (!encryptedMessages.length) throw Error("暗号化イベントの形式を確認する必要があります");
+      const participants = Array.isArray(target?.participant_ids) ? target.participant_ids
+        : Array.isArray(target?.participants) ? target.participants : [];
+      const candidateIds = [
+        String(listing.account_id || ""),
+        ...participants.map((item: unknown) =>
+          typeof item === "string" ? item : item && typeof item === "object"
+          ? String((item as Record<string, unknown>).id || (item as Record<string, unknown>).user_id || "") : ""),
+        ...events.map((event) => String(event.sender_id || "")),
+      ];
+      const userIds = [...new Set(candidateIds.filter((value) => /^[0-9]{1,24}$/.test(value)))];
       const signingKeys = (await Promise.all(userIds.map(async (userId) => {
         const response = await request("public_keys", { user_id: userId });
         return signingKeysFor(userId, records(response.data) as never[]);
