@@ -42,7 +42,7 @@ export type XChatXdk = {
         verified?: boolean;
       };
     }>;
-    errors?: unknown[];
+    errors?: unknown;
   };
   encryptMessage(params: { conversationId: string; text: string }): {
     messageId: string;
