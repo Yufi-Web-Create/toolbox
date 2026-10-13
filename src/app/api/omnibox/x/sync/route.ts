@@ -14,6 +14,8 @@ const syncErrors: Record<string, string> = {
   x_token_save_failed: "Xの認証情報を保存できませんでした。再度同期してください。",
   x_message_save_failed: "XのDMを保存できませんでした。再度同期してください。",
   x_sync_unavailable: "XのDM同期中に通信エラーが発生しました。再度同期してください。",
+  xchat_access_denied: "X Chat APIへのアクセスが拒否されました。XのAPI権限をご確認ください。",
+  xchat_api_error: "X Chat APIから会話情報を取得できませんでした。",
 };
 
 function syncUrl() {
@@ -21,7 +23,7 @@ function syncUrl() {
   return base ? new URL("/functions/v1/omnibox-x-sync", base) : null;
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const endpoint = syncUrl();
     if (!endpoint) {
@@ -78,9 +80,12 @@ export async function POST() {
       );
     }
 
+    const input = await request.json().catch(() => ({}));
+    const chatStatusMode = input?.mode === "chat_status";
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(chatStatusMode ? { mode: "chat_status" } : {}),
       cache: "no-store",
     });
 
@@ -91,6 +96,16 @@ export async function POST() {
         { ok: false, message: syncErrors[result.error] ?? "XのDMを同期できませんでした。" },
         { status: response.status >= 400 && response.status < 500 ? response.status : 502 },
       );
+    }
+
+    if (chatStatusMode) {
+      return NextResponse.json({
+        ok: true,
+        mode: "chat_status",
+        accounts_checked: Number(result.accounts_checked ?? 0),
+        conversations_on_first_pages: Number(result.conversations_on_first_pages ?? 0),
+        has_more: result.has_more === true,
+      });
     }
 
     return NextResponse.json({
