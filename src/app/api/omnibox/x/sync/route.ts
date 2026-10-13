@@ -23,7 +23,7 @@ function syncUrl() {
   return base ? new URL("/functions/v1/omnibox-x-sync", base) : null;
 }
 
-export async function POST(request: Request) {
+export async function POST(request?: Request) {
   try {
     const endpoint = syncUrl();
     if (!endpoint) {
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const input = await request.json().catch(() => ({}));
+    const input = await request?.json().catch(() => ({})) ?? {};
     const chatStatusMode = input?.mode === "chat_status";
     const response = await fetch(endpoint, {
       method: "POST",
