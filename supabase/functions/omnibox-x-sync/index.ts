@@ -120,6 +120,13 @@ Deno.serve(async (req) => {
 
   let imported = 0;
   let accounts = 0;
+  const failures: Array<{ code: string; upstream_status?: number }> = [];
+  function fail(code: string, upstreamStatus?: number) {
+    const failure = { code, ...(upstreamStatus ? { upstream_status: upstreamStatus } : {}) };
+    failures.push(failure);
+    // Never log tokens, X response bodies, message contents, or account identifiers.
+    console.error("omnibox-x-sync failure", JSON.stringify(failure));
+  }
 
   for (const connection of connections ?? []) {
     const { data: secretValue } = await admin.rpc(
@@ -127,7 +134,7 @@ Deno.serve(async (req) => {
       { p_connection_id: connection.id },
     );
     let bundle = parseBundle(secretValue);
-    if (!bundle) continue;
+    if (!bundle) { fail("x_credentials_unavailable"); continue; }
 
     let xToken =
       typeof bundle.access_token === "string" ? bundle.access_token : "";
@@ -136,121 +143,143 @@ Deno.serve(async (req) => {
       ? new Date(connection.token_expires_at).getTime()
       : 0;
 
-    if (!xToken || (expiresAt && expiresAt < Date.now() + 60_000)) {
-      const refreshed = await refreshXToken(bundle);
-      if (!refreshed) continue;
+    try {
+      if (!xToken || (expiresAt && expiresAt < Date.now() + 60_000)) {
+        const refreshed = await refreshXToken(bundle);
+        if (!refreshed) { fail("x_reconnect_required"); continue; }
 
-      bundle = refreshed;
-      xToken = String(refreshed.access_token ?? "");
+        bundle = refreshed;
+        xToken = String(refreshed.access_token ?? "");
 
-      const expiresIn =
-        typeof refreshed.expires_in === "number"
-          ? refreshed.expires_in
+        const expiresIn =
+          typeof refreshed.expires_in === "number"
+            ? refreshed.expires_in
+            : null;
+        const nextExpiry = expiresIn
+          ? new Date(Date.now() + expiresIn * 1000).toISOString()
           : null;
-      const nextExpiry = expiresIn
-        ? new Date(Date.now() + expiresIn * 1000).toISOString()
-        : null;
 
-      await admin.rpc("omnibox_replace_provider_secret", {
-        p_connection_id: connection.id,
-        p_secret_json: JSON.stringify(refreshed),
-        p_token_expires_at: nextExpiry,
+        const { error: saveError } = await admin.rpc("omnibox_replace_provider_secret", {
+          p_connection_id: connection.id,
+          p_secret_json: JSON.stringify(refreshed),
+          p_token_expires_at: nextExpiry,
+        });
+        if (saveError) { fail("x_token_save_failed"); continue; }
+      }
+
+      if (!xToken) { fail("x_reconnect_required"); continue; }
+
+      const url = new URL("https://api.x.com/2/dm_events");
+      url.searchParams.set("event_types", "MessageCreate");
+      url.searchParams.set("max_results", "100");
+      url.searchParams.set(
+        "dm_event.fields",
+        "id,text,event_type,dm_conversation_id,created_at,sender_id,participant_ids",
+      );
+      url.searchParams.set("expansions", "sender_id,participant_ids");
+      url.searchParams.set(
+        "user.fields",
+        "id,name,username,profile_image_url",
+      );
+
+      const response = await fetch(url, {
+        headers: { authorization: "Bearer " + xToken },
       });
-    }
 
-    if (!xToken) continue;
-
-    const url = new URL("https://api.x.com/2/dm_events");
-    url.searchParams.set("event_types", "MessageCreate");
-    url.searchParams.set("max_results", "100");
-    url.searchParams.set(
-      "dm_event.fields",
-      "id,text,event_type,dm_conversation_id,created_at,sender_id,participant_ids",
-    );
-    url.searchParams.set("expansions", "sender_id,participant_ids");
-    url.searchParams.set(
-      "user.fields",
-      "id,name,username,profile_image_url",
-    );
-
-    const response = await fetch(url, {
-      headers: { authorization: "Bearer " + xToken },
-    });
-
-    if (!response.ok) continue;
-
-    const result = await response.json();
-    const events = Array.isArray(result.data) ? result.data : [];
-    const users = Array.isArray(result.includes?.users)
-      ? result.includes.users
-      : [];
-    const profiles = new Map(
-      users
-        .filter((item: unknown) => item && typeof item === "object")
-        .map((item: Record<string, unknown>) => [String(item.id ?? ""), item]),
-    );
-
-    accounts += 1;
-
-    for (const event of events) {
-      if (!event || typeof event !== "object") continue;
-
-      const eventId = String(event.id ?? "").trim();
-      const senderId = String(event.sender_id ?? "").trim();
-      const threadId = String(event.dm_conversation_id ?? "").trim();
-      const body = typeof event.text === "string" ? event.text.trim() : "";
-
-      if (
-        !eventId ||
-        !senderId ||
-        !threadId ||
-        !body ||
-        senderId === connection.external_account_id
-      ) {
+      if (!response.ok) {
+        const problem = await response.json().catch(() => null);
+        const creditProblem = typeof problem?.type === "string" &&
+          problem.type.endsWith("/credits-depleted");
+        fail(creditProblem || response.status === 402 ? "x_credits_depleted" :
+          response.status === 401 ? "x_reconnect_required" :
+          response.status === 403 ? "x_access_denied" :
+          response.status === 429 ? "x_rate_limited" : "x_api_error", response.status);
         continue;
       }
 
-      const profile = profiles.get(senderId) ?? {};
-      const name =
-        typeof profile.name === "string" && profile.name.trim()
-          ? profile.name.trim()
-          : typeof profile.username === "string" &&
-              profile.username.trim()
-            ? "@" + profile.username.trim()
-            : senderId;
-      const avatar =
-        typeof profile.profile_image_url === "string"
-          ? profile.profile_image_url
-          : null;
-
-      const occurredAt =
-        typeof event.created_at === "string" && event.created_at
-          ? event.created_at
-          : new Date().toISOString();
-
-      const { error: ingestError } = await admin.rpc(
-        "omnibox_ingest_external_message",
-        {
-          p_provider_connection_id: connection.id,
-          p_provider: "x",
-          p_provider_thread_id: threadId,
-          p_customer_external_id: senderId,
-          p_customer_display_name: name,
-          p_customer_avatar_url: avatar,
-          p_provider_message_id:
-            "x:" + connection.id + ":" + eventId,
-          p_body: body,
-          p_occurred_at: occurredAt,
-          p_metadata: {
-            participant_ids: Array.isArray(event.participant_ids)
-              ? event.participant_ids
-              : [],
-          },
-        },
+      const result = await response.json();
+      if (Array.isArray(result.errors) && result.errors.length > 0) {
+        fail("x_api_partial_error", response.status);
+      }
+      const events = Array.isArray(result.data) ? result.data : [];
+      const users = Array.isArray(result.includes?.users)
+        ? result.includes.users
+        : [];
+      const profiles = new Map(
+        users
+          .filter((item: unknown) => item && typeof item === "object")
+          .map((item: Record<string, unknown>) => [String(item.id ?? ""), item]),
       );
 
-      if (!ingestError) imported += 1;
+      accounts += 1;
+
+      for (const event of events) {
+        if (!event || typeof event !== "object") continue;
+
+        const eventId = String(event.id ?? "").trim();
+        const senderId = String(event.sender_id ?? "").trim();
+        const threadId = String(event.dm_conversation_id ?? "").trim();
+        const body = typeof event.text === "string" ? event.text.trim() : "";
+
+        if (
+          !eventId ||
+          !senderId ||
+          !threadId ||
+          !body ||
+          senderId === connection.external_account_id
+        ) {
+          continue;
+        }
+
+        const profile = profiles.get(senderId) ?? {};
+        const name =
+          typeof profile.name === "string" && profile.name.trim()
+            ? profile.name.trim()
+            : typeof profile.username === "string" &&
+                profile.username.trim()
+              ? "@" + profile.username.trim()
+              : senderId;
+        const avatar =
+          typeof profile.profile_image_url === "string"
+            ? profile.profile_image_url
+            : null;
+
+        const occurredAt =
+          typeof event.created_at === "string" && event.created_at
+            ? event.created_at
+            : new Date().toISOString();
+
+        const { error: ingestError } = await admin.rpc(
+          "omnibox_ingest_external_message",
+          {
+            p_provider_connection_id: connection.id,
+            p_provider: "x",
+            p_provider_thread_id: threadId,
+            p_customer_external_id: senderId,
+            p_customer_display_name: name,
+            p_customer_avatar_url: avatar,
+            p_provider_message_id:
+              "x:" + connection.id + ":" + eventId,
+            p_body: body,
+            p_occurred_at: occurredAt,
+            p_metadata: {
+              participant_ids: Array.isArray(event.participant_ids)
+                ? event.participant_ids
+                : [],
+            },
+          },
+        );
+
+        if (!ingestError) imported += 1;
+        else fail("x_message_save_failed");
+      }
+    } catch {
+      fail("x_sync_unavailable");
     }
+  }
+
+  if (failures.length) {
+    return json(502, { ok: false, error: failures[0].code, accounts, imported, failures });
   }
 
   return json(200, { ok: true, accounts, imported });
