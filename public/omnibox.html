@@ -2472,7 +2472,9 @@
         const readiness = result.data || {};
         showToast(
           readiness.has_backup_config
-            ? 'X Chatの鍵バックアップ設定を確認しました。ただし復元用認証トークンが未対応のため、現在はPINを入力しないでください。'
+            ? (readiness.has_embedded_realm_tokens
+              ? 'X Chatの鍵バックアップ設定と認証トークン情報の存在を確認しました。復号はまだ未検証です。PINは入力しないでください。'
+              : 'X Chatの鍵バックアップ設定はありますが、復元用認証トークンは確認できませんでした。PINは入力しないでください。')
             : 'X Chatの鍵バックアップ設定を確認できませんでした。既存鍵は変更していません。',
           'info'
         );
