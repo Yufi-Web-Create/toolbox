@@ -24,6 +24,9 @@ const syncErrors: Record<string, string> = {
   xchat_invalid_resource: "X Chatの読み取り対象が無効です。",
   xchat_invalid_send_payload: "X Chatの暗号化・署名された送信データが無効です。",
   xchat_send_failed: "X Chatへの返信送信が失敗しました。",
+  xchat_storage_consent_required: "X Chat本文のチーム共有保存には明示的な同意が必要です。",
+  xchat_invalid_import_batch: "X Chatの共有保存対象の形式が無効です。",
+  xchat_import_failed: "X Chatの受信箱への保存に失敗しました。",
 };
 
 function syncUrl() {
@@ -93,6 +96,7 @@ export async function POST(request?: Request) {
     const chatKeyStatusMode = input?.mode === "chat_key_status";
     const chatReadMode = input?.mode === "chat_read";
     const chatSendMode = input?.mode === "chat_send";
+    const chatImportMode = input?.mode === "chat_import";
     if (chatReadMode && (
       typeof input.connection_id !== "string" || !/^[a-f0-9-]{36}$/i.test(input.connection_id) ||
       !["bootstrap", "conversations", "events", "public_keys", "recovery_status"].includes(input.resource) ||
@@ -121,10 +125,31 @@ export async function POST(request?: Request) {
     )) {
       return NextResponse.json({ ok: false, message: "X Chatの暗号化・署名された送信データが無効です。" }, { status: 400 });
     }
+    if (chatImportMode) {
+      const validId = typeof input.connection_id === "string" &&
+        /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(input.connection_id);
+      const validConversation = typeof input.conversation_id === "string" &&
+        /^(?:[0-9]+(?:[:-][0-9]+)?|g[A-Za-z0-9_-]+)$/.test(input.conversation_id) &&
+        input.conversation_id.length <= 128;
+      const validMessages = Array.isArray(input.messages) &&
+        input.messages.length > 0 && input.messages.length <= 20 &&
+        input.messages.every((message: unknown) => {
+          if (!message || typeof message !== "object") return false;
+          const m = message as Record<string, unknown>;
+          return Object.keys(m).sort().join(",") === "message_id,occurred_at,sender_id,text" &&
+            typeof m.message_id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(m.message_id) &&
+            typeof m.sender_id === "string" && /^[0-9]{1,24}$/.test(m.sender_id) &&
+            typeof m.text === "string" && m.text.trim().length > 0 && m.text.length <= 5000 &&
+            typeof m.occurred_at === "string" && Number.isFinite(Date.parse(m.occurred_at));
+        });
+      if (!validId || !validConversation || input.explicit_team_storage_consent !== true || !validMessages) {
+        return NextResponse.json({ ok: false, message: "共有保存の同意またはメッセージ形式を確認してください。" }, { status: 400 });
+      }
+    }
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify(chatSendMode ? { mode: "chat_send", connection_id: input.connection_id, conversation_id: input.conversation_id, payload: input.payload } : chatReadMode ? { mode: "chat_read", resource: input.resource, connection_id: input.connection_id, conversation_id: input.conversation_id, user_id: input.user_id } : chatKeyStatusMode ? { mode: "chat_key_status" } : chatStatusMode ? { mode: "chat_status" } : {}),
+      body: JSON.stringify(chatImportMode ? { mode: "chat_import", connection_id: input.connection_id, conversation_id: input.conversation_id, explicit_team_storage_consent: true, messages: input.messages } : chatSendMode ? { mode: "chat_send", connection_id: input.connection_id, conversation_id: input.conversation_id, payload: input.payload } : chatReadMode ? { mode: "chat_read", resource: input.resource, connection_id: input.connection_id, conversation_id: input.conversation_id, user_id: input.user_id } : chatKeyStatusMode ? { mode: "chat_key_status" } : chatStatusMode ? { mode: "chat_status" } : {}),
       cache: "no-store",
     });
 
@@ -137,6 +162,9 @@ export async function POST(request?: Request) {
       );
     }
 
+    if (chatImportMode) {
+      return NextResponse.json({ ok: true, processed: Number(result.processed ?? 0) }, { headers: { "Cache-Control": "no-store" } });
+    }
     if (chatSendMode) {
       return NextResponse.json({ ok: true, message_sent: result.message_sent === true }, { headers: { "Cache-Control": "no-store" } });
     }
