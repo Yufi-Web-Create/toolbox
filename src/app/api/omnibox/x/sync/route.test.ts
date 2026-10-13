@@ -51,6 +51,34 @@ describe("X sync API error guidance", () => {
       registered: 1, unregistered: 0
     });
   });
+  it("returns only allowed encrypted X Chat resources", async () => {
+    mocks.fetch.mockResolvedValue(Response.json({
+      ok: true, resource: "events", account_id: "123",
+      data: [{ encoded_event: "ENCRYPTED" }],
+      meta: { conversation_key_events: ["ENCRYPTED_KEY_CHANGE"] },
+      errors: [], oauth_access_token: "DO_NOT_FORWARD"
+    }));
+    const response = await POST(new Request("http://localhost/api/omnibox/x/sync", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "chat_read", resource: "events",
+        connection_id: "00000000-0000-4000-8000-000000000000",
+        conversation_id: "123-456" })
+    }));
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.data).toEqual([{ encoded_event: "ENCRYPTED" }]);
+    expect(payload.meta.conversation_key_events).toEqual(["ENCRYPTED_KEY_CHANGE"]);
+    expect(payload.oauth_access_token).toBeUndefined();
+  });
+  it("rejects invalid or unscoped ciphertext reads before upstream call", async () => {
+    const response = await POST(new Request("http://localhost/api/omnibox/x/sync", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mode: "chat_read", resource: "events",
+        connection_id: "../", conversation_id: "../../other" })
+    }));
+    expect(response.status).toBe(400);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
   it("preserves successful zero-result sync", async () => {
     mocks.fetch.mockResolvedValue(Response.json({ ok: true, accounts: 1, imported: 0 }));
     expect(await (await POST()).json()).toEqual({ ok: true, accounts: 1, imported: 0 });
