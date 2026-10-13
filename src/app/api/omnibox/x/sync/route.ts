@@ -15,7 +15,9 @@ const syncErrors: Record<string, string> = {
   x_message_save_failed: "XのDMを保存できませんでした。再度同期してください。",
   x_sync_unavailable: "XのDM同期中に通信エラーが発生しました。再度同期してください。",
   xchat_access_denied: "X Chat APIへのアクセスが拒否されました。XのAPI権限をご確認ください。",
-  xchat_api_error: "X Chat APIから会話情報を取得できませんでした。",
+  xchat_api_error: "X Chat APIから情報を取得できませんでした。",
+  xchat_account_unavailable: "X Chatのアカウント識別情報を確認できませんでした。",
+  xchat_key_record_unavailable: "X Chatの公開鍵登録を確認できませんでした。",
 };
 
 function syncUrl() {
@@ -82,10 +84,11 @@ export async function POST(request?: Request) {
 
     const input = await request?.json().catch(() => ({})) ?? {};
     const chatStatusMode = input?.mode === "chat_status";
+    const chatKeyStatusMode = input?.mode === "chat_key_status";
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify(chatStatusMode ? { mode: "chat_status" } : {}),
+      body: JSON.stringify(chatKeyStatusMode ? { mode: "chat_key_status" } : chatStatusMode ? { mode: "chat_status" } : {}),
       cache: "no-store",
     });
 
@@ -98,6 +101,9 @@ export async function POST(request?: Request) {
       );
     }
 
+    if (chatKeyStatusMode) {
+      return NextResponse.json({ ok: true, mode: "chat_key_status", accounts_checked: Number(result.accounts_checked ?? 0), registered: Number(result.registered ?? 0), unregistered: Number(result.unregistered ?? 0) });
+    }
     if (chatStatusMode) {
       return NextResponse.json({
         ok: true,
