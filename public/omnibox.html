@@ -2426,6 +2426,36 @@
       }
     }
 
+    window.checkXChatKeyStatus = async function(button) {
+      if (!button || button.disabled) return;
+      button.disabled = true;
+      const originalHtml = button.innerHTML;
+      button.innerHTML = '<span class="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin"></span><span>確認中...</span>';
+      try {
+        const response = await fetch('/api/omnibox/x/sync', {
+          method: 'POST',
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'chat_key_status' })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || 'X Chatの鍵登録を確認できませんでした');
+        showToast(
+          result.registered > 0
+            ? 'X Chatの公開鍵登録を確認しました。既存の秘密鍵を安全に復元する必要があります。'
+            : 'X Chatの公開鍵登録は確認できませんでした。鍵の新規登録は行っていません。',
+          'info'
+        );
+      } catch (error) {
+        showToast(error.message || 'X Chatの鍵登録を確認できませんでした', 'error');
+      } finally {
+        button.disabled = false;
+        button.innerHTML = originalHtml;
+        lucide.createIcons();
+      }
+    };
+
     window.checkXChatStatus = async function(button) {
       if (!button || button.disabled) return;
       button.disabled = true;
@@ -3960,6 +3990,9 @@
                   </button>
                   <button onclick="checkXChatStatus(this)" class="text-brand-700 font-medium hover:underline flex items-center gap-1" title="暗号化X Chatの会話情報だけを確認します。本文は取得しません。">
                     <i data-lucide="shield-check" class="w-3 h-3"></i><span>X Chat接続確認</span>
+                  </button>
+                  <button onclick="checkXChatKeyStatus(this)" class="text-brand-700 font-medium hover:underline flex items-center gap-1" title="既存の暗号鍵登録があるかのみ確認します。鍵やPINは取得しません。">
+                    <i data-lucide="key-round" class="w-3 h-3"></i><span>X Chat鍵の状態</span>
                   </button>`
               : acc.provider === 'instagram'
                 ? `<button onclick="showInstagramWebhookInfo('${acc.providerConnectionId || ''}')" class="text-brand-700 font-medium hover:underline flex items-center gap-1">
