@@ -313,7 +313,7 @@ export default function XChatLabClient() {
           <button disabled={working || !teamStorageConsent || !importCandidates.length} onClick={shareWithTeamInbox}
             className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-50">確認済み本文を受信箱へ登録（{importCandidates.length}件）</button>
           {importCandidates.length === 0 && <p className="text-xs text-amber-700">元イベントの日時が確認できないため、安全に登録できる本文がありません。</p>}
-        </section>
+        </section>}
         {!!conversationId && <div className="space-y-2">
           <textarea className="w-full rounded border p-3" value={reply} onChange={(e) => setReply(e.target.value)} placeholder="X Chatへの返信本文" />
           <button disabled={working || !reply.trim()} onClick={sendReply} className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-50">X Chatに返信する</button>
