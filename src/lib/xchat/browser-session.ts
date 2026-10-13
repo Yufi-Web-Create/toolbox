@@ -40,7 +40,6 @@ export type XChatXdk = {
         content?: { contentType?: string; text?: string };
         verified?: boolean;
       };
-      verified?: boolean;
     }>;
     errors?: unknown[];
   };
@@ -76,7 +75,7 @@ export class XChatBrowserSession {
   constructor(private readonly chat: XChatXdk) {}
 
   async unlockExistingKeys(passcode: string, userId: string, keyVersion: string) {
-    if (!/^[0-9]{1,24}$/.test(userId) || !/^\\d+$/.test(keyVersion)) throw new Error("Invalid X identity");
+    if (!/^[0-9]{1,24}$/.test(userId) || !/^[0-9]+$/.test(keyVersion)) throw new Error("Invalid X identity");
     if (!passcode) throw new Error("Passcode required");
     // Never store or log the PIN. Caller must discard it immediately afterward.
     await this.chat.unlock(passcode);
@@ -96,8 +95,8 @@ export class XChatBrowserSession {
     // Per-event errors are not ignored: a mixed batch may include valid messages,
     // but never import or render an event unless its signature is verified.
     const output: XChatVerifiedMessage[] = [];
-    for (const { event, verified } of result.messages) {
-      if (verified !== true || event.verified === false) continue;
+    for (const { event } of result.messages) {
+      if (event.verified !== true) continue;
       if (event.type !== "message" || event.content?.contentType !== "text") continue;
       if (!event.messageId || !event.conversationId || !event.senderId ||
           typeof event.content.text !== "string") continue;
