@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
       if (chatKeyStatusMode) {
         // Public-key record metadata only; no keys, PINs, or ciphertext leave the server.
         const accountId = String(connection.external_account_id ?? "");
-        if (!/^\\d{1,24}$/.test(accountId)) {
+        if (!/^[0-9]{1,24}$/.test(accountId)) {
           fail("xchat_account_unavailable");
           continue;
         }
