@@ -58,7 +58,7 @@ export async function sendReply(
     const { data: visibleConversations, error: conversationError } =
       await supabase
         .from("conversations")
-        .select("id")
+        .select("id, provider")
         .eq("id", conversationId)
         .limit(1);
 
@@ -68,6 +68,11 @@ export async function sendReply(
       visibleConversations.length !== 1
     ) {
       return { status: "error", message: CONVERSATION_ERROR };
+    }
+
+    // The LINE bridge MUST NOT be invoked for X Chat or any other provider.
+    if (visibleConversations[0].provider !== "line") {
+      return { status: "error", message: "この窓口はLINE返信の対象ではありません。X Chatは暗号化返信画面をご利用ください。" };
     }
 
     const result = await sendLineReply({
