@@ -2404,7 +2404,7 @@
             busyText: '同期中...',
             successMessage: result => result.imported > 0
               ? `XのDMを同期しました（${result.imported}件を確認）`
-              : 'XのDMは最新の状態です',
+              : '従来のX DM取得は0件です。暗号化されたX Chatは現在未対応のため、X本体のメッセージと一致しない場合があります',
             errorMessage: 'XのDMを同期できませんでした'
           });
         } catch (error) {
@@ -2417,7 +2417,7 @@
         if (!silent) {
           showToast(result.imported > 0
             ? `XのDMを同期しました（${result.imported}件を確認）`
-            : 'XのDMは最新の状態です', 'success');
+            : '従来のX DM取得は0件です。暗号化されたX Chatは現在未対応のため、X本体のメッセージと一致しない場合があります', 'success');
         }
         return result;
       } catch (error) {
@@ -2442,7 +2442,7 @@
         showToast(
           result.imported > 0
             ? `XのDMを同期しました（${result.imported}件を確認）`
-            : 'XのDMは最新の状態です',
+            : '従来のX DM取得は0件です。暗号化されたX Chatは現在未対応のため、X本体のメッセージと一致しない場合があります',
           'success'
         );
       } catch (error) {
