@@ -123,6 +123,7 @@ export async function POST(request?: Request) {
           data: {
             has_public_key_record: result.data?.has_public_key_record === true,
             has_backup_config: result.data?.has_backup_config === true,
+            has_embedded_realm_tokens: result.data?.has_embedded_realm_tokens === true,
             realm_auth_ready: false,
             pin_unlock_ready: false,
           },
