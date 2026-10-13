@@ -123,6 +123,8 @@ Deno.serve(async (req) => {
   const chatStatusMode = requestBody?.mode === "chat_status";
   const chatKeyStatusMode = requestBody?.mode === "chat_key_status";
   const chatReadMode = requestBody?.mode === "chat_read";
+  const chatSendMode = requestBody?.mode === "chat_send";
+  let chatSendResult: { message_sent: boolean } | null = null;
   let chatConversations = 0;
   let chatHasMore = false;
   let chatAccountsChecked = 0;
@@ -146,7 +148,7 @@ Deno.serve(async (req) => {
   }
 
   for (const connection of connections ?? []) {
-    if (chatReadMode && connection.id !== requestBody?.connection_id) continue;
+    if ((chatReadMode || chatSendMode) && connection.id !== requestBody?.connection_id) continue;
     const { data: secretValue } = await admin.rpc(
       "omnibox_get_provider_secret",
       { p_connection_id: connection.id },
@@ -186,6 +188,50 @@ Deno.serve(async (req) => {
       }
 
       if (!xToken) { fail("x_reconnect_required"); continue; }
+
+      if (chatSendMode) {
+        // Only signed, encrypted Chat XDK output. Plaintext, PINs, and raw keys
+        // are never accepted here. X verifies the signed event server-side.
+        const cid = String(requestBody?.conversation_id ?? "");
+        const payload = requestBody?.payload;
+        const validConversation = /^(?:[0-9]+(?:[:-][0-9]+)?|g[A-Za-z0-9_-]+)$/.test(cid) && cid.length <= 128;
+        const validPayload = payload && typeof payload === "object" &&
+          typeof payload.message_id === "string" &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.message_id) &&
+          typeof payload.encoded_message_create_event === "string" &&
+          payload.encoded_message_create_event.length > 20 &&
+          payload.encoded_message_create_event.length < 131072 &&
+          typeof payload.encoded_message_event_signature === "string" &&
+          payload.encoded_message_event_signature.length > 20 &&
+          payload.encoded_message_event_signature.length < 8192 &&
+          Object.keys(payload).sort().join(",") ===
+            "encoded_message_create_event,encoded_message_event_signature,message_id";
+        if (!validConversation || !validPayload) {
+          fail("xchat_invalid_send_payload");
+          continue;
+        }
+        const sendUrl = "https://api.x.com/2/chat/conversations/" +
+          encodeURIComponent(cid.replaceAll(":", "-")) + "/messages";
+        const sent = await fetch(sendUrl, {
+          method: "POST",
+          headers: {
+            authorization: "Bearer " + xToken,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+        if (!sent.ok) {
+          fail(sent.status === 429 ? "x_rate_limited" :
+            sent.status === 401 ? "x_reconnect_required" :
+            sent.status === 403 ? "xchat_access_denied" :
+            sent.status === 402 ? "x_credits_depleted" : "xchat_send_failed",
+            sent.status);
+          continue;
+        }
+        // Do not log X's message response, ciphertext, or identifiers.
+        chatSendResult = { message_sent: true };
+        break;
+      }
 
       if (chatReadMode) {
         // The output of this branch is ciphertext and PUBLIC metadata only.
@@ -429,6 +475,11 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (chatSendMode) {
+    if (failures.length) return json(502, { ok: false, error: failures[0].code });
+    if (!chatSendResult) return json(404, { ok: false, error: "xchat_connection_not_found" });
+    return json(200, { ok: true, ...chatSendResult });
+  }
   if (chatReadMode) {
     if (failures.length) return json(502, { ok: false, error: failures[0].code });
     if (!chatReadResult) return json(404, { ok: false, error: "xchat_connection_not_found" });
