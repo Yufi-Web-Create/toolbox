@@ -146,6 +146,43 @@ describe("X sync API error guidance", () => {
     expect(response.status).toBe(400);
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
+  it("rejects browser-decrypted X Chat storage without explicit consent", async () => {
+    mocks.fetch.mockReset();
+    const response = await POST(new Request("http://localhost/api/omnibox/x/sync", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "chat_import",
+        connection_id: "00000000-0000-4000-8000-000000000000",
+        conversation_id: "111-222",
+        messages: [{ message_id: "abc", sender_id: "123", text: "hello",
+          occurred_at: "2026-10-13T02:00:00Z" }]
+      })
+    }));
+    expect(response.status).toBe(400);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+  it("only forwards explicitly consented X Chat text without keys", async () => {
+    mocks.fetch.mockResolvedValue(Response.json({ok:true, processed:1, secret:"must-not-escape"}));
+    const messages = [{ message_id: "abc", sender_id: "123", text: "hello",
+      occurred_at: "2026-10-13T02:00:00Z" }];
+    const response = await POST(new Request("http://localhost/api/omnibox/x/sync", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "chat_import",
+        connection_id: "00000000-0000-4000-8000-000000000000",
+        conversation_id: "111-222",
+        explicit_team_storage_consent: true, messages
+      })
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ok:true,processed:1});
+    expect(JSON.parse(mocks.fetch.mock.calls.at(-1)?.[1]?.body)).toEqual({
+      mode: "chat_import",
+      connection_id: "00000000-0000-4000-8000-000000000000",
+      conversation_id: "111-222",
+      explicit_team_storage_consent: true, messages
+    });
+  });
   it("preserves successful zero-result sync", async () => {
     mocks.fetch.mockResolvedValue(Response.json({ ok: true, accounts: 1, imported: 0 }));
     expect(await (await POST()).json()).toEqual({ ok: true, accounts: 1, imported: 0 });
