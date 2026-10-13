@@ -103,7 +103,7 @@ export class XChatBrowserSession {
       // Successful SDK messages have already passed mandatory signature checks.
       // The official DecryptedMessage shape does not require a verified flag.
       if (event.verified === false) continue;
-      if (event.type !== "message") continue;
+      if (event.type !== "message" || event.content?.contentType !== "text") continue;
       if (!event.messageId || !event.conversationId || !event.senderId ||
           typeof event.content?.text !== "string") continue;
       const dedupeKey = event.conversationId + ":" + event.messageId;
