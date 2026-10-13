@@ -4,14 +4,15 @@ import { XChatBrowserSession, signingKeysFor, type XChatXdk } from "./browser-se
 function stubChat(): XChatXdk {
   return {
     unlock: vi.fn(async () => undefined),
+    setRejectUnverified: vi.fn(),
     setIdentity: vi.fn(),
     setSigningKeys: vi.fn(),
     setCacheKeys: vi.fn(),
     decryptEvents: vi.fn(() => ({ messages: [
       { event: { type: "message", messageId: "a", conversationId: "1-2", senderId: "2",
-        content: { contentType: "text", text: "hello" }, verified: true } },
+        content: { text: "hello" } } },
       { event: { type: "message", messageId: "b", conversationId: "1-2", senderId: "2",
-        content: { contentType: "text", text: "unverified" }, verified: false } },
+        content: { text: "unverified" }, verified: false } },
     ], errors: [{ code: "bad_signature" }] })),
     encryptMessage: vi.fn(() => ({
       messageId: "00000000-0000-4000-8000-000000000000",
@@ -32,6 +33,7 @@ describe("X Chat browser-only cryptographic coordinator", () => {
     const session = new XChatBrowserSession(chat);
     await session.unlockExistingKeys("example-pin-only-for-unit-test", "123", "1");
     expect(chat.unlock).toHaveBeenCalledWith("example-pin-only-for-unit-test");
+    expect(chat.setRejectUnverified).toHaveBeenCalledWith(true);
     expect(chat.setIdentity).toHaveBeenCalledWith("123", "1");
     expect(session.decryptVerifiedEvents(["ciphertext"])).toEqual([
       { messageId: "a", conversationId: "1-2", senderId: "2", text: "hello" }
