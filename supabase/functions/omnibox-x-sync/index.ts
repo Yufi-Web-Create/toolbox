@@ -121,9 +121,12 @@ Deno.serve(async (req) => {
   // Explicit, read-only X Chat metadata check. Never fetch or store ciphertext or private keys.
   const requestBody = await req.json().catch(() => ({}));
   const chatStatusMode = requestBody?.mode === "chat_status";
+  const chatKeyStatusMode = requestBody?.mode === "chat_key_status";
   let chatConversations = 0;
   let chatHasMore = false;
   let chatAccountsChecked = 0;
+  let chatKeysRegistered = 0;
+  let chatKeysMissing = 0;
   let imported = 0;
   let accounts = 0;
   let receivedEvents = 0;
@@ -180,6 +183,32 @@ Deno.serve(async (req) => {
       }
 
       if (!xToken) { fail("x_reconnect_required"); continue; }
+
+      if (chatKeyStatusMode) {
+        // Public-key record metadata only; no keys, PINs, or ciphertext leave the server.
+        const accountId = String(connection.external_account_id ?? "");
+        if (!/^\\d{1,24}$/.test(accountId)) {
+          fail("xchat_account_unavailable");
+          continue;
+        }
+        const keyUrl = new URL("https://api.x.com/2/users/" + accountId + "/public_keys");
+        keyUrl.searchParams.set("public_key.fields", "public_key_version");
+        const keyResponse = await fetch(keyUrl, { headers: { authorization: "Bearer " + xToken } });
+        if (!keyResponse.ok) {
+          fail(keyResponse.status === 429 ? "x_rate_limited" :
+            keyResponse.status === 401 ? "x_reconnect_required" :
+            keyResponse.status === 403 ? "xchat_access_denied" :
+            keyResponse.status === 404 ? "xchat_key_record_unavailable" : "xchat_api_error", keyResponse.status);
+          continue;
+        }
+        const keyResult = await keyResponse.json();
+        const records = Array.isArray(keyResult.data) ? keyResult.data :
+          keyResult.data && typeof keyResult.data === "object" ? [keyResult.data] : [];
+        if (records.length > 0) chatKeysRegistered += 1;
+        else chatKeysMissing += 1;
+        chatAccountsChecked += 1;
+        continue;
+      }
 
       if (chatStatusMode) {
         const chatResponse = await fetch("https://api.x.com/2/chat/conversations?max_results=10", {
@@ -317,6 +346,12 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (chatKeyStatusMode) {
+    const keySummary = { accounts_checked: chatAccountsChecked, registered: chatKeysRegistered, unregistered: chatKeysMissing };
+    console.info("omnibox-x-chat-key-status", JSON.stringify(keySummary));
+    if (failures.length) return json(502, { ok: false, error: failures[0].code, ...keySummary });
+    return json(200, { ok: true, mode: "chat_key_status", ...keySummary });
+  }
   if (chatStatusMode) {
     // No ciphertext, conversation IDs, private keys or message bodies in response or logs.
     const chatSummary = { accounts_checked: chatAccountsChecked, conversations_on_first_pages: chatConversations, has_more: chatHasMore };
