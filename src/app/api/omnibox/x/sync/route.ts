@@ -22,6 +22,8 @@ const syncErrors: Record<string, string> = {
   xchat_invalid_conversation: "X Chatの会話識別子が無効です。",
   xchat_invalid_user: "X Chatの利用者識別子が無効です。",
   xchat_invalid_resource: "X Chatの読み取り対象が無効です。",
+  xchat_invalid_send_payload: "X Chatの暗号化・署名された送信データが無効です。",
+  xchat_send_failed: "X Chatへの返信送信が失敗しました。",
 };
 
 function syncUrl() {
@@ -90,6 +92,7 @@ export async function POST(request?: Request) {
     const chatStatusMode = input?.mode === "chat_status";
     const chatKeyStatusMode = input?.mode === "chat_key_status";
     const chatReadMode = input?.mode === "chat_read";
+    const chatSendMode = input?.mode === "chat_send";
     if (chatReadMode && (
       typeof input.connection_id !== "string" || !/^[a-f0-9-]{36}$/i.test(input.connection_id) ||
       !["bootstrap", "conversations", "events", "public_keys", "recovery_status"].includes(input.resource) ||
@@ -98,10 +101,30 @@ export async function POST(request?: Request) {
     )) {
       return NextResponse.json({ ok: false, message: "X Chatの取得条件が無効です。" }, { status: 400 });
     }
+    if (chatSendMode && (
+      typeof input.connection_id !== "string" ||
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(input.connection_id) ||
+      typeof input.conversation_id !== "string" ||
+      !/^(?:[0-9]+(?:[:-][0-9]+)?|g[A-Za-z0-9_-]+)$/.test(input.conversation_id) ||
+      input.conversation_id.length > 128 ||
+      !input.payload || typeof input.payload !== "object" ||
+      Object.keys(input.payload).sort().join(",") !==
+        "encoded_message_create_event,encoded_message_event_signature,message_id" ||
+      typeof input.payload.message_id !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.payload.message_id) ||
+      typeof input.payload.encoded_message_create_event !== "string" ||
+      input.payload.encoded_message_create_event.length <= 20 ||
+      input.payload.encoded_message_create_event.length >= 131072 ||
+      typeof input.payload.encoded_message_event_signature !== "string" ||
+      input.payload.encoded_message_event_signature.length <= 20 ||
+      input.payload.encoded_message_event_signature.length >= 8192
+    )) {
+      return NextResponse.json({ ok: false, message: "X Chatの暗号化・署名された送信データが無効です。" }, { status: 400 });
+    }
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify(chatReadMode ? { mode: "chat_read", resource: input.resource, connection_id: input.connection_id, conversation_id: input.conversation_id, user_id: input.user_id } : chatKeyStatusMode ? { mode: "chat_key_status" } : chatStatusMode ? { mode: "chat_status" } : {}),
+      body: JSON.stringify(chatSendMode ? { mode: "chat_send", connection_id: input.connection_id, conversation_id: input.conversation_id, payload: input.payload } : chatReadMode ? { mode: "chat_read", resource: input.resource, connection_id: input.connection_id, conversation_id: input.conversation_id, user_id: input.user_id } : chatKeyStatusMode ? { mode: "chat_key_status" } : chatStatusMode ? { mode: "chat_status" } : {}),
       cache: "no-store",
     });
 
@@ -114,6 +137,9 @@ export async function POST(request?: Request) {
       );
     }
 
+    if (chatSendMode) {
+      return NextResponse.json({ ok: true, message_sent: result.message_sent === true }, { headers: { "Cache-Control": "no-store" } });
+    }
     if (chatReadMode) {
       // Only pre-encryption-key metadata and encrypted event payloads. Never forward OAuth credentials.
       if (input.resource === "recovery_status") {
