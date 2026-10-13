@@ -14,6 +14,13 @@ type InboxPageProps = {
   searchParams: Promise<{ conversation?: string | string[] }>;
 };
 
+const PROVIDER_LABELS = {
+  line: "LINE",
+  instagram: "Instagram",
+  x: "X",
+  email: "メール",
+} as const;
+
 const STATUS_LABELS = {
   unread: "未対応",
   in_progress: "対応中",
@@ -141,11 +148,11 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
 
         <section className={styles.threadColumn}>
           <div className={styles.threadHeader}>
-            <div><strong>受信トレイ</strong><span>LINE公式・すべてのステータス</span></div>
+            <div><strong>受信トレイ</strong><span>すべての連携窓口・すべてのステータス</span></div>
             <span className={styles.liveBadge}>LIVE DATA</span>
           </div>
 
-          <nav className={styles.threadList} aria-label="LINE会話一覧">
+          <nav className={styles.threadList} aria-label="問い合わせ会話一覧">
             {inbox.conversations.length === 0 ? (
               <div className={styles.threadEmpty}>
                 <strong>問い合わせはまだありません</strong>
@@ -161,14 +168,14 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
                 >
                   <div className={styles.threadAvatar}>
                     {conversation.customer_display_name.slice(0, 1)}
-                    <span>LINE</span>
+                    <span>{PROVIDER_LABELS[conversation.provider]}</span>
                   </div>
                   <div className={styles.threadMain}>
                     <div className={styles.threadTop}>
                       <strong>{conversation.customer_display_name}</strong>
                       <time>{formatDate(conversation.last_message_at)}</time>
                     </div>
-                    <span className={styles.destination}>宛先: LINE公式</span>
+                    <span className={styles.destination}>宛先: {PROVIDER_LABELS[conversation.provider]}</span>
                     <p>{conversation.last_message_preview}</p>
                     <div className={styles.threadBottom}>
                       <span>担当: 未割り当て</span>
@@ -188,7 +195,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
                 <div className={styles.customer}>
                   <div className={styles.customerAvatar}>
                     {inbox.selectedConversation.customer_display_name.slice(0, 1)}
-                    <span>LINE</span>
+                    <span>{PROVIDER_LABELS[inbox.selectedConversation.provider]}</span>
                   </div>
                   <div>
                     <div className={styles.customerTitle}>
@@ -199,7 +206,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
                   </div>
                 </div>
                 <div className={styles.chatMeta}>
-                  <span>宛先: LINE公式</span>
+                  <span>宛先: {PROVIDER_LABELS[inbox.selectedConversation.provider]}</span>
                   <small>実データ</small>
                 </div>
               </header>
@@ -231,7 +238,21 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
                   <span>親しみやすい返信</span>
                   <span>定型文挿入</span>
                 </div>
-                <ReplyForm conversationId={inbox.selectedConversation.id} />
+                {inbox.selectedConversation.provider === "line" ? (
+                  <ReplyForm conversationId={inbox.selectedConversation.id} />
+                ) : inbox.selectedConversation.provider === "x" &&
+                  inbox.selectedConversation.provider_thread_id.startsWith("xchat:") ? (
+                  <div className={styles.replyForm}>
+                    <p>X Chatは暗号化されているため、返信には端末内の鍵復元が必要です。</p>
+                    <Link href="/app/xchat-lab" className={styles.replyButton}>
+                      X Chatの暗号化返信画面を開く
+                    </Link>
+                  </div>
+                ) : (
+                  <div className={styles.replyForm}>
+                    <p>この窓口への返信はMatoMeetのメイン受信箱をご利用ください。</p>
+                  </div>
+                )}
               </div>
             </>
           ) : (
