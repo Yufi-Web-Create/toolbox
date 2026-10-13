@@ -30,6 +30,8 @@ export default function XChatLabClient() {
   const [selectedConversation, setSelectedConversation] = useState("");
   const [messages, setMessages] = useState<XChatVerifiedMessage[]>([]);
   const [reply, setReply] = useState("");
+  const [teamStorageConsent, setTeamStorageConsent] = useState(false);
+  const [importCandidates, setImportCandidates] = useState<Array<{ message_id: string; sender_id: string; text: string; occurred_at: string }>>([]);
   const pinRef = useRef<HTMLInputElement>(null);
   const sessionRef = useRef<XChatBrowserSession | null>(null);
 
@@ -188,12 +190,59 @@ export default function XChatLabClient() {
       sessionRef.current.configureParticipantKeys(signingKeys);
       const verified = sessionRef.current.decryptVerifiedEvents(encoded);
       setMessages(verified);
+      const validTime = (value: unknown) =>
+        typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
+      const importable = verified.flatMap((m) => {
+        const matching = events.find((event) =>
+          String(event.id || event.message_id || "") === m.messageId);
+        const occurredAt = validTime(matching?.created_at) ||
+          validTime(matching?.timestamp);
+        if (!occurredAt || !/^[A-Za-z0-9_-]{1,128}$/.test(m.messageId) ||
+          !/^[0-9]{1,24}$/.test(m.senderId)) return [];
+        return [{
+          message_id: m.messageId, sender_id: m.senderId,
+          text: m.text, occurred_at: occurredAt,
+        }];
+      });
+      setImportCandidates(importable);
+      setTeamStorageConsent(false);
       setConversationId(id);
       setStatus(verified.length
         ? `署名検証済みのメッセージを${verified.length}件復号しました`
         : "復号可能な署名検証済み本文がありません");
     } catch {
       setStatus("会話の復号に失敗しました。暗号化イベントと鍵更新情報の検証が必要です");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function shareWithTeamInbox() {
+    if (!unlocked || !teamStorageConsent || !connectionId || !conversationId ||
+      !importCandidates.length || working) return;
+    setWorking(true);
+    setStatus("復号した本文をMatoMeetの共有受信箱へ登録しています");
+    try {
+      let processed = 0;
+      for (let offset = 0; offset < importCandidates.length; offset += 20) {
+        const response = await fetch("/api/omnibox/x/sync", {
+          method: "POST", credentials: "same-origin", cache: "no-store",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            mode: "chat_import", connection_id: connectionId,
+            conversation_id: conversationId,
+            explicit_team_storage_consent: true,
+            messages: importCandidates.slice(offset, offset + 20),
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok || result.ok !== true) throw Error("team import failed");
+        processed += Number(result.processed || 0);
+      }
+      setStatus(`共有受信箱への登録処理が完了しました（処理件数：${processed}）。受信箱で確認してください`);
+      setTeamStorageConsent(false);
+    } catch {
+      setStatus("共有受信箱への登録に失敗しました。再試行前に受信箱の重複有無を確認してください");
     } finally {
       setWorking(false);
     }
@@ -228,7 +277,7 @@ export default function XChatLabClient() {
       <p className="text-sm text-slate-600">MatoMeet内での受信と返信を検証する専用画面です。PINは端末内の公式SDKだけで使用し、サーバーには送信しません。既存の鍵は変更しません。</p>
       <p role="status" className="rounded-lg bg-rose-50 p-3 text-sm">{status}</p>
       <label className="block text-sm">X連携アカウント
-        <select className="mt-1 block w-full rounded border p-2" value={connectionId} onChange={(e) => { sessionRef.current?.lock(); sessionRef.current = null; setUnlocked(false); setMessages([]); setPreflightReady(false); setPinAttempted(false); setAvailableConversations([]); setSelectedConversation(""); setConnectionId(e.target.value); }}>
+        <select className="mt-1 block w-full rounded border p-2" value={connectionId} onChange={(e) => { sessionRef.current?.lock(); sessionRef.current = null; setUnlocked(false); setMessages([]); setImportCandidates([]); setTeamStorageConsent(false); setPreflightReady(false); setPinAttempted(false); setAvailableConversations([]); setSelectedConversation(""); setConnectionId(e.target.value); }}>
           {connections.map((c) => <option value={c.id} key={c.id}>{c.account_name || "Xアカウント"}</option>)}
         </select>
       </label>
@@ -245,12 +294,23 @@ export default function XChatLabClient() {
       {unlocked && <section className="space-y-3">
         <button disabled={working} onClick={refreshConversations} className="rounded border px-4 py-2 disabled:opacity-50">会話一覧を取得</button>
         {!!availableConversations.length && <label className="block text-sm">本文を確認する会話
-          <select className="mt-1 block w-full rounded border p-2" value={selectedConversation} onChange={(e) => { setSelectedConversation(e.target.value); setConversationId(""); setMessages([]); }}>
+          <select className="mt-1 block w-full rounded border p-2" value={selectedConversation} onChange={(e) => { setSelectedConversation(e.target.value); setConversationId(""); setMessages([]); setImportCandidates([]); setTeamStorageConsent(false); }}>
             {availableConversations.map((c) => <option value={c.id} key={c.id}>{c.label}</option>)}
           </select>
         </label>}
         <button disabled={working || !selectedConversation} onClick={loadConversation} className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-50">選択した会話の本文を取得</button>
         <div className="space-y-2">{messages.map((m) => <div className="rounded border p-3 text-sm whitespace-pre-wrap" key={m.conversationId + m.messageId}>{m.text}</div>)}</div>
+        {!!messages.length && <section className="rounded-lg border p-4 space-y-3">
+          <h2 className="font-semibold">MatoMeetの共通受信箱へ登録</h2>
+          <p className="text-sm text-slate-600">ここで同意すると、復号した本文が組織の共有データベースに保存され、従業員からも閲覧できます。X Chatの端末内だけの暗号化保護とは異なる保存になります。</p>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" checked={teamStorageConsent} onChange={(e) => setTeamStorageConsent(e.target.checked)} />
+            復号したX Chat本文をMatoMeetのチーム受信箱へ保存することに同意します
+          </label>
+          <button disabled={working || !teamStorageConsent || !importCandidates.length} onClick={shareWithTeamInbox}
+            className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-50">確認済み本文を受信箱へ登録（{importCandidates.length}件）</button>
+          {importCandidates.length === 0 && <p className="text-xs text-amber-700">元イベントの日時が確認できないため、安全に登録できる本文がありません。</p>}
+        </section>
         {!!conversationId && <div className="space-y-2">
           <textarea className="w-full rounded border p-3" value={reply} onChange={(e) => setReply(e.target.value)} placeholder="X Chatへの返信本文" />
           <button disabled={working || !reply.trim()} onClick={sendReply} className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-50">X Chatに返信する</button>
