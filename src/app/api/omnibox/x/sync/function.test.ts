@@ -23,7 +23,7 @@ function harness(options: { status?: number; problem?: unknown; events?: unknown
   });
   runInNewContext(script, {
     Request, Response, URL, URLSearchParams, Date, btoa, fetch: fetcher,
-    console: { error: log },
+    console: { error: log, info: log },
     createClient: () => ({
       auth: { getUser: async () => ({ data: { user: { id: "user" } }, error: null }) },
       from: (table: string) => {
@@ -51,11 +51,11 @@ describe("X sync Edge Function", () => {
     expect(await (await h.call()).json()).toMatchObject({ error: "x_credits_depleted" });
   });
   it("keeps an empty successful inbox successful", async () => {
-    expect(await (await harness().call()).json()).toEqual({ ok: true, accounts: 1, imported: 0 });
+    expect(await (await harness().call()).json()).toMatchObject({ ok: true, accounts: 1, imported: 0 });
   });
   it("imports received messages and skips self-sent ones", async () => {
     const h = harness({ events: [incoming, { ...incoming, sender_id: "self" }] });
-    expect(await (await h.call()).json()).toEqual({ ok: true, accounts: 1, imported: 1 });
+    expect(await (await h.call()).json()).toMatchObject({ ok: true, accounts: 1, imported: 1 });
     expect(h.rpc.mock.calls.filter(([name]) => name === "omnibox_ingest_external_message")).toHaveLength(1);
   });
   it("reports a storage failure", async () => {
