@@ -10,9 +10,9 @@ function stubChat(): XChatXdk {
     setCacheKeys: vi.fn(),
     decryptEvents: vi.fn(() => ({ messages: [
       { event: { type: "message", messageId: "a", conversationId: "1-2", senderId: "2",
-        content: { text: "hello" } } },
+        content: { contentType: "text", text: "hello" } } },
       { event: { type: "message", messageId: "b", conversationId: "1-2", senderId: "2",
-        content: { text: "unverified" }, verified: false } },
+        content: { contentType: "text", text: "unverified" }, verified: false } },
     ], errors: [{ code: "bad_signature" }] })),
     encryptMessage: vi.fn(() => ({
       messageId: "00000000-0000-4000-8000-000000000000",
