@@ -79,7 +79,7 @@ export class XChatBrowserSession {
   }
 
   async unlockExistingKeys(passcode: string, userId: string, keyVersion: string) {
-    if (!/^[0-9]{1,24}$/.test(userId) || !/^[0-9]+$/.test(keyVersion)) throw new Error("Invalid X identity");
+    if (!/^[0-9]{1,24}$/.test(userId) || !/^[A-Za-z0-9_-]{1,64}$/.test(keyVersion)) throw new Error("Invalid X identity");
     if (!passcode) throw new Error("Passcode required");
     // Never store or log the PIN. Caller must discard it immediately afterward.
     await this.chat.unlock(passcode);
