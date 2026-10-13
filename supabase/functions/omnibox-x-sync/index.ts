@@ -286,13 +286,23 @@ Deno.serve(async (req) => {
           const hasEmbeddedRealmTokens = backupConfigs.some((config: unknown) => {
             if (!config || typeof config !== "object") return false;
             const c = config as Record<string, unknown>;
-            const tokenMap = c.token_map ?? (c.sdk_config && typeof c.sdk_config === "object"
-              ? (c.sdk_config as Record<string, unknown>).token_map : null);
-            if (!tokenMap || typeof tokenMap !== "object") return false;
-            return Object.values(tokenMap).some((entry) =>
-              entry && typeof entry === "object" && typeof (entry as Record<string, unknown>).token === "string"
-                && String((entry as Record<string, unknown>).token).length > 0
-            );
+            // X Chat public-keys API uses token_map as an array of
+            // { key: realmId, value: { address, token } } entries.
+            // Older SDK configurations can expose a dictionary of tokens.
+            const tokenMap = c.token_map ??
+              (c.sdk_config && typeof c.sdk_config === "object"
+                ? (c.sdk_config as Record<string, unknown>).token_map : null);
+            const entries = Array.isArray(tokenMap) ? tokenMap
+              : tokenMap && typeof tokenMap === "object"
+              ? Object.values(tokenMap) : [];
+            return entries.some((entry: unknown) => {
+              if (!entry || typeof entry !== "object") return false;
+              const item = entry as Record<string, unknown>;
+              const nested = item.value && typeof item.value === "object"
+                ? item.value as Record<string, unknown> : null;
+              const token = nested?.token ?? item.token;
+              return typeof token === "string" && token.length > 0;
+            });
           });
           // X OAuth does not itself provide Juicebox realm authorization. Never
           // claim that a PIN unlock is operational based on a public record alone.
