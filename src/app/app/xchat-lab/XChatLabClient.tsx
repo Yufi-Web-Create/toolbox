@@ -23,6 +23,8 @@ export default function XChatLabClient() {
   const [status, setStatus] = useState("接続情報を確認しています");
   const [working, setWorking] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
+  const [preflightReady, setPreflightReady] = useState(false);
+  const [pinAttempted, setPinAttempted] = useState(false);
   const [conversationId, setConversationId] = useState("");
   const [availableConversations, setAvailableConversations] = useState<{id: string; label: string}[]>([]);
   const [selectedConversation, setSelectedConversation] = useState("");
@@ -61,11 +63,36 @@ export default function XChatLabClient() {
     return result;
   }
 
+  async function preflight() {
+    if (working || !connectionId || pinAttempted) return;
+    setWorking(true);
+    setPreflightReady(false);
+    setStatus("PINを使わず、既存の鍵バックアップ設定を確認しています");
+    try {
+      const result = await request("recovery_status");
+      const data = result.data && typeof result.data === "object"
+        ? result.data as Record<string, unknown> : {};
+      if (data.has_public_key_record !== true || data.has_backup_config !== true) {
+        setStatus("既存の鍵バックアップが確認できません。PINは入力しないでください");
+      } else if (data.has_embedded_realm_tokens !== true) {
+        setStatus("復元用の認証トークンを確認できません。PINは入力しないでください");
+      } else {
+        setPreflightReady(true);
+        setStatus("復元用設定を確認しました。PINは一度だけ試してください。失敗したら連続入力せず結果を知らせてください");
+      }
+    } catch {
+      setStatus("復元用設定の事前確認に失敗しました。PINは入力しないでください");
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function unlock() {
-    if (working || !connectionId) return;
+    if (working || !connectionId || !preflightReady || pinAttempted) return;
+    setPinAttempted(true);
     const pin = pinRef.current?.value ?? "";
     if (pinRef.current) pinRef.current.value = "";
-    if (!pin) { setStatus("PINを入力してください"); return; }
+    if (!pin) { setPinAttempted(false); setStatus("PINを入力してください"); return; }
     setWorking(true);
     setStatus("既存の暗号鍵を端末内で復元しています");
     try {
@@ -88,7 +115,7 @@ export default function XChatLabClient() {
       setStatus("既存の暗号鍵を復元しました。会話を取得できます");
     } catch {
       setUnlocked(false);
-      setStatus("鍵の復元を確認できませんでした。PINの連続試行は避けてください");
+      setStatus("鍵の復元を確認できませんでした。この画面での再試行を停止しました。PINの連続試行は避けてください");
     } finally {
       setWorking(false);
     }
@@ -201,15 +228,19 @@ export default function XChatLabClient() {
       <p className="text-sm text-slate-600">MatoMeet内での受信と返信を検証する専用画面です。PINは端末内の公式SDKだけで使用し、サーバーには送信しません。既存の鍵は変更しません。</p>
       <p role="status" className="rounded-lg bg-rose-50 p-3 text-sm">{status}</p>
       <label className="block text-sm">X連携アカウント
-        <select className="mt-1 block w-full rounded border p-2" value={connectionId} onChange={(e) => { sessionRef.current?.lock(); sessionRef.current = null; setUnlocked(false); setMessages([]); setConnectionId(e.target.value); }}>
+        <select className="mt-1 block w-full rounded border p-2" value={connectionId} onChange={(e) => { sessionRef.current?.lock(); sessionRef.current = null; setUnlocked(false); setMessages([]); setPreflightReady(false); setPinAttempted(false); setAvailableConversations([]); setSelectedConversation(""); setConnectionId(e.target.value); }}>
           {connections.map((c) => <option value={c.id} key={c.id}>{c.account_name || "Xアカウント"}</option>)}
         </select>
       </label>
       {!unlocked && <section className="rounded-lg border p-4 space-y-3">
-        <label className="block text-sm">既存のX Chat PIN（サーバーへ送信されません）
-          <input ref={pinRef} type="password" autoComplete="off" className="mt-1 block w-full rounded border p-2" />
-        </label>
-        <button disabled={working || !connectionId} onClick={unlock} className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-50">既存鍵を復元</button>
+        <button disabled={working || !connectionId || pinAttempted} onClick={preflight} className="rounded border px-4 py-2 disabled:opacity-50">PINなしで復元準備を確認</button>
+        {preflightReady && !pinAttempted && <>
+          <label className="block text-sm">既存のX Chat PIN（サーバーへ送信されません）
+            <input ref={pinRef} type="password" autoComplete="off" className="mt-1 block w-full rounded border p-2" />
+          </label>
+          <button disabled={working || !connectionId} onClick={unlock} className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-50">既存鍵を1回だけ復元</button>
+        </>}
+        {pinAttempted && !unlocked && <p className="text-sm text-amber-800">安全のため、この画面でのPIN再試行を停止しています。連続入力しないでください。</p>}
       </section>}
       {unlocked && <section className="space-y-3">
         <button disabled={working} onClick={refreshConversations} className="rounded border px-4 py-2 disabled:opacity-50">会話一覧を取得</button>
