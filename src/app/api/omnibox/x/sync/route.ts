@@ -3,6 +3,19 @@ import { NextResponse } from "next/server";
 import { isPlanKey, PLAN_DEFINITIONS } from "../../../../../lib/plans";
 import { createClient } from "../../../../../lib/supabase/server";
 
+const syncErrors: Record<string, string> = {
+  x_credentials_unavailable: "Xの接続情報を取得できませんでした。Xを再連携してください。",
+  x_reconnect_required: "Xの認証を更新できませんでした。Xを再連携してください。",
+  x_credits_depleted: "X APIのクレジットが不足しています。X開発者コンソールの残高を確認してください。",
+  x_access_denied: "X APIがDM取得を拒否しました。X開発者コンソールで利用権限とAPI利用状況を確認してください。",
+  x_rate_limited: "X APIの取得回数制限に達しました。時間を置いて再度同期してください。",
+  x_api_error: "X APIでDM取得に失敗しました。再度同期し、続く場合はお問い合わせください。",
+  x_api_partial_error: "XのDMを一部取得できませんでした。再度同期してください。",
+  x_token_save_failed: "Xの認証情報を保存できませんでした。再度同期してください。",
+  x_message_save_failed: "XのDMを保存できませんでした。再度同期してください。",
+  x_sync_unavailable: "XのDM同期中に通信エラーが発生しました。再度同期してください。",
+};
+
 function syncUrl() {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   return base ? new URL("/functions/v1/omnibox-x-sync", base) : null;
@@ -75,7 +88,7 @@ export async function POST() {
 
     if (!response.ok || result.ok !== true) {
       return NextResponse.json(
-        { ok: false, message: "XのDMを同期できませんでした。" },
+        { ok: false, message: syncErrors[result.error] ?? "XのDMを同期できませんでした。" },
         { status: response.status >= 400 && response.status < 500 ? response.status : 502 },
       );
     }
