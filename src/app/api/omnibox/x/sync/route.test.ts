@@ -79,6 +79,34 @@ describe("X sync API error guidance", () => {
     expect(response.status).toBe(400);
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
+  it("never forwards backup secrets in recovery prerequisite status", async () => {
+    mocks.fetch.mockResolvedValue(Response.json({
+      ok: true, resource: "recovery_status",
+      data: {
+        has_public_key_record: true,
+        has_backup_config: true,
+        realm_auth_ready: true,
+        pin_unlock_ready: true,
+        secret_token: "must-not-escape",
+      }
+    }));
+    const response = await POST(new Request("http://localhost/api/omnibox/x/sync", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "chat_read", resource: "recovery_status",
+        connection_id: "00000000-0000-4000-8000-000000000000"
+      })
+    }));
+    expect(await response.json()).toEqual({
+      ok: true, resource: "recovery_status",
+      data: {
+        has_public_key_record: true,
+        has_backup_config: true,
+        realm_auth_ready: false,
+        pin_unlock_ready: false
+      }
+    });
+  });
   it("preserves successful zero-result sync", async () => {
     mocks.fetch.mockResolvedValue(Response.json({ ok: true, accounts: 1, imported: 0 }));
     expect(await (await POST()).json()).toEqual({ ok: true, accounts: 1, imported: 0 });
