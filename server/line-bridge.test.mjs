@@ -81,7 +81,7 @@ test("core bridge configuration does not require LINE credentials in environment
   assert.deepEqual(config.missing, []);
 });
 
-test("health reports disconnected when no encrypted LINE config exists yet", async () => {
+test("health reports server readiness without leaking any organization LINE connection", async () => {
   const server = createLineBridgeServer({
     env: {
       PORT: "0",
@@ -106,7 +106,8 @@ test("health reports disconnected when no encrypted LINE config exists yet", asy
     const body = await response.json();
     assert.equal(body.ok, true);
     assert.equal(body.configured, true);
-    assert.equal(body.lineConnected, false);
+    assert.equal(body.bridgeReady, true);
+    assert.equal("lineConnected" in body, false);
   } finally {
     server.close();
     await once(server, "close");
@@ -125,7 +126,7 @@ test("getLineWebhookStatus reports active and matching webhook state", async () 
       }),
       { status: 200, headers: { "content-type": "application/json" } },
     );
-  }, "test-access-token");
+  }, "test-access-token", "https://omnibox-line-bridge.onrender.com/webhooks/line");
 
   assert.equal(calls.length, 1);
   assert.equal(result.lineApiReachable, true);
