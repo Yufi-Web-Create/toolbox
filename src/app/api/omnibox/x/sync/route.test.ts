@@ -109,6 +109,43 @@ describe("X sync API error guidance", () => {
       }
     });
   });
+  it("forwards only signed encrypted X Chat replies for an authenticated connection", async () => {
+    mocks.fetch.mockResolvedValue(Response.json({ ok: true, message_sent: true, secret: "hidden" }));
+    const payload = {
+      message_id: "00000000-0000-4000-8000-000000000000",
+      encoded_message_create_event: "encrypted-content-not-plaintext-12345",
+      encoded_message_event_signature: "signed-content-not-secret-12345"
+    };
+    const response = await POST(new Request("http://localhost/api/omnibox/x/sync", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "chat_send",
+        connection_id: "00000000-0000-4000-8000-000000000000",
+        conversation_id: "111-222", payload
+      })
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, message_sent: true });
+    expect(JSON.parse(mocks.fetch.mock.calls.at(-1)?.[1]?.body)).toEqual({
+      mode: "chat_send",
+      connection_id: "00000000-0000-4000-8000-000000000000",
+      conversation_id: "111-222", payload
+    });
+  });
+  it("rejects unsafely plaintext X Chat replies", async () => {
+    mocks.fetch.mockReset();
+    const response = await POST(new Request("http://localhost/api/omnibox/x/sync", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "chat_send",
+        connection_id: "00000000-0000-4000-8000-000000000000",
+        conversation_id: "111-222",
+        payload: { text: "plaintext message" }
+      })
+    }));
+    expect(response.status).toBe(400);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
   it("preserves successful zero-result sync", async () => {
     mocks.fetch.mockResolvedValue(Response.json({ ok: true, accounts: 1, imported: 0 }));
     expect(await (await POST()).json()).toEqual({ ok: true, accounts: 1, imported: 0 });
