@@ -26,6 +26,7 @@ export default function XChatLabClient() {
   const [preflightReady, setPreflightReady] = useState(false);
   const [pinAttempted, setPinAttempted] = useState(false);
   const [conversationId, setConversationId] = useState("");
+  const [ownXUserId, setOwnXUserId] = useState("");
   const [availableConversations, setAvailableConversations] = useState<{id: string; label: string}[]>([]);
   const [selectedConversation, setSelectedConversation] = useState("");
   const [messages, setMessages] = useState<XChatVerifiedMessage[]>([]);
@@ -114,6 +115,7 @@ export default function XChatLabClient() {
       sessionRef.current?.lock();
       sessionRef.current = session;
       setUnlocked(true);
+      setOwnXUserId(String(bootstrap.account_id || ""));
       setStatus("既存の暗号鍵を復元しました。会話を取得できます");
     } catch {
       setUnlocked(false);
@@ -193,6 +195,7 @@ export default function XChatLabClient() {
       const validTime = (value: unknown) =>
         typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
       const importable = verified.flatMap((m) => {
+        if (m.senderId === ownXUserId) return [];
         const matching = events.find((event) =>
           String(event.id || event.message_id || "") === m.messageId);
         const occurredAt = validTime(matching?.created_at) ||
@@ -277,7 +280,7 @@ export default function XChatLabClient() {
       <p className="text-sm text-slate-600">MatoMeet内での受信と返信を検証する専用画面です。PINは端末内の公式SDKだけで使用し、サーバーには送信しません。既存の鍵は変更しません。</p>
       <p role="status" className="rounded-lg bg-rose-50 p-3 text-sm">{status}</p>
       <label className="block text-sm">X連携アカウント
-        <select className="mt-1 block w-full rounded border p-2" value={connectionId} onChange={(e) => { sessionRef.current?.lock(); sessionRef.current = null; setUnlocked(false); setMessages([]); setImportCandidates([]); setTeamStorageConsent(false); setPreflightReady(false); setPinAttempted(false); setAvailableConversations([]); setSelectedConversation(""); setConnectionId(e.target.value); }}>
+        <select className="mt-1 block w-full rounded border p-2" value={connectionId} onChange={(e) => { sessionRef.current?.lock(); sessionRef.current = null; setUnlocked(false); setMessages([]); setOwnXUserId(""); setImportCandidates([]); setTeamStorageConsent(false); setPreflightReady(false); setPinAttempted(false); setAvailableConversations([]); setSelectedConversation(""); setConnectionId(e.target.value); }}>
           {connections.map((c) => <option value={c.id} key={c.id}>{c.account_name || "Xアカウント"}</option>)}
         </select>
       </label>
