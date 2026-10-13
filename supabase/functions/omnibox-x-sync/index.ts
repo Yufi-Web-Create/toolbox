@@ -196,7 +196,11 @@ Deno.serve(async (req) => {
         const publicUserId = String(requestBody?.user_id ?? "");
         const xBase = "https://api.x.com/2";
         let safeUrl: URL;
-        if (kind === "bootstrap") {
+        if (kind === "recovery_status") {
+          if (!/^[0-9]{1,24}$/.test(accountId)) { fail("xchat_account_unavailable"); continue; }
+          safeUrl = new URL(xBase + "/users/" + accountId + "/public_keys");
+          safeUrl.searchParams.set("public_key.fields", "public_key_version,juicebox_config");
+        } else if (kind === "bootstrap") {
           if (!/^[0-9]{1,24}$/.test(accountId)) { fail("xchat_account_unavailable"); continue; }
           safeUrl = new URL(xBase + "/users/" + accountId + "/public_keys");
           safeUrl.searchParams.set("public_key.fields", "public_key_version,public_key,signing_public_key,identity_public_key_signature,juicebox_config");
@@ -225,6 +229,23 @@ Deno.serve(async (req) => {
           continue;
         }
         const payload = await chatResponse.json();
+        if (kind === "recovery_status") {
+          const records = Array.isArray(payload.data) ? payload.data :
+            payload.data && typeof payload.data === "object" ? [payload.data] : [];
+          const hasBackupConfig = records.some((item: Record<string, unknown>) =>
+            item && typeof item === "object" && Boolean(item.juicebox_config)
+          );
+          // X OAuth does not itself provide Juicebox realm authorization. Never
+          // claim that a PIN unlock is operational based on a public record alone.
+          chatReadResult = { resource: kind, account_id: accountId, data: {
+            has_public_key_record: records.length > 0,
+            has_backup_config: hasBackupConfig,
+            realm_auth_ready: false,
+            pin_unlock_ready: false
+          }, meta: {}, errors: [] };
+          chatAccountsChecked += 1;
+          break;
+        }
         // Do not log/store this body: even ciphertext and public metadata can be sensitive.
         chatReadResult = { resource: kind, account_id: accountId, data: payload.data ?? [],
           meta: payload.meta ?? {}, errors: Array.isArray(payload.errors) ? payload.errors.map(() => ({ code: "partial_result" })) : [] };
