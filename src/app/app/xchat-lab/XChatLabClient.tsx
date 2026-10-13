@@ -24,6 +24,8 @@ export default function XChatLabClient() {
   const [working, setWorking] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [conversationId, setConversationId] = useState("");
+  const [availableConversations, setAvailableConversations] = useState<{id: string; label: string}[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState("");
   const [messages, setMessages] = useState<XChatVerifiedMessage[]>([]);
   const [reply, setReply] = useState("");
   const pinRef = useRef<HTMLInputElement>(null);
@@ -92,16 +94,38 @@ export default function XChatLabClient() {
     }
   }
 
+  async function refreshConversations() {
+    if (!unlocked || working) return;
+    setWorking(true);
+    setStatus("X Chatの会話一覧を取得しています");
+    try {
+      const listing = await request("conversations");
+      const found = records(listing.data).map((item, index) => {
+        const id = String(item.id || item.conversation_id || "");
+        const participants = Array.isArray(item.participant_ids) ? item.participant_ids.join(", ") : "";
+        return { id, label: participants ? `会話${index + 1}（${participants}）` : `会話${index + 1}（${id}）` };
+      }).filter((item) => item.id.length > 0);
+      setAvailableConversations(found);
+      setSelectedConversation(found[0]?.id || "");
+      setStatus(found.length ? `会話${found.length}件を取得しました。対象を選択してください。`
+        : "X Chatの会話がありません");
+    } catch {
+      setStatus("会話一覧を取得できませんでした");
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function loadConversation() {
-    if (!unlocked || !sessionRef.current || working) return;
+    if (!unlocked || !sessionRef.current || working || !selectedConversation) return;
     setWorking(true);
     setStatus("会話と署名検証用の公開鍵を取得しています");
     try {
       const listing = await request("conversations");
       const conversations = records(listing.data);
-      const target = conversations.find((item) => typeof item.id === "string" || typeof item.conversation_id === "string");
+      const target = conversations.find((item) => String(item.id || item.conversation_id || "") === selectedConversation);
       const id = String(target?.id || target?.conversation_id || "");
-      if (!id) throw Error("X Chatの会話がありません");
+      if (!id) throw Error("選択した会話が見つかりません");
       const eventResult = await request("events", { conversation_id: id });
       const events = records(eventResult.data);
       const encryptedMessages = events
@@ -153,6 +177,7 @@ export default function XChatLabClient() {
     setWorking(true);
     setStatus("返信を暗号化してX Chatに送信しています");
     try {
+      if (!window.confirm("選択したX Chat会話へ実際に返信を送信します。送信しますか？")) return;
       const payload = sessionRef.current.prepareEncryptedReply(conversationId, reply);
       const response = await fetch("/api/omnibox/x/sync", {
         method: "POST", credentials: "same-origin", cache: "no-store",
@@ -187,7 +212,13 @@ export default function XChatLabClient() {
         <button disabled={working || !connectionId} onClick={unlock} className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-50">既存鍵を復元</button>
       </section>}
       {unlocked && <section className="space-y-3">
-        <button disabled={working} onClick={loadConversation} className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-50">X Chatの本文を取得</button>
+        <button disabled={working} onClick={refreshConversations} className="rounded border px-4 py-2 disabled:opacity-50">会話一覧を取得</button>
+        {!!availableConversations.length && <label className="block text-sm">本文を確認する会話
+          <select className="mt-1 block w-full rounded border p-2" value={selectedConversation} onChange={(e) => { setSelectedConversation(e.target.value); setConversationId(""); setMessages([]); }}>
+            {availableConversations.map((c) => <option value={c.id} key={c.id}>{c.label}</option>)}
+          </select>
+        </label>}
+        <button disabled={working || !selectedConversation} onClick={loadConversation} className="rounded bg-rose-700 px-4 py-2 text-white disabled:opacity-50">選択した会話の本文を取得</button>
         <div className="space-y-2">{messages.map((m) => <div className="rounded border p-3 text-sm whitespace-pre-wrap" key={m.conversationId + m.messageId}>{m.text}</div>)}</div>
         {!!conversationId && <div className="space-y-2">
           <textarea className="w-full rounded border p-3" value={reply} onChange={(e) => setReply(e.target.value)} placeholder="X Chatへの返信本文" />
