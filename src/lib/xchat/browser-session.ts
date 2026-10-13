@@ -24,6 +24,8 @@ export type XChatVerifiedMessage = {
 };
 
 export type XChatXdk = {
+  lock?(): void;
+  free?(): void;
   unlock(passcode: string): Promise<unknown>;
   setIdentity(userId: string, keyVersion: string): void;
   setSigningKeys(keys: XChatSigningKey[]): void;
@@ -132,6 +134,8 @@ export class XChatBrowserSession {
   lock() {
     this.unlocked = false;
     this.seen.clear();
-    // The owning UI MUST also dispose of its Chat XDK instance (keys live there).
+    // Dispose SDK-held private keys as well; do not leave cryptographic state unlocked.
+    if (typeof this.chat.lock === "function") this.chat.lock();
+    else if (typeof this.chat.free === "function") this.chat.free();
   }
 }
