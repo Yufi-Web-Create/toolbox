@@ -61,7 +61,7 @@ describe("sendReply", () => {
     mocks.select.mockReturnValue({ eq: mocks.eq });
     mocks.eq.mockReturnValue({ limit: mocks.limit });
     mocks.limit.mockResolvedValue({
-      data: [{ id: "conversation-1" }],
+      data: [{ id: "conversation-1", provider: "line" }],
       error: null,
     });
     mocks.sendLineReply.mockResolvedValue({ success: true });
@@ -113,6 +113,14 @@ describe("sendReply", () => {
     const result = await sendReply(initialState, replyData());
 
     expect(result.status).toBe("error");
+    expect(mocks.sendLineReply).not.toHaveBeenCalled();
+  });
+
+  it("does not call LINE transport for an encrypted X Chat thread", async () => {
+    mocks.limit.mockResolvedValue({ data: [{ id: "conversation-1", provider: "x" }], error: null });
+    const result = await sendReply(initialState, replyData());
+    expect(result.status).toBe("error");
+    expect(result.message).toContain("暗号化返信画面");
     expect(mocks.sendLineReply).not.toHaveBeenCalled();
   });
 
