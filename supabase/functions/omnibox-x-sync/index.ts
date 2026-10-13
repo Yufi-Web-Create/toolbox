@@ -118,6 +118,12 @@ Deno.serve(async (req) => {
     return json(500, { ok: false, error: "connections_unavailable" });
   }
 
+  // Explicit, read-only X Chat metadata check. Never fetch or store ciphertext or private keys.
+  const requestBody = await req.json().catch(() => ({}));
+  const chatStatusMode = requestBody?.mode === "chat_status";
+  let chatConversations = 0;
+  let chatHasMore = false;
+  let chatAccountsChecked = 0;
   let imported = 0;
   let accounts = 0;
   let receivedEvents = 0;
@@ -174,6 +180,27 @@ Deno.serve(async (req) => {
       }
 
       if (!xToken) { fail("x_reconnect_required"); continue; }
+
+      if (chatStatusMode) {
+        const chatResponse = await fetch("https://api.x.com/2/chat/conversations?max_results=10", {
+          headers: { authorization: "Bearer " + xToken },
+        });
+        if (!chatResponse.ok) {
+          fail(
+            chatResponse.status === 429 ? "x_rate_limited" :
+            chatResponse.status === 401 ? "x_reconnect_required" :
+            chatResponse.status === 403 ? "xchat_access_denied" :
+            chatResponse.status === 402 ? "x_credits_depleted" : "xchat_api_error",
+            chatResponse.status,
+          );
+          continue;
+        }
+        const chatResult = await chatResponse.json();
+        chatConversations += Array.isArray(chatResult.data) ? chatResult.data.length : 0;
+        chatHasMore ||= Boolean(chatResult.meta?.has_more || chatResult.meta?.next_token);
+        chatAccountsChecked += 1;
+        continue;
+      }
 
       const url = new URL("https://api.x.com/2/dm_events");
       url.searchParams.set("event_types", "MessageCreate");
@@ -288,6 +315,14 @@ Deno.serve(async (req) => {
     } catch {
       fail("x_sync_unavailable");
     }
+  }
+
+  if (chatStatusMode) {
+    // No ciphertext, conversation IDs, private keys or message bodies in response or logs.
+    const chatSummary = { accounts_checked: chatAccountsChecked, conversations_on_first_pages: chatConversations, has_more: chatHasMore };
+    console.info("omnibox-x-chat-status", JSON.stringify(chatSummary));
+    if (failures.length) return json(502, { ok: false, error: failures[0].code, ...chatSummary });
+    return json(200, { ok: true, mode: "chat_status", ...chatSummary });
   }
 
   const diagnostics = { accounts, received_events: receivedEvents, api_reported_events: apiReportedEvents, empty_with_pagination: emptyWithPagination, imported, skipped_own: skippedOwn, skipped_empty_text: skippedEmptyText, skipped_malformed: skippedMalformed };
