@@ -85,6 +85,7 @@ describe("X sync API error guidance", () => {
       data: {
         has_public_key_record: true,
         has_backup_config: true,
+        has_embedded_realm_tokens: true,
         realm_auth_ready: true,
         pin_unlock_ready: true,
         secret_token: "must-not-escape",
@@ -102,6 +103,7 @@ describe("X sync API error guidance", () => {
       data: {
         has_public_key_record: true,
         has_backup_config: true,
+        has_embedded_realm_tokens: true,
         realm_auth_ready: false,
         pin_unlock_ready: false
       }
