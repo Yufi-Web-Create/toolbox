@@ -120,6 +120,10 @@ Deno.serve(async (req) => {
 
   let imported = 0;
   let accounts = 0;
+  let receivedEvents = 0;
+  let skippedOwn = 0;
+  let skippedEmptyText = 0;
+  let skippedMalformed = 0;
   const failures: Array<{ code: string; upstream_status?: number }> = [];
   function fail(code: string, upstreamStatus?: number) {
     const failure = { code, ...(upstreamStatus ? { upstream_status: upstreamStatus } : {}) };
@@ -213,6 +217,7 @@ Deno.serve(async (req) => {
 
       accounts += 1;
 
+      receivedEvents += events.length;
       for (const event of events) {
         if (!event || typeof event !== "object") continue;
 
@@ -221,13 +226,16 @@ Deno.serve(async (req) => {
         const threadId = String(event.dm_conversation_id ?? "").trim();
         const body = typeof event.text === "string" ? event.text.trim() : "";
 
-        if (
-          !eventId ||
-          !senderId ||
-          !threadId ||
-          !body ||
-          senderId === connection.external_account_id
-        ) {
+        if (!eventId || !senderId || !threadId) {
+          skippedMalformed += 1;
+          continue;
+        }
+        if (senderId === connection.external_account_id) {
+          skippedOwn += 1;
+          continue;
+        }
+        if (!body) {
+          skippedEmptyText += 1;
           continue;
         }
 
@@ -278,9 +286,12 @@ Deno.serve(async (req) => {
     }
   }
 
+  const diagnostics = { accounts, received_events: receivedEvents, imported, skipped_own: skippedOwn, skipped_empty_text: skippedEmptyText, skipped_malformed: skippedMalformed };
+  // Counts only. Never log customer identifiers, DM contents, or OAuth credentials.
+  console.info("omnibox-x-sync summary", JSON.stringify(diagnostics));
   if (failures.length) {
-    return json(502, { ok: false, error: failures[0].code, accounts, imported, failures });
+    return json(502, { ok: false, error: failures[0].code, ...diagnostics, failures });
   }
 
-  return json(200, { ok: true, accounts, imported });
+  return json(200, { ok: true, ...diagnostics });
 });
