@@ -10,7 +10,10 @@ const initialState: ReplyState = {
   message: "",
 };
 
-export function ReplyForm({ conversationId }: { conversationId: string }) {
+export function ReplyForm({
+  conversationId,
+  provider = "line",
+}: { conversationId: string; provider?: "line" | "email" | "instagram" }) {
   const [state, formAction, isPending] = useActionState(sendReply, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -32,7 +35,7 @@ export function ReplyForm({ conversationId }: { conversationId: string }) {
         maxLength={5000}
         required
         rows={4}
-        placeholder="LINEへ送るメッセージを入力"
+        placeholder={provider === "email" ? "メールの返信を入力" : provider === "instagram" ? "Instagramの返信を入力" : "LINEへ送るメッセージを入力"}
         className={styles.replyTextarea}
       />
       <div className={styles.replyFooter}>
@@ -45,7 +48,7 @@ export function ReplyForm({ conversationId }: { conversationId: string }) {
           {state.message}
         </p>
         <button type="submit" disabled={isPending} className={styles.replyButton}>
-          {isPending ? "送信中..." : "LINEへ返信"}
+          {isPending ? "送信中..." : provider === "email" ? "メールを返信" : provider === "instagram" ? "Instagramへ返信" : "LINEへ返信"}
         </button>
       </div>
     </form>
