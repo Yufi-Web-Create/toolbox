@@ -70,26 +70,55 @@ export async function sendReply(
       return { status: "error", message: CONVERSATION_ERROR };
     }
 
-    // The LINE bridge MUST NOT be invoked for X Chat or any other provider.
-    if (visibleConversations[0].provider !== "line") {
-      return { status: "error", message: "この窓口はLINE返信の対象ではありません。X Chatは暗号化返信画面をご利用ください。" };
+    const provider = visibleConversations[0].provider as string;
+    if (provider === "x") {
+      return { status: "error", message: "Xは投稿専用です。DMへの返信には対応していません。" };
+    }
+    if (provider !== "line" && provider !== "instagram" && provider !== "email") {
+      return { status: "error", message: "この窓口からの返信には対応していません。" };
     }
 
-    const result = await sendLineReply({
-      conversationId,
-      message,
-      accessToken,
-    });
-
-    if (!result.success) {
-      return { status: "error", message: result.message };
+    if (provider === "line") {
+      const result = await sendLineReply({
+        conversationId,
+        message,
+        accessToken,
+      });
+      if (!result.success) {
+        return { status: "error", message: result.message };
+      }
+    } else {
+      const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+      if (!base) {
+        return { status: "error", message: "返信サービスの設定を確認できませんでした。" };
+      }
+      const response = await fetch(new URL("/functions/v1/omnibox-provider-reply", base), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ conversationId, message }),
+        cache: "no-store",
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.ok !== true) {
+        return {
+          status: "error",
+          message: provider === "email"
+            ? "Gmailから返信できませんでした。Google連携をご確認ください。"
+            : "Instagramへ返信できませんでした。連携権限をご確認ください。",
+        };
+      }
     }
 
     revalidatePath("/app/inbox");
 
     return {
       status: "success",
-      message: "LINEへ返信を送信しました。",
+      message: provider === "email"
+        ? "メールを返信しました。"
+        : provider === "instagram" ? "Instagramへ返信しました。" : "LINEへ返信を送信しました。",
     };
   } catch {
     return { status: "error", message: CONVERSATION_ERROR };
