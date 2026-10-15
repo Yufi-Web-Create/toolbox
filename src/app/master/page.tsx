@@ -300,8 +300,6 @@ export default async function MasterPage({
                 "tweet.write",
                 "media.write",
                 "users.read",
-                "dm.read",
-                "dm.write",
                 "offline.access",
               ]
             }
