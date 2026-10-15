@@ -156,7 +156,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
             {inbox.conversations.length === 0 ? (
               <div className={styles.threadEmpty}>
                 <strong>問い合わせはまだありません</strong>
-                <span>LINE接続後、ここに実際のメッセージが表示されます。</span>
+                <span>LINE・Instagram・Gmailを接続すると問い合わせが表示されます。</span>
               </div>
             ) : inbox.conversations.map((conversation) => {
               const selected = conversation.id === inbox.selectedConversation?.id;
@@ -238,16 +238,11 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
                   <span>親しみやすい返信</span>
                   <span>定型文挿入</span>
                 </div>
-                {inbox.selectedConversation.provider === "line" ? (
-                  <ReplyForm conversationId={inbox.selectedConversation.id} />
-                ) : inbox.selectedConversation.provider === "x" &&
-                  inbox.selectedConversation.provider_thread_id.startsWith("xchat:") ? (
-                  <div className={styles.replyForm}>
-                    <p>X Chatは暗号化されているため、返信には端末内の鍵復元が必要です。</p>
-                    <Link href="/app/xchat-lab" className={styles.replyButton}>
-                      X Chatの暗号化返信画面を開く
-                    </Link>
-                  </div>
+                {["line", "instagram", "email"].includes(inbox.selectedConversation.provider) ? (
+                  <ReplyForm
+                    conversationId={inbox.selectedConversation.id}
+                    provider={inbox.selectedConversation.provider as "line" | "instagram" | "email"}
+                  />
                 ) : (
                   <div className={styles.replyForm}>
                     <p>この窓口への返信はMatoMeetのメイン受信箱をご利用ください。</p>

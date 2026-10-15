@@ -77,7 +77,10 @@ export async function getInboxSnapshot(
       return { success: false, message: INBOX_LOAD_ERROR };
     }
 
-    const conversations = conversationData as InboxConversation[];
+    // X connections are for publishing only; hide historical X DM rows without deleting them.
+    const conversations = (conversationData as InboxConversation[]).filter(
+      (conversation) => conversation.provider !== "x",
+    );
     const selectedConversation =
       conversations.find((conversation) => conversation.id === requestedConversationId) ??
       conversations[0] ??

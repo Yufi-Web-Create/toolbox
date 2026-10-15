@@ -108,10 +108,9 @@ https://<omnibox-host>/api/omnibox/oauth/x/callback
    - tweet.read
    - tweet.write
    - users.read
-   - dm.read
-   - dm.write
+   - media.write
    - offline.access
-6. Confirm that the X plan / access tier used by the developer app permits the APIs needed by OmniBox, especially Direct Messages.
+6. Confirm that the X plan / access tier used by the developer app permits the APIs needed by OmniBox, especially post publishing and media upload.
 
 ### Store-user connection
 

@@ -153,6 +153,9 @@ export async function getProviderConfig(
       clientSecret,
       authorizeUrl: "https://x.com/i/oauth2/authorize",
       tokenUrl: "https://api.x.com/2/oauth2/token",
+      // X is for scheduled/immediate posts ONLY, never Direct Messages.
+      // Keep the X media upload scope; exclude legacy DM scopes even if the
+      // operator has historical scopes saved in an earlier Developer App.
       scopes: Array.from(new Set([
         ...(stored?.scopes?.length
           ? stored.scopes
@@ -160,11 +163,9 @@ export async function getProviderConfig(
               "tweet.read",
               "tweet.write",
               "users.read",
-              "dm.read",
-              "dm.write",
               "offline.access",
-            ])),
-        "media.write",
+            ])).filter((scope) => scope !== "dm.read" && scope !== "dm.write"),
+        "tweet.read", "tweet.write", "users.read", "media.write", "offline.access",
       ])),
       redirectUri,
     };

@@ -38,7 +38,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
     employeeLimit: null,
     socialPublishing: true,
     instagramDm: true,
-    xDm: true,
+    xDm: false,
     aiResponsesPerMonth: 0,
     locationsIncluded: 1,
     shopify: true,
@@ -50,7 +50,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
     employeeLimit: null,
     socialPublishing: true,
     instagramDm: true,
-    xDm: true,
+    xDm: false,
     aiResponsesPerMonth: 500,
     locationsIncluded: 1,
     shopify: true,
@@ -62,7 +62,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
     employeeLimit: null,
     socialPublishing: true,
     instagramDm: true,
-    xDm: true,
+    xDm: false,
     aiResponsesPerMonth: 1500,
     locationsIncluded: 3,
     shopify: true,
@@ -74,7 +74,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
     employeeLimit: null,
     socialPublishing: true,
     instagramDm: true,
-    xDm: true,
+    xDm: false,
     aiResponsesPerMonth: 1500,
     locationsIncluded: null,
     shopify: true,
@@ -93,7 +93,7 @@ export function isPlanKey(value: unknown): value is PlanKey {
 
 export function planAllowsProvider(plan: PlanKey, provider: string) {
   if (provider === "instagram") return PLAN_DEFINITIONS[plan].instagramDm;
-  if (provider === "x") return PLAN_DEFINITIONS[plan].xDm;
+  if (provider === "x") return PLAN_DEFINITIONS[plan].socialPublishing;
   return true;
 }
 

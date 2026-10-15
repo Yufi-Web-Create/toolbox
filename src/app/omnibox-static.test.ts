@@ -172,10 +172,12 @@ describe("uploaded MatoMeet application shell", () => {
     expect(html).toContain("syncGoogleInbox");
   });
 
-  it("supports X DM synchronization in the connected account UI", () => {
-    expect(html).toContain("/api/omnibox/x/sync");
-    expect(html).toContain("syncXInbox");
-    expect(html).toContain("X DMを同期");
+  it("keeps X publishing-only and offers Gmail integration", () => {
+    expect(html).toContain("投稿専用");
+    expect(html).not.toContain("syncXInbox");
+    expect(html).not.toContain("X DMを同期");
+    expect(html).toContain("startOAuthFlow('google')");
+    expect(html).toContain("Gmail・Google Workspaceを連携");
   });
 
   it("uses direct multi-image social publishing and scheduled post APIs", () => {
@@ -359,8 +361,7 @@ describe("uploaded MatoMeet application shell", () => {
     expect(html).toContain("aiResponsesPerMonth");
     expect(html).toContain("matomeet_ai_usage_");
     expect(html).not.toContain("localStorage.getItem('omnibox_ai_trial_quota')");
-    expect(html).toContain("SNS窓口のログイン連携");
-    expect(html).not.toContain("SNS・メール窓口のログイン連携");
+    expect(html).toContain("SNS・メール窓口のログイン連携");
   });
 
   it("supports renaming connected account display names", () => {

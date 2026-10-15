@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   limit: vi.fn(),
   sendLineReply: vi.fn(),
   revalidatePath: vi.fn(),
+  fetch: vi.fn(),
 }));
 
 vi.mock("../../../lib/supabase/server", () => ({
@@ -41,6 +42,8 @@ function replyData(conversationId = "conversation-1", message = "hello") {
 describe("sendReply", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubGlobal("fetch", mocks.fetch);
 
     mocks.createClient.mockResolvedValue({
       auth: {
@@ -120,8 +123,30 @@ describe("sendReply", () => {
     mocks.limit.mockResolvedValue({ data: [{ id: "conversation-1", provider: "x" }], error: null });
     const result = await sendReply(initialState, replyData());
     expect(result.status).toBe("error");
-    expect(result.message).toContain("暗号化返信画面");
+    expect(result.message).toContain("投稿専用");
     expect(mocks.sendLineReply).not.toHaveBeenCalled();
+  });
+
+  it("sends Gmail replies to the correct provider service, not LINE", async () => {
+    mocks.limit.mockResolvedValue({
+      data: [{ id: "conversation-1", provider: "email" }], error: null,
+    });
+    mocks.fetch.mockResolvedValue(Response.json({ ok: true, provider: "email" }));
+    const result = await sendReply(initialState, replyData("conversation-1", "お返事です"));
+    expect(result).toEqual({ status: "success", message: "メールを返信しました。" });
+    expect(mocks.sendLineReply).not.toHaveBeenCalled();
+    const [url, options] = mocks.fetch.mock.calls[0];
+    expect(String(url)).toBe("https://example.supabase.co/functions/v1/omnibox-provider-reply");
+    expect(JSON.parse(options.body)).toEqual({ conversationId: "conversation-1", message: "お返事です" });
+  });
+  it("does not falsely report success when Gmail rejects the reply", async () => {
+    mocks.limit.mockResolvedValue({
+      data: [{ id: "conversation-1", provider: "email" }], error: null,
+    });
+    mocks.fetch.mockResolvedValue(Response.json({ ok: false, error: "gmail_send_failed" }, { status: 502 }));
+    const result = await sendReply(initialState, replyData());
+    expect(result.status).toBe("error");
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it("sends only after authentication and RLS visibility checks pass", async () => {
