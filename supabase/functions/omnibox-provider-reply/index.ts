@@ -331,69 +331,7 @@ Deno.serve(async (req) => {
   }
 
   if (conversation.provider === "x") {
-    const expiresAt = connection.token_expires_at
-      ? new Date(connection.token_expires_at).getTime()
-      : 0;
-
-    if (!accessToken || (expiresAt && expiresAt < Date.now() + 60_000)) {
-      const refreshed = await refreshXToken(bundle);
-      if (!refreshed) {
-        return json(409, { ok: false, error: "x_token_refresh_failed" });
-      }
-
-      bundle = refreshed;
-      accessToken = String(refreshed.access_token ?? "");
-      const expiresIn =
-        typeof refreshed.expires_in === "number"
-          ? refreshed.expires_in
-          : null;
-      const nextExpiry = expiresIn
-        ? new Date(Date.now() + expiresIn * 1000).toISOString()
-        : null;
-
-      await admin.rpc("omnibox_replace_provider_secret", {
-        p_connection_id: connection.id,
-        p_secret_json: JSON.stringify(refreshed),
-        p_token_expires_at: nextExpiry,
-      });
-    }
-
-    if (!accessToken || !conversation.customer_external_id) {
-      return json(409, { ok: false, error: "x_token_missing" });
-    }
-
-    const endpoint =
-      "https://api.x.com/2/dm_conversations/with/" +
-      encodeURIComponent(conversation.customer_external_id) +
-      "/messages";
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        authorization: "Bearer " + accessToken,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ text: message }),
-    });
-
-    if (!response.ok) {
-      return json(502, { ok: false, error: "x_send_failed" });
-    }
-
-    const sent = await response.json();
-    const providerMessageId =
-      typeof sent?.data?.dm_event_id === "string" && sent.data.dm_event_id
-        ? "x:" + connection.id + ":" + sent.data.dm_event_id
-        : "x:" + connection.id + ":out:" + crypto.randomUUID();
-
-    await admin.rpc("omnibox_record_external_outbound", {
-      p_conversation_id: conversation.id,
-      p_provider_message_id: providerMessageId,
-      p_body: message,
-      p_sent_by_user_id: user.id,
-    });
-
-    return json(200, { ok: true, provider: "x" });
+    return json(410, { ok: false, error: "x_messaging_disabled" });
   }
 
   if (conversation.provider === "instagram") {
