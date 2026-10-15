@@ -1062,9 +1062,9 @@
         <div>
           <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
             <i data-lucide="shield-check" class="w-5 h-5 text-brand-600"></i>
-            <span>SNS窓口のログイン連携</span>
+            <span>SNS・メール窓口のログイン連携</span>
           </h3>
-          <p class="text-xs text-slate-500 mt-0.5">SNSアカウントでログインするだけで、DMの受信と予約投稿が即座に開通します。</p>
+          <p class="text-xs text-slate-500 mt-0.5">LINE・Instagramの問い合わせ、Gmailのメール、Xの投稿をそれぞれ公式の連携方法で管理できます。</p>
         </div>
         <button onclick="closeAddAccountModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100">
           <i data-lucide="x" class="w-5 h-5"></i>
@@ -1135,13 +1135,30 @@
               </div>
               <div class="text-left">
                 <div class="text-xs font-bold text-slate-800 group-hover:text-slate-900 flex items-center gap-1.5">
-                  <span>𝕏 (Twitter) でログインして連携</span>
-                  <span class="text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-medium">DM & ポスト予約</span>
+                  <span>𝕏 (Twitter) の投稿アカウントを接続</span>
+                  <span class="text-[9px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-medium">投稿専用</span>
                 </div>
-                <div class="text-[11px] text-slate-400">公式ログイン画面から安全にアカウントを接続</div>
+                <div class="text-[11px] text-slate-400">即時投稿・予約投稿に対応。DMは取得しません。</div>
               </div>
             </div>
             <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 group-hover:text-slate-900 group-hover:translate-x-0.5 transition"></i>
+          </button>
+
+          <!-- Gmail / Google Workspace -->
+          <button onclick="startOAuthFlow('google')" data-oauth-provider="google" class="w-full flex items-center justify-between p-3.5 rounded-xl border border-[#EDE5E7] hover:border-blue-400 hover:bg-blue-50/40 transition group">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                <i data-lucide="mail" class="w-5 h-5"></i>
+              </div>
+              <div class="text-left">
+                <div class="text-xs font-bold text-slate-800 group-hover:text-blue-700 flex items-center gap-1.5">
+                  <span>Gmail・Google Workspaceを連携</span>
+                  <span class="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">メール受信・返信</span>
+                </div>
+                <div class="text-[11px] text-slate-400">Googleの公式認証で接続。メールを共通受信箱へ取り込みます。</div>
+              </div>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
           </button>
         </div>
 
@@ -1756,7 +1773,7 @@
 
     function providerAllowedByPlan(provider) {
       if (provider === 'instagram') return currentPlanFeatures.instagramDm !== false;
-      if (provider === 'x') return currentPlanFeatures.xDm !== false;
+      if (provider === 'x') return currentPlanFeatures.socialPublishing !== false;
       return true;
     }
 
@@ -1990,7 +2007,8 @@
 
       const labels = {
         instagram: 'Instagram',
-        x: 'X'
+        x: 'X',
+        google: 'Gmail'
       };
 
       const rows = Object.entries(labels).map(([provider, label]) => {
@@ -2377,218 +2395,6 @@
       }
     }
 
-    async function syncXInbox({ silent = true, reloadInbox = false, button = null } = {}) {
-      if (isDemoSession) return { ok: true, imported: 0 };
-
-      const hasX = connectedAccounts.some(account => account.provider === 'x');
-      if (!hasX) return { ok: true, imported: 0 };
-
-      const task = async () => {
-        const response = await fetch('/api/omnibox/x/sync', {
-          method: 'POST',
-          credentials: 'same-origin',
-          cache: 'no-store'
-        });
-        const result = await response.json();
-
-        if (!response.ok || !result.ok) {
-          throw new Error(result.message || 'XのDMを同期できませんでした');
-        }
-        if (reloadInbox) await loadLiveInbox(null, { silent: true });
-        return result;
-      };
-
-      if (button && !silent) {
-        try {
-          return await runWithBusy(button, task, {
-            busyText: '同期中...',
-            successMessage: result => result.imported > 0
-              ? `XのDMを同期しました（${result.imported}件を確認）`
-              : '従来のX DM取得は0件です。暗号化されたX Chatは現在未対応のため、X本体のメッセージと一致しない場合があります',
-            errorMessage: 'XのDMを同期できませんでした'
-          });
-        } catch (error) {
-          return { ok: false, imported: 0, message: error.message };
-        }
-      }
-
-      try {
-        const result = await task();
-        if (!silent) {
-          showToast(result.imported > 0
-            ? `XのDMを同期しました（${result.imported}件を確認）`
-            : '従来のX DM取得は0件です。暗号化されたX Chatは現在未対応のため、X本体のメッセージと一致しない場合があります', 'success');
-        }
-        return result;
-      } catch (error) {
-        if (!silent) showToast(error.message || 'XのDMを同期できませんでした', 'error');
-        return { ok: false, imported: 0, message: error.message };
-      }
-    }
-
-    window.checkXChatKeyStatus = async function(button) {
-      if (!button || button.disabled) return;
-      button.disabled = true;
-      const originalHtml = button.innerHTML;
-      button.innerHTML = '<span class="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin"></span><span>確認中...</span>';
-      try {
-        const response = await fetch('/api/omnibox/x/sync', {
-          method: 'POST',
-          credentials: 'same-origin',
-          cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'chat_key_status' })
-        });
-        const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.message || 'X Chatの鍵登録を確認できませんでした');
-        showToast(
-          result.registered > 0
-            ? 'X Chatの公開鍵登録を確認しました。既存の秘密鍵を安全に復元する必要があります。'
-            : 'X Chatの公開鍵登録は確認できませんでした。鍵の新規登録は行っていません。',
-          'info'
-        );
-      } catch (error) {
-        showToast(error.message || 'X Chatの鍵登録を確認できませんでした', 'error');
-      } finally {
-        button.disabled = false;
-        button.innerHTML = originalHtml;
-        lucide.createIcons();
-      }
-    };
-
-    window.checkXChatRecoveryStatus = async function(button, connectionId) {
-      if (!button || button.disabled || !connectionId) return;
-      button.disabled = true;
-      const saved = button.innerHTML;
-      button.textContent = '確認中...';
-      try {
-        const response = await fetch('/api/omnibox/x/sync', {
-          method: 'POST', credentials: 'same-origin', cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'chat_read', resource: 'recovery_status', connection_id: connectionId })
-        });
-        const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.message || '復号の準備状況を確認できませんでした');
-        const readiness = result.data || {};
-        showToast(
-          readiness.has_backup_config
-            ? (readiness.has_embedded_realm_tokens
-              ? 'X Chatの鍵バックアップ設定と認証トークン情報の存在を確認しました。復号はまだ未検証です。PINは入力しないでください。'
-              : 'X Chatの鍵バックアップ設定はありますが、復元用認証トークンは確認できませんでした。PINは入力しないでください。')
-            : 'X Chatの鍵バックアップ設定を確認できませんでした。既存鍵は変更していません。',
-          'info'
-        );
-      } catch (error) {
-        showToast(error.message || '復号の準備状況を確認できませんでした', 'error');
-      } finally {
-        button.disabled = false;
-        button.innerHTML = saved;
-        lucide.createIcons();
-      }
-    };
-
-    window.checkXChatEncryptedHistory = async function(button, connectionId) {
-      if (!button || button.disabled || !connectionId) return;
-      button.disabled = true;
-      const originalHtml = button.innerHTML;
-      button.innerHTML = '<span class="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin"></span><span>確認中...</span>';
-      const read = async (resource, extra = {}) => {
-        const response = await fetch('/api/omnibox/x/sync', {
-          method: 'POST', credentials: 'same-origin', cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'chat_read', resource, connection_id: connectionId, ...extra })
-        });
-        const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.message || '暗号化履歴を取得できませんでした');
-        return result;
-      };
-      try {
-        const conversations = await read('conversations');
-        const items = Array.isArray(conversations.data) ? conversations.data : [];
-        if (!items.length) {
-          showToast('X Chatの会話情報は0件です。APIの許可範囲と接続先を確認してください。', 'warning');
-        } else {
-          const conversationId = String(items[0]?.id || items[0]?.conversation_id || '');
-          if (!conversationId) throw new Error('X Chat会話IDを取得できませんでした');
-          const events = await read('events', { conversation_id: conversationId });
-          const amount = Array.isArray(events.data) ? events.data.length : 0;
-          const changeEvents = Array.isArray(events.meta?.conversation_key_events)
-            ? events.meta.conversation_key_events.length : 0;
-          showToast(
-            'X Chatを確認: 会話' + items.length + '件以上、暗号化イベント' +
-            amount + '件、鍵更新イベント' + changeEvents +
-            '件。本文の表示には端末内での鍵復元が必要です。',
-            'info'
-          );
-        }
-      } catch (error) {
-        showToast(error.message || 'X Chatの暗号化履歴を取得できませんでした', 'error');
-      } finally {
-        button.disabled = false;
-        button.innerHTML = originalHtml;
-        lucide.createIcons();
-      }
-    };
-
-    window.checkXChatStatus = async function(button) {
-      if (!button || button.disabled) return;
-      button.disabled = true;
-      const originalHtml = button.innerHTML;
-      button.innerHTML = '<span class="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin"></span><span>確認中...</span>';
-      try {
-        const response = await fetch('/api/omnibox/x/sync', {
-          method: 'POST',
-          credentials: 'same-origin',
-          cache: 'no-store',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'chat_status' })
-        });
-        const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.message || 'X Chatの接続状況を確認できませんでした');
-        const count = Number(result.conversations_on_first_pages || 0);
-        showToast(
-          'X Chatの会話情報: ' + count + '件' +
-          (result.has_more ? '以上' : '') +
-          '（内容の復号と受信箱表示は未対応です）',
-          'info'
-        );
-      } catch (error) {
-        showToast(error.message || 'X Chatの接続状況を確認できませんでした', 'error');
-      } finally {
-        button.disabled = false;
-        button.innerHTML = originalHtml;
-        lucide.createIcons();
-      }
-    };
-
-    window.manualSyncXInbox = async function(button) {
-      if (!button) return;
-      const xAccount = connectedAccounts.find(account => account.provider === 'x');
-      if (!xAccount) {
-        showToast('Xアカウントの接続情報を確認できませんでした', 'warning');
-        return;
-      }
-      button.disabled = true;
-      const originalHtml = button.innerHTML;
-      button.innerHTML = '<span class="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin"></span><span>同期中...</span>';
-      try {
-        const result = await syncXInbox({ silent: true, reloadInbox: true });
-        if (!result?.ok) throw new Error(result?.message || 'XのDMを同期できませんでした');
-        showToast(
-          result.imported > 0
-            ? `XのDMを同期しました（${result.imported}件を確認）`
-            : '従来のX DM取得は0件です。暗号化されたX Chatは現在未対応のため、X本体のメッセージと一致しない場合があります',
-          'success'
-        );
-      } catch (error) {
-        showToast(error?.message || 'XのDMを同期できませんでした', 'error');
-      } finally {
-        button.disabled = false;
-        button.innerHTML = originalHtml;
-        lucide.createIcons();
-      }
-    };
-
     function socialPostStatusLabel(status) {
       return {
         scheduled: '予約中',
@@ -2727,10 +2533,8 @@
 
             if (!providerInboxSyncStarted) {
               providerInboxSyncStarted = true;
-              void Promise.all([
-                syncGoogleInbox({ silent: true, reloadInbox: false }),
-                syncXInbox({ silent: true, reloadInbox: false })
-              ]).then(() => loadLiveInbox(currentThreadId, { silent: true }));
+              void syncGoogleInbox({ silent: true, reloadInbox: false })
+                .then(() => loadLiveInbox(currentThreadId, { silent: true }));
             }
           }
         } else {
@@ -4039,8 +3843,8 @@
 
             <div class="mt-4 grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-slate-600">
               <div>
-                <span class="text-[10px] text-slate-400 block">受信会話数</span>
-                <span class="font-bold text-slate-800">${threadCount}件</span>
+                <span class="text-[10px] text-slate-400 block">${acc.provider === 'x' ? '利用機能' : '受信会話数'}</span>
+                <span class="font-bold text-slate-800">${acc.provider === 'x' ? '投稿専用' : threadCount + '件'}</span>
               </div>
               <div>
                 <span class="text-[10px] text-slate-400 block">トークン状態</span>
@@ -4059,21 +3863,7 @@
                   <i data-lucide="refresh-cw" class="w-3 h-3"></i><span>Gmailを同期</span>
                 </button>`
               : acc.provider === 'x'
-                ? `<button onclick="manualSyncXInbox(this)" class="text-brand-700 font-medium hover:underline flex items-center gap-1">
-                    <i data-lucide="refresh-cw" class="w-3 h-3"></i><span>X DMを同期</span>
-                  </button>
-                  <button onclick="checkXChatStatus(this)" class="text-brand-700 font-medium hover:underline flex items-center gap-1" title="暗号化X Chatの会話情報だけを確認します。本文は取得しません。">
-                    <i data-lucide="shield-check" class="w-3 h-3"></i><span>X Chat接続確認</span>
-                  </button>
-                  <button onclick="checkXChatKeyStatus(this)" class="text-brand-700 font-medium hover:underline flex items-center gap-1" title="既存の暗号鍵登録があるかのみ確認します。鍵やPINは取得しません。">
-                    <i data-lucide="key-round" class="w-3 h-3"></i><span>X Chat鍵の状態</span>
-                  </button>
-                  <button onclick="checkXChatEncryptedHistory(this, '${acc.providerConnectionId || ''}')" class="text-brand-700 font-medium hover:underline flex items-center gap-1" title="暗号化イベントの取得可否を検証します。本文は復号しません。">
-                    <i data-lucide="lock-keyhole" class="w-3 h-3"></i><span>X Chat暗号化履歴を確認</span>
-                  </button>
-                  <button onclick="checkXChatRecoveryStatus(this, '${acc.providerConnectionId || ''}')" class="text-brand-700 font-medium hover:underline flex items-center gap-1" title="PINや鍵を送信せず復号の前提条件だけを確認します">
-                    <i data-lucide="shield" class="w-3 h-3"></i><span>X Chat復号準備を確認</span>
-                  </button>`
+                ? '<span class="text-slate-600 font-semibold">投稿・予約投稿のみ利用できます</span>'
               : acc.provider === 'instagram'
                 ? `<button onclick="showInstagramWebhookInfo('${acc.providerConnectionId || ''}')" class="text-brand-700 font-medium hover:underline flex items-center gap-1">
                     <i data-lucide="radio" class="w-3 h-3"></i><span>DM受信設定</span>
@@ -4433,7 +4223,7 @@
         return;
       }
       if (account.provider === 'x') {
-        await syncXInbox({ silent: false, reloadInbox: true, button });
+        showToast('Xは投稿専用の連携です。投稿作成からご利用ください');
         return;
       }
 
