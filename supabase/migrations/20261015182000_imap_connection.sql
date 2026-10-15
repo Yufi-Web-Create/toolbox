@@ -64,4 +64,4 @@ end $$;
 revoke all on function public.omnibox_store_imap_connection(text,text,text) from public,anon;
 grant execute on function public.omnibox_store_imap_connection(text,text,text) to authenticated;
 
--- Message ingestion and SMTP replies will be enabled after dedicated integration tests.\n
+-- Message ingestion and SMTP replies will be enabled after dedicated integration tests.
