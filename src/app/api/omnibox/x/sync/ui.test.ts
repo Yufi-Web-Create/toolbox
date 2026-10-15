@@ -1,22 +1,13 @@
 import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
-import { expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
 
-it("shows the API guidance through the actual manual sync button handler", async () => {
+it("offers Gmail sync while removing legacy X DM and Chat actions from the app UI", () => {
   const html = readFileSync("public/omnibox.html", "utf8");
-  const start = html.indexOf("    async function syncXInbox(");
-  const handlerStart = html.indexOf("    window.manualSyncXInbox", start);
-  const end = html.indexOf("\n    };", handlerStart) + "\n    };".length;
-  const toast = vi.fn();
-  const context = {
-    window: {} as { manualSyncXInbox: (button: { disabled: boolean; innerHTML: string }) => Promise<void> },
-    isDemoSession: false, connectedAccounts: [{ provider: "x" }],
-    fetch: async () => Response.json({ ok: false, message: "X APIのクレジットが不足しています。" }, { status: 502 }),
-    showToast: toast, lucide: { createIcons: vi.fn() }, loadLiveInbox: vi.fn(),
-  };
-  runInNewContext(html.slice(start, end), context);
-  const button = { disabled: false, innerHTML: "X DMを同期" };
-  await context.window.manualSyncXInbox(button);
-  expect(toast).toHaveBeenCalledWith("X APIのクレジットが不足しています。", "error");
-  expect(button).toEqual({ disabled: false, innerHTML: "X DMを同期" });
+  expect(html).toContain("syncGoogleInbox");
+  expect(html).toContain("Gmailを同期");
+  expect(html).toContain("startOAuthFlow('google')");
+  expect(html).not.toContain("manualSyncXInbox");
+  expect(html).not.toContain("checkXChatStatus");
+  expect(html).not.toContain("checkXChatKeyStatus");
+  expect(html).not.toContain("/api/omnibox/x/sync");
 });
