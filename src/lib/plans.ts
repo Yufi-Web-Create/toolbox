@@ -22,7 +22,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
   lite: {
     key: "lite",
     name: "ライト",
-    monthlyPrice: 9800,
+    monthlyPrice: 0,
     employeeLimit: 3,
     socialPublishing: false,
     instagramDm: false,
@@ -34,7 +34,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
   standard: {
     key: "standard",
     name: "スタンダード",
-    monthlyPrice: 29800,
+    monthlyPrice: 6980,
     employeeLimit: null,
     socialPublishing: true,
     instagramDm: true,
@@ -46,7 +46,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
   pro: {
     key: "pro",
     name: "プロ",
-    monthlyPrice: 44800,
+    monthlyPrice: 19800,
     employeeLimit: null,
     socialPublishing: true,
     instagramDm: true,
