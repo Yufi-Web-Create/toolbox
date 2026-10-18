@@ -263,6 +263,22 @@ export async function POST(request: Request) {
       );
     }
 
+    // A free-plan post consumes a monthly slot when publication is requested,
+    // including scheduled posts. Drafts never consume the allowance.
+    const monthlyLimit = PLAN_DEFINITIONS[ctx.plan].postsPerMonth;
+    if (monthlyLimit !== null) {
+      const now = new Date();
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+      const { count, error: usageError } = await ctx.supabase
+        .from("social_posts")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", ctx.organizationId)
+        .gte("created_at", monthStart)
+        .not("status", "in", '("draft","cancelled")');
+      if (usageError) return NextResponse.json({ ok: false, message: "投稿上限を確認できませんでした。" }, { status: 503 });
+      if ((count ?? 0) >= monthlyLimit) return NextResponse.json({ ok: false, message: `無料プランの投稿は月${monthlyLimit}回までです。` }, { status: 403 });
+    }
+
     const { data: post, error: insertError } = await ctx.supabase
       .from("social_posts")
       .insert({
