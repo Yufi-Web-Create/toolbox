@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 import {
   isPlanKey,
@@ -108,6 +109,25 @@ export async function POST(request: Request) {
         { ok: false, message: "有料プランへの変更は決済機能の準備完了後に利用できます。" },
         { status: 403 },
       );
+    }
+
+    // Never allow a free-plan write to override an active Stripe subscription.
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!serviceKey || !supabaseUrl) {
+      return NextResponse.json({ ok: false, message: "契約状態を確認できません。" }, { status: 503 });
+    }
+    const admin = createAdminClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: billing, error: billingError } = await admin.from("organization_billing")
+      .select("stripe_subscription_id,stripe_status")
+      .eq("organization_id", ctx.organizationId).maybeSingle();
+    if (billingError) {
+      return NextResponse.json({ ok: false, message: "契約状態を確認できません。" }, { status: 503 });
+    }
+    if (billing?.stripe_subscription_id && !["canceled", "incomplete_expired"].includes(billing.stripe_status)) {
+      return NextResponse.json({ ok: false, message: "有料契約の解約は契約管理画面から行ってください。" }, { status: 409 });
     }
 
     const { data, error } = await ctx.supabase.rpc(
