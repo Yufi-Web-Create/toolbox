@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
     );
     listUrl.searchParams.set("labelIds", "INBOX");
     listUrl.searchParams.set("maxResults", "25");
-    listUrl.searchParams.set("q", "-from:me");
+    // INBOX already limits ingestion to delivered mail. Do not exclude\n    // messages from the account owner: self-addressed test mail can carry\n    // both INBOX and SENT labels and must still appear in MatoMeet.
 
     const listResponse = await fetch(listUrl, {
       headers: { authorization: `Bearer ${gmailToken}` },
