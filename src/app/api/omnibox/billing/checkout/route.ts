@@ -12,14 +12,12 @@ export async function POST(request: Request) {
   if (memberError || memberships?.length !== 1 || memberships[0].role !== "owner")
     return NextResponse.json({ error: "組織管理者のみ操作できます。" }, { status: 403 });
 
-  const { plan } = await request.json().catch(() => ({ plan: null }));
+  const body: unknown = await request.json().catch(() => null);
+  const plan = body && typeof body === "object" && "plan" in body ? (body as { plan?: unknown }).plan : null;
   if (plan !== "standard" && plan !== "pro")
     return NextResponse.json({ error: "有効な有料プランを選んでください。" }, { status: 400 });
 
-  const priceKey = {
-    standard: "STRIPE_PRICE_STANDARD",
-    pro: "STRIPE_PRICE_PRO",
-  }[plan];
+  const priceKey = plan === "standard" ? "STRIPE_PRICE_STANDARD" : "STRIPE_PRICE_PRO";
   const priceId = process.env[priceKey];
   const secret = process.env.STRIPE_SECRET_KEY;
   if (!secret || !priceId) return NextResponse.json({ error: "決済の準備中です。" }, { status: 503 });
