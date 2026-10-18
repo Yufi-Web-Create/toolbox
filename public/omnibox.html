@@ -916,6 +916,10 @@
             </div>
 
             <div id="plan-options-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" onclick="openBillingPortal()" class="px-4 py-2.5 rounded-xl border border-brand-200 bg-brand-50 text-brand-900 hover:bg-brand-100 text-xs font-bold">契約・お支払いの管理</button>
+              <span class="text-[11px] text-slate-500">支払い方法の変更、プラン変更、解約はStripeの契約管理画面で行います。</span>
+            </div>
 
             <div class="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-600 leading-relaxed">
               プラン変更後、利用可能な機能は即時切り替わります。既存の会話・連携データは削除されず、上位プランへ戻すと再び利用できます。
@@ -1900,6 +1904,23 @@
       lucide.createIcons();
     }
 
+    window.openBillingPortal = async function() {
+      if (loggedInUser?.roleKey !== 'owner') {
+        showToast('契約管理は管理者のみ操作できます');
+        return;
+      }
+      try {
+        const response = await fetch('/api/omnibox/billing/portal', { method: 'POST', credentials: 'same-origin' });
+        const result = await response.json();
+        if (!response.ok || !result.ok || !result.url) throw new Error(result.error || '契約管理を開けませんでした');
+        const url = new URL(result.url);
+        if (url.protocol !== 'https:' || url.hostname !== 'billing.stripe.com') throw new Error('契約管理URLを確認できませんでした');
+        window.location.assign(url.href);
+      } catch (error) {
+        showToast(error.message || '契約管理を開けませんでした');
+      }
+    };
+
     window.changeOrganizationPlan = async function(plan) {
       if (loggedInUser?.roleKey !== 'owner') {
         showToast('プラン変更は管理者のみ行えます');
@@ -1907,7 +1928,7 @@
       }
       if (!planCatalog[plan] || plan === currentPlan) return;
       if (plan === 'lite') {
-        showToast('有料契約の解約は現在準備中です。契約期間中の自動切替を防ぐため、ここからは変更できません。');
+        showToast('有料契約の解約は「契約・お支払いの管理」から行ってください。');
         return;
       }
       if (!window.confirm(`${planCatalog[plan].name}（${planCatalog[plan].price}）の決済画面へ進みますか？契約はお支払い完了後に反映されます。`)) return;
