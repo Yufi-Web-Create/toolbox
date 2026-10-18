@@ -101,6 +101,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // Paid entitlements must only be granted by verified Stripe billing events.
+    // Never allow the browser-facing plan endpoint to self-upgrade.
+    if (plan !== "lite") {
+      return NextResponse.json(
+        { ok: false, message: "有料プランへの変更は決済機能の準備完了後に利用できます。" },
+        { status: 403 },
+      );
+    }
+
     const { data, error } = await ctx.supabase.rpc(
       "omnibox_update_organization_plan",
       {
