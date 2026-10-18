@@ -15,6 +15,7 @@ export type PlanDefinition = {
   xDm: boolean;
   aiResponsesPerMonth: number;
   locationsIncluded: number | null;
+  postsPerMonth: number | null;
   shopify: boolean;
 };
 
@@ -22,37 +23,40 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
   lite: {
     key: "lite",
     name: "ライト",
-    monthlyPrice: 9800,
+    monthlyPrice: 0,
     employeeLimit: 3,
-    socialPublishing: false,
-    instagramDm: false,
+    socialPublishing: true,
+    instagramDm: true,
     xDm: false,
-    aiResponsesPerMonth: 0,
+    aiResponsesPerMonth: 10,
     locationsIncluded: 1,
+    postsPerMonth: 2,
     shopify: false,
   },
   standard: {
     key: "standard",
     name: "スタンダード",
-    monthlyPrice: 29800,
+    monthlyPrice: 2500,
     employeeLimit: null,
     socialPublishing: true,
     instagramDm: true,
     xDm: false,
     aiResponsesPerMonth: 0,
     locationsIncluded: 1,
+    postsPerMonth: null,
     shopify: true,
   },
   pro: {
     key: "pro",
     name: "プロ",
-    monthlyPrice: 44800,
+    monthlyPrice: 9800,
     employeeLimit: null,
     socialPublishing: true,
     instagramDm: true,
     xDm: false,
     aiResponsesPerMonth: 500,
     locationsIncluded: 1,
+    postsPerMonth: null,
     shopify: true,
   },
   premium: {
@@ -65,6 +69,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
     xDm: false,
     aiResponsesPerMonth: 1500,
     locationsIncluded: 3,
+    postsPerMonth: null,
     shopify: true,
   },
   enterprise: {
@@ -77,6 +82,7 @@ export const PLAN_DEFINITIONS: Record<PlanKey, PlanDefinition> = {
     xDm: false,
     aiResponsesPerMonth: 1500,
     locationsIncluded: null,
+    postsPerMonth: null,
     shopify: true,
   },
 };
@@ -107,6 +113,7 @@ export function planFeatures(plan: PlanKey) {
     aiResponsesPerMonth: definition.aiResponsesPerMonth,
     employeeLimit: definition.employeeLimit,
     locationsIncluded: definition.locationsIncluded,
+    postsPerMonth: definition.postsPerMonth,
     shopify: definition.shopify,
   };
 }
