@@ -27,13 +27,18 @@ create or replace function public.matomeet_apply_stripe_subscription(
 language plpgsql security definer set search_path = public, pg_temp
 as $$
 declare v_inserted int;
+declare v_existing_subscription text;
 begin
  if auth.role() <> 'service_role' then raise exception 'forbidden'; end if;
  if p_event_id is null or p_event_id = '' or p_subscription_id is null or p_subscription_id = '' then raise exception 'invalid event'; end if;
- if p_plan not in ('lite','standard','pro','premium') then raise exception 'invalid plan'; end if;
+ if p_plan not in ('standard','pro') then raise exception 'invalid plan'; end if;
  -- Serialize updates per organization to avoid conflicting webhook delivery.
  perform 1 from public.organizations where id = p_organization_id for update;
  if not found then raise exception 'unknown organization'; end if;
+ select stripe_subscription_id into v_existing_subscription from public.organization_billing where organization_id = p_organization_id;
+ if v_existing_subscription is not null and v_existing_subscription <> p_subscription_id then
+   raise exception 'conflicting subscription for organization';
+ end if;
  insert into public.stripe_billing_events(event_id,event_type) values(p_event_id,p_event_type)
  on conflict do nothing;
  get diagnostics v_inserted = row_count;
