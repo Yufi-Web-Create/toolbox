@@ -28,6 +28,8 @@ language plpgsql security definer set search_path = public, pg_temp
 as $$
 declare v_inserted int;
 declare v_existing_subscription text;
+declare v_existing_status text;
+declare v_existing_customer text;
 begin
  if auth.role() <> 'service_role' then raise exception 'forbidden'; end if;
  if p_event_id is null or p_event_id = '' or p_subscription_id is null or p_subscription_id = '' then raise exception 'invalid event'; end if;
@@ -35,9 +37,20 @@ begin
  -- Serialize updates per organization to avoid conflicting webhook delivery.
  perform 1 from public.organizations where id = p_organization_id for update;
  if not found then raise exception 'unknown organization'; end if;
- select stripe_subscription_id into v_existing_subscription from public.organization_billing where organization_id = p_organization_id;
+ select stripe_subscription_id, stripe_status, stripe_customer_id
+ into v_existing_subscription, v_existing_status, v_existing_customer
+ from public.organization_billing where organization_id = p_organization_id;
+ if v_existing_customer is not null and v_existing_customer <> p_customer_id then
+   raise exception 'customer mismatch for organization';
+ end if;
  if v_existing_subscription is not null and v_existing_subscription <> p_subscription_id then
-   raise exception 'conflicting subscription for organization';
+   if v_existing_status not in ('canceled', 'incomplete_expired') then
+     raise exception 'conflicting subscription for organization';
+   end if;
+   -- Prevent delayed events for an old canceled subscription from replacing a new one.
+   if p_status not in ('active', 'trialing') then
+     raise exception 'replacement subscription is not active';
+   end if;
  end if;
  insert into public.stripe_billing_events(event_id,event_type) values(p_event_id,p_event_type)
  on conflict do nothing;
