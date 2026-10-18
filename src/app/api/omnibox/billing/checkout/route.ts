@@ -13,13 +13,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "組織管理者のみ操作できます。" }, { status: 403 });
 
   const { plan } = await request.json().catch(() => ({ plan: null }));
-  if (plan !== "standard" && plan !== "pro" && plan !== "premium")
+  if (plan !== "standard" && plan !== "pro")
     return NextResponse.json({ error: "有効な有料プランを選んでください。" }, { status: 400 });
 
   const priceKey = {
     standard: "STRIPE_PRICE_STANDARD",
     pro: "STRIPE_PRICE_PRO",
-    premium: "STRIPE_PRICE_PREMIUM",
   }[plan];
   const priceId = process.env[priceKey];
   const secret = process.env.STRIPE_SECRET_KEY;
