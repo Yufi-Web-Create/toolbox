@@ -1,5 +1,9 @@
 "use server";
 
+import { redirect } from "next/navigation";
+import { createClient } from "../../lib/supabase/server";
+import { internalEmailForLoginId } from "../../lib/login-id";
+
 import {
   isValidLoginId,
   normalizeLoginId,
@@ -64,11 +68,20 @@ export async function signup(
       };
     }
 
-    return {
-      status: "success",
-      message: "アカウントを作成しました。IDとパスワードでログインできます。",
-    };
+    const supabase = await createClient();
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email: internalEmailForLoginId(loginId),
+      password,
+    });
+    if (loginError) {
+      return {
+        status: "success",
+        message: "アカウントを作成しました。ログイン画面からIDとパスワードでログインしてください。",
+      };
+    }
   } catch {
     return { status: "error", message: "アカウントを作成できませんでした。" };
   }
+
+  redirect("/");
 }
