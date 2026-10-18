@@ -72,7 +72,6 @@ export async function POST(request: Request) {
     const priceEntries = [
       ["standard", process.env.STRIPE_PRICE_STANDARD],
       ["pro", process.env.STRIPE_PRICE_PRO],
-      ["premium", process.env.STRIPE_PRICE_PREMIUM],
     ] as const;
     const plan = priceEntries.find(([, price]) => price && price === priceId)?.[0];
     if (!organizationId || !customer || !priceId || !plan)
