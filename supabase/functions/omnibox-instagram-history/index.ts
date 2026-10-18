@@ -8,7 +8,7 @@ function fromId(v:unknown):string {
   return v&&typeof v==="object" ? str((v as Record<string,unknown>).id) : "";
 }
 async function graph(path:string, token:string, query:Record<string,string>={}) {
-  const u=new URL("https://graph.instagram.com/v26.0/"+encodeURIComponent(path));
+  const u=new URL("https://graph.instagram.com/v26.0/"+path.split("/").map(encodeURIComponent).join("/"));
   for(const [k,v] of Object.entries(query))u.searchParams.set(k,v);
   const r=await fetch(u,{headers:{authorization:"Bearer "+token}});
   if(!r.ok)throw new Error("instagram_api_"+r.status);
