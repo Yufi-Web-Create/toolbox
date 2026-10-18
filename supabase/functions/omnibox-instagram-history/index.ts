@@ -56,26 +56,39 @@ Deno.serve(async(req)=>{
       const rawMessages=(history.messages&&typeof history.messages==="object")
         ? (history.messages as Record<string,unknown>).data : null;
       const messages=Array.isArray(rawMessages)?rawMessages.slice(0,20):[];
+      // Resolve the customer ID from the conversation, not solely from
+      // message.from: outgoing historical messages are authored by the business.
+      const participants=conversation.participants &&
+        typeof conversation.participants==="object" ?
+        (conversation.participants as Record<string,unknown>).data : null;
+      const participantIds=Array.isArray(participants)
+        ? participants.map(fromId).filter(Boolean) : [];
+      const counterpart=participantIds.find(id=>id!==connection.external_account_id) ||
+        messages.map(v=>v&&typeof v==="object"?fromId((v as Record<string,unknown>).from):"")
+          .find(id=>id && id!==connection.external_account_id) || "";
+
       for(const raw of messages.reverse()){
         if(!raw||typeof raw!=="object")continue;
         const msg=raw as Record<string,unknown>;
         const id=str(msg.id),sender=fromId(msg.from),body=str(msg.message).trim();
-        // Outgoing history is not imported as a fake inbound customer message.
-        if(!id||!sender||sender===connection.external_account_id||!body)continue;
+        if(!id||!sender||!body)continue;
+        const direction=sender===connection.external_account_id?"outbound":"inbound";
+        const recipient=msg.to && typeof msg.to==="object" ?
+          (msg.to as Record<string,unknown>).data : null;
+        const recipients=Array.isArray(recipient)?recipient.map(fromId):[];
+        const customerId=direction==="inbound"?sender:
+          counterpart || recipients.find(id=>id && id!==connection.external_account_id) || "";
+        if(!customerId){skipped++;continue;}
         const providerMessageId="instagram:"+connection.id+":"+id;
-        const {data:existing}=await admin.from("messages").select("id").eq("organization_id",membership.organization_id)
-          .eq("provider_message_id",providerMessageId).limit(1);
-        if(existing?.length)continue;
         const time=Date.parse(str(msg.created_time));
         const occurredAt=Number.isFinite(time)?new Date(time).toISOString():new Date().toISOString();
-        const {error}=await admin.rpc("omnibox_ingest_external_message",{
-          p_provider_connection_id:connection.id,p_provider:"instagram",
-          // Align with webhook using Instagram-scoped sender ID rather than graph conversation ID.
-          p_provider_thread_id:sender,p_customer_external_id:sender,p_customer_display_name:sender,
-          p_customer_avatar_url:null,p_provider_message_id:providerMessageId,p_body:body,
-          p_occurred_at:occurredAt,p_metadata:{historical_import:true,instagram_conversation_id:thread},
+        const {data:inserted,error}=await admin.rpc("omnibox_ingest_instagram_history",{
+          p_connection_id:connection.id,p_customer_id:customerId,
+          p_message_id:providerMessageId,p_body:body,p_occurred_at:occurredAt,
+          p_direction:direction,p_conversation_id:thread,
         });
-        if(!error)imported++;else skipped++;
+        if(!error && inserted===true)imported++;
+        else if(error)skipped++;
       }
     }
   }catch(e){
