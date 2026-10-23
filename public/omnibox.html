@@ -464,6 +464,9 @@
             <p id="inbox-filter-label" class="text-[10px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis max-w-[220px]" title="現在の絞り込み">すべてのアカウント・全ステータス</p>
           </div>
           <div class="flex items-center gap-1">
+            <button id="inbox-refresh-button" type="button" onclick="refreshInboxManually()" aria-label="受信箱を更新" title="受信箱を更新" class="inline-flex items-center gap-1 rounded-lg border border-[#EDE5E7] px-2 py-1.5 text-[11px] font-medium text-brand-700 bg-white hover:bg-brand-50 disabled:opacity-50">
+              <i id="inbox-refresh-icon" data-lucide="refresh-cw" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">更新</span>
+            </button>
             <span class="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-sync"></span>リアルタイム受信
             </span>
@@ -488,6 +491,7 @@
           </div>
         </div>
 
+        <div id="inbox-pull-indicator" class="md:hidden text-center text-[11px] text-brand-700 overflow-hidden shrink-0" style="height:0;transition:height .16s ease" aria-live="polite">下に引っ張って更新</div>
         <!-- スレッドリスト本体 -->
         <div id="thread-list-container" class="overflow-y-auto flex-1 divide-y divide-slate-100" aria-live="polite" aria-busy="true">
           <div class="p-4 space-y-3">
@@ -2425,6 +2429,89 @@
         minute: '2-digit'
       });
     }
+
+    // A single refresh path for desktop click and mobile pull-to-refresh.
+    let inboxManualRefreshBusy = false;
+    window.refreshInboxManually = async function () {
+      if (inboxManualRefreshBusy) return;
+      inboxManualRefreshBusy = true;
+      const button = document.getElementById('inbox-refresh-button');
+      const icon = document.getElementById('inbox-refresh-icon');
+      const indicator = document.getElementById('inbox-pull-indicator');
+      if (button) button.disabled = true;
+      if (icon) icon.classList.add('animate-spin');
+      if (indicator) {
+        indicator.textContent = '更新中...';
+        indicator.style.height = '28px';
+      }
+      try {
+        if (!isDemoSession) {
+          // First sync Gmail with the provider, then re-read the unified inbox.
+          const googleResult = await syncGoogleInbox({ silent: true, reloadInbox: false });
+          const inboxResult = await loadLiveInbox(null, { silent: true });
+          if (googleResult?.ok === false || inboxResult === false) {
+            throw new Error('一部のメッセージを更新できませんでした');
+          }
+        } else {
+          onDataUpdated();
+        }
+        showToast('受信箱を更新しました', 'success');
+      } catch (error) {
+        showToast(error?.message || '更新できませんでした。もう一度お試しください');
+      } finally {
+        inboxManualRefreshBusy = false;
+        if (button) button.disabled = false;
+        if (icon) icon.classList.remove('animate-spin');
+        if (indicator) {
+          indicator.style.height = '0px';
+          indicator.textContent = '下に引っ張って更新';
+        }
+      }
+    };
+
+    (function enableInboxPullToRefresh() {
+      let startY = null;
+      let distance = 0;
+      const threshold = 75;
+      const list = document.getElementById('thread-list-container');
+      const indicator = document.getElementById('inbox-pull-indicator');
+      if (!list || !indicator) return;
+      list.addEventListener('touchstart', (event) => {
+        startY = null;
+        distance = 0;
+        if (window.innerWidth >= 768 || inboxManualRefreshBusy ||
+            document.getElementById('view-inbox')?.classList.contains('mobile-chat-open') ||
+            list.scrollTop > 0 || event.touches.length !== 1) return;
+        startY = event.touches[0].clientY;
+      }, { passive: true });
+      list.addEventListener('touchmove', (event) => {
+        if (startY === null || event.touches.length !== 1) return;
+        if (list.scrollTop > 0) {
+          startY = null;
+          indicator.style.height = '0px';
+          return;
+        }
+        distance = Math.max(0, Math.min(115, event.touches[0].clientY - startY));
+        indicator.style.height = Math.round(distance * .5) + 'px';
+        indicator.textContent = distance >= threshold ? '離すと更新します' : '下に引っ張って更新';
+      }, { passive: true });
+      list.addEventListener('touchend', () => {
+        if (startY === null) return;
+        const shouldRefresh = distance >= threshold;
+        startY = null;
+        distance = 0;
+        if (shouldRefresh) {
+          window.refreshInboxManually();
+        } else {
+          indicator.style.height = '0px';
+        }
+      }, { passive: true });
+      list.addEventListener('touchcancel', () => {
+        startY = null;
+        distance = 0;
+        if (!inboxManualRefreshBusy) indicator.style.height = '0px';
+      }, { passive: true });
+    })();
 
     async function syncGoogleInbox({ silent = true, reloadInbox = false } = {}) {
       if (isDemoSession) return { ok: true, imported: 0 };
