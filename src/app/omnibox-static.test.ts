@@ -327,7 +327,8 @@ describe("uploaded MatoMeet application shell", () => {
 
   it("supports plan selection and plan-based feature locking", () => {
     expect(html).toContain("ご契約プラン");
-    expect(html).toContain("/api/omnibox/settings/plan");
+    expect(html).toContain("/api/omnibox/billing/checkout");
+    expect(html).toContain("/api/omnibox/billing/portal");
     expect(html).toContain("changeOrganizationPlan");
     expect(html).toContain("applyPlanAccess");
     expect(html).toContain("currentPlanFeatures");
