@@ -1341,6 +1341,56 @@ async function handleLineReply({ request, response, config, fetchImpl }) {
   sendJson(response, 200, { ok: true });
 }
 
+// Triggered by the database for newly persisted inbound Instagram/X messages.
+// The signed Edge Function verifies ownership, age, direction and atomically
+// claims the message, so arbitrary requests cannot create arbitrary pushes.
+async function handlePushDispatch({ request, response, config, fetchImpl }) {
+  if (!config.configured) {
+    sendJson(response, 503, { ok: false, error: "bridge_not_configured" });
+    return;
+  }
+
+  let payload;
+  try {
+    payload = await readJsonBody(request);
+  } catch {
+    sendJson(response, 400, { ok: false, error: "invalid_json" });
+    return;
+  }
+
+  const organizationId = payload?.organizationId;
+  const messageId = payload?.messageId;
+  if (!isUuid(organizationId) || !isUuid(messageId)) {
+    sendJson(response, 400, { ok: false, error: "invalid_message" });
+    return;
+  }
+
+  // This dispatch endpoint contains no credentials and never trusts the caller
+  // to designate recipients. The Edge Function authorizes the message and
+  // guarantees that each eligible message is claimed only once.
+  const { response: claimResponse, data } = await signedEdgeRequest(fetchImpl, config, {
+    action: "claim-push-event",
+    organizationId,
+    messageId,
+  });
+  if (!claimResponse.ok) {
+    sendJson(response, 502, { ok: false, error: "push_claim_failed" });
+    return;
+  }
+  if (!data?.claimed) {
+    sendJson(response, 200, { ok: true, sent: false, reason: "not_eligible_or_already_claimed" });
+    return;
+  }
+
+  try {
+    await notifyPushSubscribers(fetchImpl, config, organizationId);
+    sendJson(response, 200, { ok: true, sent: true });
+  } catch {
+    console.error("Push notification dispatch failed");
+    sendJson(response, 502, { ok: false, error: "push_delivery_failed" });
+  }
+}
+
 export function createLineBridgeServer({
   env = process.env,
   fetchImpl = globalThis.fetch,
@@ -1353,6 +1403,11 @@ export function createLineBridgeServer({
 
       if (request.method === "GET" && url.pathname === "/health") {
         await handleHealth({ response, config, fetchImpl });
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/push/dispatch") {
+        await handlePushDispatch({ request, response, config, fetchImpl });
         return;
       }
 
