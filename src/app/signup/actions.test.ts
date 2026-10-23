@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { signup, type SignupState } from "./actions";
 
+vi.mock("../../lib/supabase/server", () => ({
+  createClient: vi.fn(async () => ({ auth: { signInWithPassword: vi.fn(async () => ({ error: { message: "sign in unavailable in test" } })) } })),
+}));
+
 const initialState: SignupState = {
   status: "idle",
   message: "",
@@ -81,7 +85,7 @@ describe("signup", () => {
     expect(fetch).toHaveBeenCalled();
     expect(result).toEqual({
       status: "success",
-      message: "アカウントを作成しました。IDとパスワードでログインできます。",
+      message: "アカウントを作成しました。ログイン画面からIDとパスワードでログインしてください。",
     });
   });
 
