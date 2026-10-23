@@ -8,6 +8,8 @@ const portal = read("./api/omnibox/billing/portal/route.ts");
 const webhook = read("./api/omnibox/billing/webhook/route.ts");
 const sql = read("../../supabase/migrations/20261023180000_billing_003_subscriptions.sql");
 
+const downgradeGuard = read("../../supabase/migrations/20261023183000_billing_004_prevent_paid_downgrade.sql");
+
 describe("BILLING-003 integration safety contracts", () => {
   it("offers exactly three visible tiers at the agreed prices", () => {
     const plans = html.split("const planCatalog = {")[1].split("let providerInboxSyncStarted")[0];
@@ -32,5 +34,8 @@ describe("BILLING-003 integration safety contracts", () => {
     expect(sql).toContain("service_role");
     expect(sql).toContain("p_event_created");
     expect(sql).toContain("for update");
+    expect(downgradeGuard).toContain("billing_subscriptions");
+    expect(downgradeGuard).toContain("past_due");
+    expect(downgradeGuard).toContain("p_plan_key <> 'lite'");
   });
 });
