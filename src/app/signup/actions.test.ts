@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { signup, type SignupState } from "./actions";
+const { signInWithPassword, redirectMock } = vi.hoisted(() => ({
+  signInWithPassword: vi.fn(),
+  redirectMock: vi.fn(),
+}));
+vi.mock("../../lib/supabase/server", () => ({
+  createClient: async () => ({ auth: { signInWithPassword } }),
+}));
+vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 
 const initialState: SignupState = {
   status: "idle",
@@ -21,6 +29,8 @@ function createSignupData(
 
 describe("signup", () => {
   beforeEach(() => {
+    signInWithPassword.mockReset().mockResolvedValue({ error: null });
+    redirectMock.mockReset();
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubGlobal(
       "fetch",
@@ -79,10 +89,12 @@ describe("signup", () => {
     );
 
     expect(fetch).toHaveBeenCalled();
-    expect(result).toEqual({
-      status: "success",
-      message: "アカウントを作成しました。IDとパスワードでログインできます。",
+    expect(result).toBeUndefined();
+    expect(signInWithPassword).toHaveBeenCalledWith({
+      email: expect.any(String),
+      password: "password123",
     });
+    expect(redirectMock).toHaveBeenCalledWith("/");
   });
 
   it("reports a duplicate login ID", async () => {
