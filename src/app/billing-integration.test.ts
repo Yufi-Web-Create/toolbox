@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const html = read("../../public/omnibox.html");
-const checkout = read("../api/omnibox/billing/checkout/route.ts");
-const portal = read("../api/omnibox/billing/portal/route.ts");
-const webhook = read("../api/omnibox/billing/webhook/route.ts");
-const sql = read("../../../../supabase/migrations/20261023180000_billing_003_subscriptions.sql");
+const checkout = read("./api/omnibox/billing/checkout/route.ts");
+const portal = read("./api/omnibox/billing/portal/route.ts");
+const webhook = read("./api/omnibox/billing/webhook/route.ts");
+const sql = read("../../supabase/migrations/20261023180000_billing_003_subscriptions.sql");
 
 describe("BILLING-003 integration safety contracts", () => {
   it("offers exactly three visible tiers at the agreed prices", () => {
