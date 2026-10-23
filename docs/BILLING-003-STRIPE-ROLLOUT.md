@@ -23,7 +23,7 @@ Register: `https://<app-domain>/api/omnibox/billing/webhook`
 Events: `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`.
 
 ## Must complete before enabling for paying customers
-1. Apply SQL migration `20261023180000_billing_003_subscriptions.sql` and verify grants / RLS.
+1. Apply SQL migrations `20261023180000_billing_003_subscriptions.sql` and `20261023183000_billing_004_prevent_paid_downgrade.sql` in order; verify grants / RLS. The second prevents browser-side downgrade while Stripe billing is still active.
 2. Make explicit plan-selection UI call Checkout and redirect to Stripe Checkout URL; add success/cancel user feedback.
 3. Add a billing portal for existing subscribers, renewal, cancel and plan changes; don't create duplicate subscriptions.
 4. Test valid/invalid webhook signatures, event retries, stale events, simultaneous callbacks, cancellation, failed payment, price changes, multiple organizations and demo users.
